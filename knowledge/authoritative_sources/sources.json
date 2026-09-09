@@ -1,0 +1,471 @@
+{
+  "generatedFrom": "lib/knowledge/sources.ts",
+  "note": "Seed list only. No content has been retrieved. All sources are PENDING_RETRIEVAL with empty excerpts and confidence 0.",
+  "sources": [
+    {
+      "id": "src_irs_form_1120s_instructions",
+      "layer": "AUTHORITATIVE",
+      "title": "Instructions for Form 1120-S, U.S. Income Tax Return for an S Corporation",
+      "url": "https://www.irs.gov/instructions/i1120s",
+      "publisher": "Internal Revenue Service",
+      "jurisdiction": "FEDERAL",
+      "excerpt": "",
+      "confidence": 0,
+      "reviewBy": null,
+      "status": "PENDING_RETRIEVAL",
+      "tags": [
+        "irs",
+        "s-corp",
+        "income-tax",
+        "due-date",
+        "form-1120s",
+        "url-unverified",
+        "retrievalInstructions:Fetch the current-year instructions; capture 'When To File', extension rules, and Schedule K-1 furnishing deadline. Record the tax year the instructions cover."
+      ]
+    },
+    {
+      "id": "src_irs_form_941",
+      "layer": "AUTHORITATIVE",
+      "title": "About Form 941, Employer's Quarterly Federal Tax Return",
+      "url": "https://www.irs.gov/forms-pubs/about-form-941",
+      "publisher": "Internal Revenue Service",
+      "jurisdiction": "FEDERAL",
+      "excerpt": "",
+      "confidence": 0,
+      "reviewBy": null,
+      "status": "PENDING_RETRIEVAL",
+      "tags": [
+        "irs",
+        "payroll",
+        "form-941",
+        "quarterly",
+        "due-date",
+        "url-unverified",
+        "retrievalInstructions:Capture quarterly filing due dates and deposit schedule references (monthly vs semiweekly). Follow the link to the instructions for the current revision."
+      ]
+    },
+    {
+      "id": "src_irs_form_940",
+      "layer": "AUTHORITATIVE",
+      "title": "About Form 940, Employer's Annual Federal Unemployment (FUTA) Tax Return",
+      "url": "https://www.irs.gov/forms-pubs/about-form-940",
+      "publisher": "Internal Revenue Service",
+      "jurisdiction": "FEDERAL",
+      "excerpt": "",
+      "confidence": 0,
+      "reviewBy": null,
+      "status": "PENDING_RETRIEVAL",
+      "tags": [
+        "irs",
+        "payroll",
+        "form-940",
+        "futa",
+        "annual",
+        "due-date",
+        "rate",
+        "wage-base",
+        "url-unverified",
+        "retrievalInstructions:Capture the annual due date, FUTA rate, wage base and credit-reduction notes from the instructions."
+      ]
+    },
+    {
+      "id": "src_irs_pub_15",
+      "layer": "AUTHORITATIVE",
+      "title": "Publication 15 (Circular E), Employer's Tax Guide",
+      "url": "https://www.irs.gov/publications/p15",
+      "publisher": "Internal Revenue Service",
+      "jurisdiction": "FEDERAL",
+      "excerpt": "",
+      "confidence": 0,
+      "reviewBy": null,
+      "status": "PENDING_RETRIEVAL",
+      "tags": [
+        "irs",
+        "payroll",
+        "social-security",
+        "medicare",
+        "rate",
+        "wage-base",
+        "deposit-rules",
+        "url-unverified",
+        "retrievalInstructions:Capture the Social Security rate and wage base, Medicare rate and additional Medicare threshold, and deposit rules for the tax year. Record the publication year."
+      ]
+    },
+    {
+      "id": "src_irs_s_corp_compensation",
+      "layer": "AUTHORITATIVE",
+      "title": "S Corporation Compensation and Medical Insurance Issues",
+      "url": "https://www.irs.gov/businesses/small-businesses-self-employed/s-corporation-compensation-and-medical-insurance-issues",
+      "publisher": "Internal Revenue Service",
+      "jurisdiction": "FEDERAL",
+      "excerpt": "",
+      "confidence": 0,
+      "reviewBy": null,
+      "status": "PENDING_RETRIEVAL",
+      "tags": [
+        "irs",
+        "s-corp",
+        "reasonable-compensation",
+        "officer-compensation",
+        "url-unverified",
+        "retrievalInstructions:Capture the reasonable-compensation factors verbatim. This page supports professional judgment only; it never yields a number."
+      ]
+    },
+    {
+      "id": "src_irs_form_1099_nec_instructions",
+      "layer": "AUTHORITATIVE",
+      "title": "Instructions for Forms 1099-MISC and 1099-NEC",
+      "url": "https://www.irs.gov/instructions/i1099mec",
+      "publisher": "Internal Revenue Service",
+      "jurisdiction": "FEDERAL",
+      "excerpt": "",
+      "confidence": 0,
+      "reviewBy": null,
+      "status": "PENDING_RETRIEVAL",
+      "tags": [
+        "irs",
+        "information-returns",
+        "1099-nec",
+        "contractors",
+        "due-date",
+        "url-unverified",
+        "retrievalInstructions:Capture who must receive a 1099-NEC, the reporting threshold, and the furnishing/filing due dates for the tax year."
+      ]
+    },
+    {
+      "id": "src_irs_form_w9",
+      "layer": "AUTHORITATIVE",
+      "title": "About Form W-9, Request for Taxpayer Identification Number and Certification",
+      "url": "https://www.irs.gov/forms-pubs/about-form-w-9",
+      "publisher": "Internal Revenue Service",
+      "jurisdiction": "FEDERAL",
+      "excerpt": "",
+      "confidence": 0,
+      "reviewBy": null,
+      "status": "PENDING_RETRIEVAL",
+      "tags": [
+        "irs",
+        "contractors",
+        "w-9",
+        "documentation",
+        "url-unverified",
+        "retrievalInstructions:Capture when a W-9 is requested from a US payee and retention expectations."
+      ]
+    },
+    {
+      "id": "src_irs_form_w8ben",
+      "layer": "AUTHORITATIVE",
+      "title": "About Form W-8 BEN, Certificate of Foreign Status of Beneficial Owner",
+      "url": "https://www.irs.gov/forms-pubs/about-form-w-8-ben",
+      "publisher": "Internal Revenue Service",
+      "jurisdiction": "FEDERAL",
+      "excerpt": "",
+      "confidence": 0,
+      "reviewBy": null,
+      "status": "PENDING_RETRIEVAL",
+      "tags": [
+        "irs",
+        "international",
+        "w-8ben",
+        "foreign-persons",
+        "withholding",
+        "url-unverified",
+        "retrievalInstructions:Capture when a W-8BEN applies to a foreign individual payee and its validity period. Which form applies to a given worker is a CPA/attorney decision."
+      ]
+    },
+    {
+      "id": "src_irs_estimated_taxes",
+      "layer": "AUTHORITATIVE",
+      "title": "Estimated Taxes (corporations and individuals)",
+      "url": "https://www.irs.gov/businesses/small-businesses-self-employed/estimated-taxes",
+      "publisher": "Internal Revenue Service",
+      "jurisdiction": "FEDERAL",
+      "excerpt": "",
+      "confidence": 0,
+      "reviewBy": null,
+      "status": "PENDING_RETRIEVAL",
+      "tags": [
+        "irs",
+        "estimated-tax",
+        "due-date",
+        "personal-reminder",
+        "url-unverified",
+        "retrievalInstructions:Capture the individual and corporate estimated payment schedule. Owner personal estimates are OUT OF SCOPE for the business system; store only as a reminder."
+      ]
+    },
+    {
+      "id": "src_irs_pub_463",
+      "layer": "AUTHORITATIVE",
+      "title": "Publication 463, Travel, Gift, and Car Expenses",
+      "url": "https://www.irs.gov/publications/p463",
+      "publisher": "Internal Revenue Service",
+      "jurisdiction": "FEDERAL",
+      "excerpt": "",
+      "confidence": 0,
+      "reviewBy": null,
+      "status": "PENDING_RETRIEVAL",
+      "tags": [
+        "irs",
+        "meals",
+        "travel",
+        "substantiation",
+        "deductibility",
+        "url-unverified",
+        "retrievalInstructions:Capture the meals deductibility percentage, substantiation requirements (amount, time, place, business purpose, attendees) and per-diem references for the tax year."
+      ]
+    },
+    {
+      "id": "src_irs_pub_946",
+      "layer": "AUTHORITATIVE",
+      "title": "Publication 946, How To Depreciate Property",
+      "url": "https://www.irs.gov/publications/p946",
+      "publisher": "Internal Revenue Service",
+      "jurisdiction": "FEDERAL",
+      "excerpt": "",
+      "confidence": 0,
+      "reviewBy": null,
+      "status": "PENDING_RETRIEVAL",
+      "tags": [
+        "irs",
+        "depreciation",
+        "section-179",
+        "bonus",
+        "fixed-assets",
+        "url-unverified",
+        "retrievalInstructions:Capture Section 179 limits, bonus depreciation percentage and MACRS class lives for the tax year. Tax depreciation elections are CPA decisions."
+      ]
+    },
+    {
+      "id": "src_irs_pub_583",
+      "layer": "AUTHORITATIVE",
+      "title": "Publication 583, Starting a Business and Keeping Records",
+      "url": "https://www.irs.gov/publications/p583",
+      "publisher": "Internal Revenue Service",
+      "jurisdiction": "FEDERAL",
+      "excerpt": "",
+      "confidence": 0,
+      "reviewBy": null,
+      "status": "PENDING_RETRIEVAL",
+      "tags": [
+        "irs",
+        "recordkeeping",
+        "retention",
+        "documents",
+        "url-unverified",
+        "retrievalInstructions:Capture the recordkeeping guidance and the 'how long to keep records' table for the retention policy defaults."
+      ]
+    },
+    {
+      "id": "src_irs_pub_587",
+      "layer": "AUTHORITATIVE",
+      "title": "Publication 587, Business Use of Your Home",
+      "url": "https://www.irs.gov/publications/p587",
+      "publisher": "Internal Revenue Service",
+      "jurisdiction": "FEDERAL",
+      "excerpt": "",
+      "confidence": 0,
+      "reviewBy": null,
+      "status": "PENDING_RETRIEVAL",
+      "tags": [
+        "irs",
+        "home-office",
+        "deductibility",
+        "url-unverified",
+        "retrievalInstructions:Capture the exclusive-use and principal-place-of-business tests and the simplified method rate. Added because the home_office_rules tax rule needs it."
+      ]
+    },
+    {
+      "id": "src_ftb_form_100s",
+      "layer": "AUTHORITATIVE",
+      "title": "Form 100S, California S Corporation Franchise or Income Tax Return (booklet)",
+      "url": "https://www.ftb.ca.gov/forms/search/",
+      "publisher": "California Franchise Tax Board",
+      "jurisdiction": "CALIFORNIA",
+      "excerpt": "",
+      "confidence": 0,
+      "reviewBy": null,
+      "status": "PENDING_RETRIEVAL",
+      "tags": [
+        "ftb",
+        "california",
+        "s-corp",
+        "form-100s",
+        "due-date",
+        "url-unverified",
+        "retrievalInstructions:Search the FTB forms index for the current-year 100S booklet; capture 'When to file', automatic extension and payment rules."
+      ]
+    },
+    {
+      "id": "src_ftb_s_corp_franchise_tax",
+      "layer": "AUTHORITATIVE",
+      "title": "S corporations — franchise tax rate and minimum franchise tax",
+      "url": "https://www.ftb.ca.gov/file/business/types/corporations/s-corporations.html",
+      "publisher": "California Franchise Tax Board",
+      "jurisdiction": "CALIFORNIA",
+      "excerpt": "",
+      "confidence": 0,
+      "reviewBy": null,
+      "status": "PENDING_RETRIEVAL",
+      "tags": [
+        "ftb",
+        "california",
+        "s-corp",
+        "franchise-tax",
+        "rate",
+        "minimum-tax",
+        "url-unverified",
+        "retrievalInstructions:Capture the S corporation franchise tax rate and the minimum franchise tax amount plus first-year exemptions. Never restate these numbers from memory."
+      ]
+    },
+    {
+      "id": "src_ftb_estimated_tax_corporations",
+      "layer": "AUTHORITATIVE",
+      "title": "Estimated tax payments for corporations",
+      "url": "https://www.ftb.ca.gov/pay/estimated-tax-payments.html",
+      "publisher": "California Franchise Tax Board",
+      "jurisdiction": "CALIFORNIA",
+      "excerpt": "",
+      "confidence": 0,
+      "reviewBy": null,
+      "status": "PENDING_RETRIEVAL",
+      "tags": [
+        "ftb",
+        "california",
+        "estimated-tax",
+        "corporations",
+        "due-date",
+        "url-unverified",
+        "retrievalInstructions:Capture the corporate estimated payment installment schedule and minimum-tax first-installment rules."
+      ]
+    },
+    {
+      "id": "src_edd_de9_de9c",
+      "layer": "AUTHORITATIVE",
+      "title": "Required filings and due dates (DE 9 / DE 9C)",
+      "url": "https://edd.ca.gov/en/payroll_taxes/required_filings_and_due_dates/",
+      "publisher": "California Employment Development Department",
+      "jurisdiction": "CALIFORNIA",
+      "excerpt": "",
+      "confidence": 0,
+      "reviewBy": null,
+      "status": "PENDING_RETRIEVAL",
+      "tags": [
+        "edd",
+        "california",
+        "payroll",
+        "de9",
+        "de9c",
+        "quarterly",
+        "due-date",
+        "url-unverified",
+        "retrievalInstructions:Capture DE 9 / DE 9C quarterly due dates and deposit (DE 88) frequency rules."
+      ]
+    },
+    {
+      "id": "src_edd_payroll_tax_rates",
+      "layer": "AUTHORITATIVE",
+      "title": "Rates and withholding (UI, ETT, SDI)",
+      "url": "https://edd.ca.gov/en/payroll_taxes/rates_and_withholding/",
+      "publisher": "California Employment Development Department",
+      "jurisdiction": "CALIFORNIA",
+      "excerpt": "",
+      "confidence": 0,
+      "reviewBy": null,
+      "status": "PENDING_RETRIEVAL",
+      "tags": [
+        "edd",
+        "california",
+        "payroll",
+        "rate",
+        "sui",
+        "ett",
+        "sdi",
+        "wage-base",
+        "url-unverified",
+        "retrievalInstructions:Capture the UI new-employer rate and taxable wage limit, ETT rate, and SDI rate/wage limit for the tax year."
+      ]
+    },
+    {
+      "id": "src_edd_employer_registration",
+      "layer": "AUTHORITATIVE",
+      "title": "Am I required to register as an employer?",
+      "url": "https://edd.ca.gov/en/payroll_taxes/am_i_required_to_register_as_an_employer/",
+      "publisher": "California Employment Development Department",
+      "jurisdiction": "CALIFORNIA",
+      "excerpt": "",
+      "confidence": 0,
+      "reviewBy": null,
+      "status": "PENDING_RETRIEVAL",
+      "tags": [
+        "edd",
+        "california",
+        "payroll",
+        "registration",
+        "employer",
+        "url-unverified",
+        "retrievalInstructions:Capture the registration threshold and timing for California employers."
+      ]
+    },
+    {
+      "id": "src_edd_sdi",
+      "layer": "AUTHORITATIVE",
+      "title": "State Disability Insurance — employer requirements",
+      "url": "https://edd.ca.gov/en/disability/employer_requirements/",
+      "publisher": "California Employment Development Department",
+      "jurisdiction": "CALIFORNIA",
+      "excerpt": "",
+      "confidence": 0,
+      "reviewBy": null,
+      "status": "PENDING_RETRIEVAL",
+      "tags": [
+        "edd",
+        "california",
+        "payroll",
+        "sdi",
+        "withholding",
+        "url-unverified",
+        "retrievalInstructions:Capture employer obligations for SDI withholding and notices."
+      ]
+    },
+    {
+      "id": "src_ca_sos_statement_of_information",
+      "layer": "AUTHORITATIVE",
+      "title": "Statement of Information filing requirements (LLC)",
+      "url": "https://www.sos.ca.gov/business-programs/business-entities/statements",
+      "publisher": "California Secretary of State",
+      "jurisdiction": "CALIFORNIA",
+      "excerpt": "",
+      "confidence": 0,
+      "reviewBy": null,
+      "status": "PENDING_RETRIEVAL",
+      "tags": [
+        "sos",
+        "california",
+        "statement-of-information",
+        "due-date",
+        "entity-compliance",
+        "url-unverified",
+        "retrievalInstructions:Capture the LLC filing cadence (biennial), the filing window relative to the formation month, and the fee."
+      ]
+    },
+    {
+      "id": "src_dol_flsa_misclassification",
+      "layer": "AUTHORITATIVE",
+      "title": "Employee or Independent Contractor Classification Under the FLSA",
+      "url": "https://www.dol.gov/agencies/whd/flsa/misclassification",
+      "publisher": "U.S. Department of Labor",
+      "jurisdiction": "FEDERAL",
+      "excerpt": "",
+      "confidence": 0,
+      "reviewBy": null,
+      "status": "PENDING_RETRIEVAL",
+      "tags": [
+        "dol",
+        "flsa",
+        "worker-classification",
+        "url-unverified",
+        "retrievalInstructions:Capture the current economic-reality test factors. Supports professional judgment only; the system never classifies workers."
+      ]
+    }
+  ]
+}
