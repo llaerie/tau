@@ -806,6 +806,8 @@ export interface ProposedAction {
     touchesEquity?: boolean;
     movesMoney?: boolean;
     involvesRelatedParty?: boolean;
+    touchesRestrictedAccount?: boolean;
+    isExactMatch?: boolean;
   };
 }
 
