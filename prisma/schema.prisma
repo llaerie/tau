@@ -1,0 +1,1364 @@
+// Tau AI CFO — PostgreSQL persistence schema.
+//
+// Design rules (see docs/BUILD_BRIEF.md):
+//  * Every money column is NUMERIC(19,4). The application layer only ever sees DecimalString.
+//  * Calendar dates (ISODate) are DATE; timestamps (ISODateTime) are TIMESTAMPTZ(3).
+//  * audit_events is append-only: no updatedAt, insert-only trigger in prisma/rls.sql.
+//  * Structured sub-documents that are never queried relationally are JSON (payroll lines,
+//    budget/forecast lines, approval action/risk, calc inputs/values).
+//  * Cross-entity "soft" references (journalEntryId on a transaction, documentIds, ...) are
+//    plain indexed columns so engines may upsert entities in any order; the hard FKs are the
+//    ledger core (journal_lines → journal_entries/accounts, journal_entries → periods) and
+//    the owned child tables (invoice_lines, sessions).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+enum FieldStatus {
+  CONFIRMED
+  UNCONFIRMED
+  PROFESSIONAL_REVIEW_REQUIRED
+  SUPERSEDED
+}
+
+enum Role {
+  OWNER
+  FINANCE_OPERATOR
+  CPA
+  PAYROLL_PROFESSIONAL
+  ATTORNEY
+  AUDITOR
+  VIEWER
+  SYSTEM
+  AGENT
+}
+
+enum ActorType {
+  USER
+  AGENT
+  SYSTEM
+}
+
+enum RiskLevel {
+  GREEN
+  YELLOW
+  RED
+}
+
+enum AccountType {
+  ASSET
+  LIABILITY
+  EQUITY
+  REVENUE
+  EXPENSE
+}
+
+enum NormalBalance {
+  DEBIT
+  CREDIT
+}
+
+enum AccountSubtype {
+  CASH
+  ACCOUNTS_RECEIVABLE
+  PREPAID
+  OTHER_CURRENT_ASSET
+  FIXED_ASSET
+  ACCUMULATED_DEPRECIATION
+  OTHER_ASSET
+  ACCOUNTS_PAYABLE
+  CREDIT_CARD
+  ACCRUED_LIABILITY
+  PAYROLL_LIABILITY
+  TAX_LIABILITY
+  DEFERRED_REVENUE
+  OTHER_CURRENT_LIABILITY
+  LONG_TERM_DEBT
+  OWNER_EQUITY
+  SHAREHOLDER_DISTRIBUTIONS
+  RETAINED_EARNINGS
+  OPERATING_REVENUE
+  OTHER_INCOME
+  COST_OF_REVENUE
+  PAYROLL_EXPENSE
+  PAYROLL_TAX_EXPENSE
+  OPERATING_EXPENSE
+  DEPRECIATION_EXPENSE
+  INTEREST_EXPENSE
+  TAX_EXPENSE
+  OTHER_EXPENSE
+  SUSPENSE
+}
+
+enum CashFlowSection {
+  CASH
+  OPERATING
+  INVESTING
+  FINANCING
+}
+
+enum JournalEntryStatus {
+  DRAFT
+  PENDING_APPROVAL
+  POSTED
+  REVERSED
+  VOID
+}
+
+enum JournalSource {
+  OPENING_BALANCE
+  BANK_IMPORT
+  CARD_IMPORT
+  PAYROLL
+  AR
+  AP
+  MANUAL
+  AGENT
+  ADJUSTING
+  CLOSING
+  CORRECTING
+  REVERSAL
+  DEPRECIATION
+  SYSTEM
+}
+
+enum EntityRefType {
+  VENDOR
+  CUSTOMER
+  EMPLOYEE
+  CONTRACTOR
+  OWNER
+  TAX_AUTHORITY
+  BANK
+  OTHER
+}
+
+enum PeriodStatus {
+  OPEN
+  SOFT_CLOSED
+  LOCKED
+}
+
+enum BankAccountType {
+  CHECKING
+  SAVINGS
+  MONEY_MARKET
+}
+
+enum TransactionSourceKind {
+  BANK
+  CARD
+}
+
+enum TransactionFlag {
+  POSSIBLE_DUPLICATE
+  POSSIBLE_PERSONAL
+  MISSING_RECEIPT
+  TRANSFER
+  REFUND
+  LARGE_UNUSUAL
+  NEW_MERCHANT
+  UNCATEGORIZED
+  REVIEW_REQUIRED
+  RELATED_PARTY
+  INTERNATIONAL
+  SPLIT
+}
+
+enum CategoryStatus {
+  UNCATEGORIZED
+  SUGGESTED
+  APPROVED
+  REJECTED
+}
+
+enum TaxDocStatus {
+  NOT_REQUIRED
+  REQUESTED
+  ON_FILE
+  UNKNOWN
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PARTIALLY_PAID
+  PAID
+  OVERDUE
+  VOID
+}
+
+enum BillStatus {
+  RECEIVED
+  APPROVED
+  SCHEDULED
+  PAID
+  DISPUTED
+  DUPLICATE
+  VOID
+}
+
+enum PaymentDirection {
+  IN
+  OUT
+}
+
+enum PaymentMethod {
+  ACH
+  WIRE
+  CARD
+  CHECK
+  OTHER
+}
+
+enum WorkerType {
+  EMPLOYEE
+  CONTRACTOR
+  UNRESOLVED
+}
+
+enum WorkerClassificationStatus {
+  CONFIRMED
+  UNRESOLVED_PROFESSIONAL_REVIEW
+}
+
+enum CompensationType {
+  SALARY
+  HOURLY
+  CONTRACT
+}
+
+enum CompensationPeriod {
+  MONTHLY
+  ANNUAL
+  HOURLY
+}
+
+enum CompensationBasis {
+  GROSS
+  NET
+  EMPLOYER_COST
+  CONTRACT_FEE
+  UNKNOWN
+}
+
+enum PayMethod {
+  PAYROLL_PROVIDER
+  ACH
+  WIRE
+  INTERNATIONAL_PLATFORM
+  UNKNOWN
+}
+
+enum PayrollRunStatus {
+  DRAFT
+  APPROVED
+  PAID
+  RECONCILED
+  EXCEPTION
+}
+
+enum PayrollLiabilityKind {
+  FEDERAL_WITHHOLDING_AND_FICA
+  FEDERAL_UNEMPLOYMENT
+  STATE_WITHHOLDING_AND_SDI
+  STATE_UNEMPLOYMENT_AND_ETT
+  OTHER
+}
+
+enum PayrollLiabilityStatus {
+  ACCRUED
+  PAID
+  UNKNOWN
+}
+
+enum Jurisdiction {
+  FEDERAL
+  CALIFORNIA
+  OTHER_STATE
+  CHINA
+  OTHER
+}
+
+enum TaxObligationStatus {
+  UPCOMING
+  DUE
+  PAID
+  FILED
+  UNKNOWN
+  NOT_APPLICABLE_PENDING_REVIEW
+}
+
+enum TaxRuleStatus {
+  CURRENT
+  STALE
+  PENDING_RETRIEVAL
+  SUPERSEDED
+  PROFESSIONAL_REVIEW_REQUIRED
+}
+
+enum CpaReviewStatus {
+  NOT_REQUESTED
+  REQUESTED
+  REVIEWED
+  REJECTED
+}
+
+enum DepreciationMethod {
+  STRAIGHT_LINE
+}
+
+enum DocumentKind {
+  RECEIPT
+  CUSTOMER_INVOICE
+  VENDOR_BILL
+  BANK_STATEMENT
+  CARD_STATEMENT
+  CONTRACT
+  PAYROLL_REPORT
+  TAX_NOTICE
+  TAX_RETURN
+  W9
+  W8
+  ENTITY_DOCUMENT
+  INSURANCE
+  CPA_CORRESPONDENCE
+  OTHER
+}
+
+enum BudgetStatus {
+  DRAFT
+  APPROVED
+  SUPERSEDED
+}
+
+enum ForecastStatus {
+  DRAFT
+  ACTIVE
+  SUPERSEDED
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  EXPIRED
+  WITHDRAWN
+}
+
+enum AgentActionStatus {
+  PROPOSED
+  AWAITING_APPROVAL
+  APPROVED
+  EXECUTED
+  SIMULATED
+  REJECTED
+  BLOCKED
+  FAILED
+  ROLLED_BACK
+}
+
+enum KnowledgeLayer {
+  AUTHORITATIVE
+  PROFESSIONAL
+  COMPANY
+  HISTORICAL_DECISION
+  EDUCATION
+}
+
+enum KnowledgeSourceStatus {
+  CURRENT
+  STALE
+  PENDING_RETRIEVAL
+  SUPERSEDED
+}
+
+enum GuidanceStatus {
+  PENDING_APPROVAL
+  ACTIVE
+  SUPERSEDED
+  REJECTED
+}
+
+enum PolicyStatus {
+  DRAFT
+  ACTIVE
+  SUPERSEDED
+}
+
+enum CompetencyDomain {
+  ACCOUNTING_FOUNDATIONS
+  ADVANCED_ACCOUNTING
+  FINANCIAL_STATEMENT_ANALYSIS
+  FPA
+  CASH_MANAGEMENT
+  CORPORATE_FINANCE
+  VALUATION
+  TAX_OPERATIONS
+  PAYROLL_WORKFORCE
+  AP_AR
+  FINANCIAL_CONTROLS
+  CFO_STRATEGY
+}
+
+enum CalcUnit {
+  USD
+  CURRENCY
+  RATIO
+  PERCENT
+  MONTHS
+  WEEKS
+  DAYS
+  COUNT
+  TABLE
+  OBJECT
+}
+
+// ---------------------------------------------------------------------------
+// Company profile & configuration
+// ---------------------------------------------------------------------------
+
+model CompanyProfile {
+  id                 String   @id
+  displayName        String
+  isSynthetic        Boolean  @default(true)
+  /// ConfigField<string> JSON documents — unknown facts stay `value: null`.
+  entityType         Json
+  taxElection        Json
+  state              Json
+  fiscalYearEnd      Json
+  accountingMethod   Json
+  functionalCurrency String   @default("USD")
+  asOfDate           DateTime @db.Date
+  createdAt          DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime @default(now()) @updatedAt @db.Timestamptz(3)
+
+  @@map("company_profiles")
+}
+
+model ConfigField {
+  section           String
+  key               String
+  label             String
+  /// NULL means UNKNOWN. Never coerced to zero.
+  value             Json?
+  status            FieldStatus
+  note              String?
+  requiredConfirmer Role?
+  updatedBy         String?
+  sourceIds         String[]    @default([])
+  synthetic         Boolean     @default(false)
+  /// Prior values: [{ value, status, updatedAt, updatedBy }]
+  history           Json        @default("[]")
+  createdAt         DateTime    @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime    @default(now()) @updatedAt @db.Timestamptz(3)
+
+  @@id([section, key])
+  @@index([status])
+  @@map("config_fields")
+}
+
+// ---------------------------------------------------------------------------
+// Chart of accounts, periods, ledger
+// ---------------------------------------------------------------------------
+
+model Account {
+  id              String           @id
+  code            String           @unique
+  name            String
+  type            AccountType
+  subtype         AccountSubtype
+  normalBalance   NormalBalance
+  cashFlowSection CashFlowSection?
+  parentId        String?
+  isActive        Boolean          @default(true)
+  description     String?
+  restricted      Boolean          @default(false)
+  createdAt       DateTime         @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime         @default(now()) @updatedAt @db.Timestamptz(3)
+
+  lines JournalLine[]
+
+  @@index([type])
+  @@index([subtype])
+  @@index([parentId])
+  @@map("accounts")
+}
+
+model Period {
+  id               String       @id
+  year             Int
+  month            Int
+  startDate        DateTime     @db.Date
+  endDate          DateTime     @db.Date
+  status           PeriodStatus @default(OPEN)
+  lockedAt         DateTime?    @db.Timestamptz(3)
+  lockedBy         String?
+  lockApprovalId   String?
+  closeChecklistId String?
+  /// Lock/unlock/soft-close history entries
+  tags             String[]     @default([])
+  createdAt        DateTime     @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime     @default(now()) @updatedAt @db.Timestamptz(3)
+
+  entries JournalEntry[]
+
+  @@unique([year, month])
+  @@index([status])
+  @@map("periods")
+}
+
+model JournalEntry {
+  id                String             @id
+  entryNumber       Int
+  date              DateTime           @db.Date
+  periodId          String
+  description       String
+  memo              String?
+  status            JournalEntryStatus @default(DRAFT)
+  source            JournalSource
+  sourceIds         String[]           @default([])
+  createdBy         String
+  createdAt         DateTime           @db.Timestamptz(3)
+  postedAt          DateTime?          @db.Timestamptz(3)
+  approvalId        String?
+  reversesEntryId   String?
+  reversedByEntryId String?
+  tags              String[]           @default([])
+  updatedAt         DateTime           @default(now()) @updatedAt @db.Timestamptz(3)
+
+  period Period        @relation(fields: [periodId], references: [id])
+  lines  JournalLine[]
+
+  @@index([date])
+  @@index([periodId])
+  @@index([status])
+  @@index([source])
+  @@index([entryNumber])
+  @@index([reversesEntryId])
+  @@map("journal_entries")
+}
+
+model JournalLine {
+  id            String         @id
+  entryId       String
+  lineNo        Int
+  accountId     String
+  debit         Decimal        @default(0) @db.Decimal(19, 4)
+  credit        Decimal        @default(0) @db.Decimal(19, 4)
+  currency      String         @default("USD")
+  memo          String?
+  entityRefType EntityRefType?
+  entityRefId   String?
+
+  entry   JournalEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  account Account      @relation(fields: [accountId], references: [id])
+
+  @@unique([entryId, lineNo])
+  @@index([accountId])
+  @@index([entityRefType, entityRefId])
+  @@map("journal_lines")
+}
+
+// ---------------------------------------------------------------------------
+// Bank, cards, transactions
+// ---------------------------------------------------------------------------
+
+model BankAccount {
+  id          String          @id
+  name        String
+  institution String
+  accountType BankAccountType
+  last4       String
+  currency    String          @default("USD")
+  glAccountId String
+  isSynthetic Boolean         @default(true)
+  openedDate  DateTime?       @db.Date
+  createdAt   DateTime        @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime        @default(now()) @updatedAt @db.Timestamptz(3)
+
+  @@index([glAccountId])
+  @@map("bank_accounts")
+}
+
+model Card {
+  id                String   @id
+  name              String
+  issuer            String
+  last4             String
+  currency          String   @default("USD")
+  glAccountId       String
+  isSynthetic       Boolean  @default(true)
+  statementCloseDay Int?
+  paymentDueDay     Int?
+  createdAt         DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime @default(now()) @updatedAt @db.Timestamptz(3)
+
+  @@index([glAccountId])
+  @@map("cards")
+}
+
+model Transaction {
+  id                  String                @id
+  sourceKind          TransactionSourceKind
+  /// BankAccount.id or Card.id
+  sourceAccountId     String
+  externalId          String
+  date                DateTime              @db.Date
+  postedDate          DateTime              @db.Date
+  /// Signed. Negative = money leaving the account / charge on the card.
+  amount              Decimal               @db.Decimal(19, 4)
+  currency            String                @default("USD")
+  descriptionRaw      String
+  merchantNormalized  String?
+  counterpartyRefType EntityRefType?
+  counterpartyRefId   String?
+  categoryAccountId   String?
+  categoryStatus      CategoryStatus        @default(UNCATEGORIZED)
+  categoryConfidence  Float                 @default(0)
+  categoryReason      String?
+  categorySuggestedBy String?
+  categoryApprovedBy  String?
+  /// [{ accountId, amount, memo? }] for split transactions
+  categorySplits      Json?
+  journalEntryId      String?
+  documentIds         String[]              @default([])
+  transferPairId      String?
+  duplicateOfId       String?
+  flags               TransactionFlag[]     @default([])
+  importBatchId       String
+  meta                Json?
+  createdAt           DateTime              @default(now()) @db.Timestamptz(3)
+  updatedAt           DateTime              @default(now()) @updatedAt @db.Timestamptz(3)
+
+  @@index([date])
+  @@index([sourceAccountId, date])
+  @@index([sourceAccountId, externalId])
+  @@index([journalEntryId])
+  @@index([categoryStatus])
+  @@index([categoryAccountId])
+  @@index([importBatchId])
+  @@map("transactions")
+}
+
+// ---------------------------------------------------------------------------
+// Counterparties, AR / AP
+// ---------------------------------------------------------------------------
+
+model Vendor {
+  id               String       @id
+  name             String
+  normalizedNames  String[]     @default([])
+  defaultAccountId String?
+  paymentTermsDays Int?
+  isRecurring      Boolean      @default(false)
+  category         String?
+  country          String
+  taxDocStatus     TaxDocStatus @default(UNKNOWN)
+  active           Boolean      @default(true)
+  createdAt        DateTime     @db.Timestamptz(3)
+  approvedBy       String?
+  updatedAt        DateTime     @default(now()) @updatedAt @db.Timestamptz(3)
+
+  @@index([name])
+  @@index([active])
+  @@map("vendors")
+}
+
+model Customer {
+  id                 String   @id
+  name               String
+  paymentTermsDays   Int
+  country            String
+  relatedParty       Boolean  @default(false)
+  relatedPartyNote   String?
+  contractDocumentId String?
+  active             Boolean  @default(true)
+  createdAt          DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime @default(now()) @updatedAt @db.Timestamptz(3)
+
+  @@index([name])
+  @@map("customers")
+}
+
+model Invoice {
+  id                 String        @id
+  number             String
+  customerId         String
+  issueDate          DateTime      @db.Date
+  dueDate            DateTime      @db.Date
+  servicePeriodStart DateTime?     @db.Date
+  servicePeriodEnd   DateTime?     @db.Date
+  currency           String        @default("USD")
+  total              Decimal       @db.Decimal(19, 4)
+  amountPaid         Decimal       @default(0) @db.Decimal(19, 4)
+  status             InvoiceStatus @default(DRAFT)
+  journalEntryId     String?
+  documentId         String?
+  paymentIds         String[]      @default([])
+  createdAt          DateTime      @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime      @default(now()) @updatedAt @db.Timestamptz(3)
+
+  lines InvoiceLine[]
+
+  @@index([number])
+  @@index([customerId])
+  @@index([status])
+  @@index([issueDate])
+  @@index([dueDate])
+  @@index([journalEntryId])
+  @@map("invoices")
+}
+
+model InvoiceLine {
+  id               String  @id
+  invoiceId        String
+  lineNo           Int
+  description      String
+  quantity         Decimal @db.Decimal(19, 4)
+  unitPrice        Decimal @db.Decimal(19, 4)
+  amount           Decimal @db.Decimal(19, 4)
+  revenueAccountId String
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@unique([invoiceId, lineNo])
+  @@index([revenueAccountId])
+  @@map("invoice_lines")
+}
+
+model Bill {
+  id               String     @id
+  vendorId         String
+  number           String
+  receivedDate     DateTime   @db.Date
+  billDate         DateTime   @db.Date
+  dueDate          DateTime   @db.Date
+  currency         String     @default("USD")
+  total            Decimal    @db.Decimal(19, 4)
+  amountPaid       Decimal    @default(0) @db.Decimal(19, 4)
+  status           BillStatus @default(RECEIVED)
+  expenseAccountId String
+  description      String
+  documentId       String?
+  journalEntryId   String?
+  paymentIds       String[]   @default([])
+  duplicateOfId    String?
+  approvalId       String?
+  createdAt        DateTime   @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime   @default(now()) @updatedAt @db.Timestamptz(3)
+
+  @@index([vendorId])
+  @@index([status])
+  @@index([dueDate])
+  @@index([billDate])
+  @@index([journalEntryId])
+  @@index([vendorId, number])
+  @@map("bills")
+}
+
+model Payment {
+  id                  String           @id
+  direction           PaymentDirection
+  date                DateTime         @db.Date
+  amount              Decimal          @db.Decimal(19, 4)
+  currency            String           @default("USD")
+  method              PaymentMethod
+  counterpartyRefType EntityRefType?
+  counterpartyRefId   String?
+  /// [{ targetType: "INVOICE" | "BILL", targetId, amount }]
+  applications        Json             @default("[]")
+  transactionId       String?
+  journalEntryId      String?
+  memo                String?
+  createdAt           DateTime         @default(now()) @db.Timestamptz(3)
+  updatedAt           DateTime         @default(now()) @updatedAt @db.Timestamptz(3)
+
+  @@index([date])
+  @@index([direction])
+  @@index([transactionId])
+  @@index([journalEntryId])
+  @@map("payments")
+}
+
+// ---------------------------------------------------------------------------
+// Workforce & payroll (row-level security applied in prisma/rls.sql)
+// ---------------------------------------------------------------------------
+
+model Worker {
+  id                   String                     @id
+  displayName          String
+  roleTitle            String
+  country              String
+  workerType           WorkerType
+  classificationStatus WorkerClassificationStatus
+  compType             CompensationType
+  compAmount           Decimal                    @db.Decimal(19, 4)
+  compCurrency         String                     @default("USD")
+  compPeriod           CompensationPeriod
+  compBasis            CompensationBasis
+  compStatus           FieldStatus
+  compNote             String?
+  startDate            DateTime                   @db.Date
+  endDate              DateTime?                  @db.Date
+  isOwner              Boolean                    @default(false)
+  relatedParty         Boolean                    @default(false)
+  relatedPartyNote     String?
+  payMethod            PayMethod?
+  documentIds          String[]                   @default([])
+  /// InternationalWorkerReview document (fields are ConfigFields)
+  internationalReview  Json?
+  isSynthetic          Boolean                    @default(true)
+  createdAt            DateTime                   @default(now()) @db.Timestamptz(3)
+  updatedAt            DateTime                   @default(now()) @updatedAt @db.Timestamptz(3)
+
+  @@index([workerType])
+  @@index([country])
+  @@map("workers")
+}
+
+model PayrollRun {
+  id                   String           @id
+  periodStart          DateTime         @db.Date
+  periodEnd            DateTime         @db.Date
+  payDate              DateTime         @db.Date
+  currency             String           @default("USD")
+  providerRef          String?
+  status               PayrollRunStatus @default(DRAFT)
+  /// PayrollLine[] — per-worker detail (RLS-protected)
+  lines                Json             @default("[]")
+  totalGross           Decimal          @db.Decimal(19, 4)
+  totalEmployeeTaxes   Decimal          @db.Decimal(19, 4)
+  totalOtherDeductions Decimal          @db.Decimal(19, 4)
+  totalNetPay          Decimal          @db.Decimal(19, 4)
+  totalEmployerTaxes   Decimal          @db.Decimal(19, 4)
+  totalEmployerCost    Decimal          @db.Decimal(19, 4)
+  journalEntryId       String?
+  netPayTransactionIds String[]         @default([])
+  rateAssumptionSetId  String?
+  /// { status, varianceAmount?, notes? }
+  reconciliation       Json?
+  createdAt            DateTime         @default(now()) @db.Timestamptz(3)
+  updatedAt            DateTime         @default(now()) @updatedAt @db.Timestamptz(3)
+
+  @@index([payDate])
+  @@index([status])
+  @@index([journalEntryId])
+  @@map("payroll_runs")
+}
+
+model PayrollLiability {
+  id                  String                 @id
+  payrollRunId        String
+  kind                PayrollLiabilityKind
+  amount              Decimal                @db.Decimal(19, 4)
+  currency            String                 @default("USD")
+  accruedDate         DateTime               @db.Date
+  dueDate             DateTime?              @db.Date
+  status              PayrollLiabilityStatus @default(ACCRUED)
+  paidTransactionId   String?
+  glAccountId         String
+  dueDateSourceRuleId String?
+  createdAt           DateTime               @default(now()) @db.Timestamptz(3)
+  updatedAt           DateTime               @default(now()) @updatedAt @db.Timestamptz(3)
+
+  @@index([payrollRunId])
+  @@index([status])
+  @@index([dueDate])
+  @@index([glAccountId])
+  @@map("payroll_liabilities")
+}
+
+// ---------------------------------------------------------------------------
+// Tax
+// ---------------------------------------------------------------------------
+
+model TaxObligation {
+  id                String              @id
+  jurisdiction      Jurisdiction
+  kind              String
+  title             String
+  description       String
+  taxYear           Int
+  periodLabel       String?
+  dueDate           DateTime?           @db.Date
+  amount            Decimal?            @db.Decimal(19, 4)
+  currency          String              @default("USD")
+  status            TaxObligationStatus @default(UNKNOWN)
+  ruleSourceId      String?
+  requiresCpaReview Boolean             @default(true)
+  documentIds       String[]            @default([])
+  workpaperId       String?
+  notes             String[]            @default([])
+  createdAt         DateTime            @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime            @default(now()) @updatedAt @db.Timestamptz(3)
+
+  @@index([taxYear])
+  @@index([dueDate])
+  @@index([status])
+  @@index([jurisdiction, kind])
+  @@map("tax_obligations")
+}
+
+model TaxRule {
+  id             String        @id
+  jurisdiction   Jurisdiction
+  taxYear        Int?
+  key            String
+  title          String
+  normalizedRule String
+  parameters     Json?
+  sourceId       String
+  status         TaxRuleStatus
+  confidence     Float
+  effectiveDate  DateTime?     @db.Date
+  reviewBy       DateTime      @db.Date
+  approvedBy     String?
+  createdAt      DateTime      @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime      @default(now()) @updatedAt @db.Timestamptz(3)
+
+  @@index([jurisdiction, key, taxYear])
+  @@index([sourceId])
+  @@index([status])
+  @@index([reviewBy])
+  @@map("tax_rules")
+}
+
+model TaxWorkpaper {
+  id                        String          @id
+  title                     String
+  taxYear                   Int
+  jurisdiction              Jurisdiction
+  obligationId              String?
+  /// [{ label, value, sourceIds }]
+  facts                     Json            @default("[]")
+  /// CalcResult ids
+  calculations              String[]        @default([])
+  /// Assumption[]
+  assumptions               Json            @default("[]")
+  professionalJudgmentItems String[]        @default([])
+  confidence                Float
+  cpaReviewRequired         Boolean         @default(true)
+  cpaReviewStatus           CpaReviewStatus @default(NOT_REQUESTED)
+  createdAt                 DateTime        @db.Timestamptz(3)
+  createdBy                 String
+  updatedAt                 DateTime        @default(now()) @updatedAt @db.Timestamptz(3)
+
+  @@index([taxYear, jurisdiction])
+  @@index([obligationId])
+  @@map("tax_workpapers")
+}
+
+// ---------------------------------------------------------------------------
+// Assets & documents
+// ---------------------------------------------------------------------------
+
+model FixedAsset {
+  id                               String             @id
+  name                             String
+  acquiredDate                     DateTime           @db.Date
+  cost                             Decimal            @db.Decimal(19, 4)
+  salvageValue                     Decimal            @default(0) @db.Decimal(19, 4)
+  usefulLifeMonths                 Int
+  method                           DepreciationMethod @default(STRAIGHT_LINE)
+  assetAccountId                   String
+  accumulatedDepreciationAccountId String
+  depreciationExpenseAccountId     String
+  inServiceDate                    DateTime           @db.Date
+  disposedDate                     DateTime?          @db.Date
+  sourceTransactionId              String?
+  documentId                       String?
+  taxTreatmentStatus               FieldStatus
+  createdAt                        DateTime           @default(now()) @db.Timestamptz(3)
+  updatedAt                        DateTime           @default(now()) @updatedAt @db.Timestamptz(3)
+
+  @@index([assetAccountId])
+  @@index([inServiceDate])
+  @@map("fixed_assets")
+}
+
+model Document {
+  id                       String       @id
+  kind                     DocumentKind
+  title                    String
+  date                     DateTime     @db.Date
+  vendorId                 String?
+  customerId               String?
+  workerId                 String?
+  amount                   Decimal?     @db.Decimal(19, 4)
+  currency                 String?
+  linkedTransactionIds     String[]     @default([])
+  linkedJournalEntryIds    String[]     @default([])
+  storagePath              String
+  mimeType                 String
+  extracted                Json?
+  classificationConfidence Float        @default(0)
+  retentionPolicyKey       String
+  retainUntil              DateTime?    @db.Date
+  isSynthetic              Boolean      @default(true)
+  tags                     String[]     @default([])
+  uploadedAt               DateTime     @db.Timestamptz(3)
+  updatedAt                DateTime     @default(now()) @updatedAt @db.Timestamptz(3)
+
+  @@index([kind])
+  @@index([date])
+  @@index([vendorId])
+  @@index([customerId])
+  @@index([workerId])
+  @@map("documents")
+}
+
+// ---------------------------------------------------------------------------
+// Planning
+// ---------------------------------------------------------------------------
+
+model Budget {
+  id          String       @id
+  name        String
+  fiscalYear  Int
+  version     Int
+  status      BudgetStatus @default(DRAFT)
+  /// BudgetLine[]
+  lines       Json         @default("[]")
+  /// Assumption[]
+  assumptions Json         @default("[]")
+  approvedBy  String?
+  approvedAt  DateTime?    @db.Timestamptz(3)
+  createdAt   DateTime     @db.Timestamptz(3)
+  updatedAt   DateTime     @default(now()) @updatedAt @db.Timestamptz(3)
+
+  @@index([fiscalYear, status])
+  @@map("budgets")
+}
+
+model Forecast {
+  id            String         @id
+  name          String
+  asOfDate      DateTime       @db.Date
+  horizonMonths Int
+  /// Record<string, DriverAssumption>
+  drivers       Json           @default("{}")
+  /// ForecastLine[]
+  lines         Json           @default("[]")
+  status        ForecastStatus @default(DRAFT)
+  version       Int
+  createdAt     DateTime       @db.Timestamptz(3)
+  createdBy     String
+  calcIds       String[]       @default([])
+  updatedAt     DateTime       @default(now()) @updatedAt @db.Timestamptz(3)
+
+  @@index([asOfDate])
+  @@index([status])
+  @@map("forecasts")
+}
+
+model Scenario {
+  id              String   @id
+  name            String
+  description     String
+  baseForecastId  String
+  driverOverrides Json     @default("{}")
+  events          Json     @default("[]")
+  createdAt       DateTime @db.Timestamptz(3)
+  createdBy       String
+  updatedAt       DateTime @default(now()) @updatedAt @db.Timestamptz(3)
+
+  @@index([baseForecastId])
+  @@map("scenarios")
+}
+
+// ---------------------------------------------------------------------------
+// Governance: approvals, agent actions, audit
+// ---------------------------------------------------------------------------
+
+model ApprovalRequest {
+  id                     String         @id
+  /// ProposedAction
+  action                 Json
+  /// RiskAssessment
+  risk                   Json
+  actionKind             String
+  riskLevel              RiskLevel
+  requestedApproverRoles Role[]         @default([])
+  status                 ApprovalStatus @default(PENDING)
+  requestedAt            DateTime       @db.Timestamptz(3)
+  decidedAt              DateTime?      @db.Timestamptz(3)
+  decidedBy              String?
+  decidedByRole          Role?
+  decisionComment        String?
+  expiresAt              DateTime?      @db.Timestamptz(3)
+  auditEventIds          String[]       @default([])
+  updatedAt              DateTime       @default(now()) @updatedAt @db.Timestamptz(3)
+
+  @@index([status])
+  @@index([requestedAt])
+  @@index([riskLevel])
+  @@index([actionKind])
+  @@map("approval_requests")
+}
+
+model AgentAction {
+  id            String            @id
+  /// ProposedAction
+  action        Json
+  /// RiskAssessment
+  risk          Json
+  actionKind    String
+  agent         String
+  riskLevel     RiskLevel
+  status        AgentActionStatus
+  approvalId    String?
+  auditEventId  String?
+  executedAt    DateTime?         @db.Timestamptz(3)
+  result        Json?
+  blockedReason String?
+  createdAt     DateTime          @default(now()) @db.Timestamptz(3)
+  updatedAt     DateTime          @default(now()) @updatedAt @db.Timestamptz(3)
+
+  @@index([status])
+  @@index([agent])
+  @@index([approvalId])
+  @@index([riskLevel])
+  @@map("agent_actions")
+}
+
+/// Append-only, hash-chained. No updatedAt by design; UPDATE/DELETE/TRUNCATE raise (prisma/rls.sql).
+model AuditEvent {
+  id                String    @id
+  seq               Int       @unique
+  timestamp         DateTime  @db.Timestamptz(3)
+  actorType         ActorType
+  actorId           String
+  actorRole         Role
+  actorDisplayName  String?
+  agent             String?
+  /// ModelInfo
+  model             Json?
+  workflowVersion   String
+  promptVersion     String?
+  eventType         String
+  /// ToolCallRecord[]
+  toolsCalled       Json      @default("[]")
+  sourceDocumentIds String[]  @default([])
+  calculationIds    String[]  @default([])
+  proposedActionId  String?
+  finalAction       String?
+  approvalIds       String[]  @default([])
+  confidence        Float?
+  explanation       String
+  beforeState       Json?
+  afterState        Json?
+  previousHash      String
+  hash              String    @unique
+  insertedAt        DateTime  @default(now()) @db.Timestamptz(3)
+
+  @@index([timestamp])
+  @@index([eventType])
+  @@index([actorId])
+  @@index([proposedActionId])
+  @@index([previousHash])
+  @@map("audit_events")
+}
+
+// ---------------------------------------------------------------------------
+// Knowledge & policy
+// ---------------------------------------------------------------------------
+
+model Policy {
+  id               String       @id
+  key              String
+  title            String
+  body             String
+  version          Int
+  status           PolicyStatus @default(DRAFT)
+  effectiveDate    DateTime     @db.Date
+  approvedBy       String?
+  sourceGuidanceId String?
+  parameters       Json?
+  createdAt        DateTime     @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime     @default(now()) @updatedAt @db.Timestamptz(3)
+
+  @@unique([key, version])
+  @@index([key, status])
+  @@map("policies")
+}
+
+model KnowledgeSource {
+  id             String                @id
+  layer          KnowledgeLayer
+  title          String
+  url            String?
+  publisher      String?
+  jurisdiction   Jurisdiction?
+  effectiveDate  DateTime?             @db.Date
+  retrievedAt    DateTime?             @db.Timestamptz(3)
+  taxYear        Int?
+  excerpt        String
+  normalizedRule String?
+  confidence     Float
+  reviewBy       DateTime?             @db.Date
+  status         KnowledgeSourceStatus
+  tags           String[]              @default([])
+  contentHash    String?
+  createdAt      DateTime              @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime              @default(now()) @updatedAt @db.Timestamptz(3)
+
+  @@index([layer])
+  @@index([status])
+  @@index([jurisdiction, taxYear])
+  @@index([reviewBy])
+  @@map("knowledge_sources")
+}
+
+model ProfessionalGuidance {
+  id           String         @id
+  authorRole   Role
+  authorName   String?
+  title        String
+  body         String
+  receivedAt   DateTime       @db.Timestamptz(3)
+  approvedAt   DateTime?      @db.Timestamptz(3)
+  approvedBy   String?
+  appliesTo    String[]       @default([])
+  status       GuidanceStatus @default(PENDING_APPROVAL)
+  supersedesId String?
+  documentId   String?
+  updatedAt    DateTime       @default(now()) @updatedAt @db.Timestamptz(3)
+
+  @@index([status])
+  @@index([authorRole])
+  @@map("professional_guidance")
+}
+
+// ---------------------------------------------------------------------------
+// Academy / evaluation / calculations
+// ---------------------------------------------------------------------------
+
+model EvaluationRecord {
+  id              String           @id
+  runId           String
+  caseId          String
+  domain          CompetencyDomain
+  competency      String
+  capabilityKey   String
+  agent           String
+  passed          Boolean
+  score           Float
+  failures        String[]         @default([])
+  expectedSummary String
+  actualSummary   String
+  /// ModelInfo
+  model           Json
+  durationMs      Int
+  ranAt           DateTime         @db.Timestamptz(3)
+
+  @@index([runId])
+  @@index([caseId])
+  @@index([capabilityKey])
+  @@index([domain])
+  @@index([ranAt])
+  @@map("evaluation_records")
+}
+
+model CompetencyScore {
+  capabilityKey          String           @id
+  domain                 CompetencyDomain
+  label                  String
+  currentLevel           Int
+  maxAllowedLevel        Int
+  passRate               Float
+  /// Partial<EvalMetrics>
+  metrics                Json             @default("{}")
+  evaluationCount        Int              @default(0)
+  consecutivePassingRuns Int              @default(0)
+  lastTestedAt           DateTime?        @db.Timestamptz(3)
+  failureCaseIds         String[]         @default([])
+  promotionEligible      Boolean          @default(false)
+  promotionBlockers      String[]         @default([])
+  updatedAt              DateTime         @default(now()) @updatedAt @db.Timestamptz(3)
+
+  @@index([domain])
+  @@map("competency_scores")
+}
+
+/// CalcResult produced by the deterministic engine.
+model Calculation {
+  id          String   @id
+  name        String
+  value       Json
+  unit        CalcUnit
+  formula     String
+  inputs      Json     @default("{}")
+  sourceIds   String[] @default([])
+  /// Assumption[]
+  assumptions Json     @default("[]")
+  asOfDate    DateTime @db.Date
+  notes       String[] @default([])
+  fingerprint String?
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+
+  @@index([name])
+  @@index([asOfDate])
+  @@index([fingerprint])
+  @@map("calculations")
+}
+
+// ---------------------------------------------------------------------------
+// Auth
+// ---------------------------------------------------------------------------
+
+model User {
+  id           String   @id
+  email        String   @unique
+  displayName  String
+  role         Role
+  passwordHash String?
+  createdAt    DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime @default(now()) @updatedAt @db.Timestamptz(3)
+
+  sessions Session[]
+
+  @@map("users")
+}
+
+model Session {
+  id         String    @id
+  userId     String
+  /// Hash of the opaque session token; the raw token is never stored.
+  tokenHash  String    @unique
+  role       Role
+  createdAt  DateTime  @default(now()) @db.Timestamptz(3)
+  expiresAt  DateTime  @db.Timestamptz(3)
+  lastSeenAt DateTime? @db.Timestamptz(3)
+  revokedAt  DateTime? @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+// ---------------------------------------------------------------------------
+// Database-side permissions (consumed by prisma/rls.sql policies)
+// ---------------------------------------------------------------------------
+
+/// Role → permission grants used by row-level-security policies. Seeded by prisma/rls.sql to
+/// mirror PERMISSION_MATRIX in lib/security/rbac.ts. Declared here so `prisma db push` keeps it.
+model RolePermission {
+  role       String
+  permission String
+
+  @@id([role, permission])
+  @@map("tau_role_permissions")
+}

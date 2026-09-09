@@ -19,7 +19,8 @@
     "lab:cpa": "tsx scripts/cpa-package.ts",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
-    "db:seed": "tsx scripts/db-seed.ts"
+    "db:seed": "tsx scripts/db-seed.ts",
+    "db:rls": "tsx scripts/db-apply-rls.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.124.0",
