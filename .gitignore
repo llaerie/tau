@@ -1,0 +1,12 @@
+node_modules
+.next
+out
+.env
+.env.local
+*.tsbuildinfo
+next-env.d.ts
+.tau/
+evals/results/*.json
+!evals/results/.gitkeep
+!evals/results/latest-summary.json
+coverage

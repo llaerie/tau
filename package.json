@@ -1,0 +1,48 @@
+{
+  "name": "tau-ai-cfo",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Tau AI CFO Operating System - Phase One Training Lab",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "evals": "tsx scripts/run-evals.ts",
+    "evals:report": "tsx scripts/readiness-report.ts",
+    "lab:seed": "tsx scripts/seed-lab.ts",
+    "lab:brief": "tsx scripts/weekly-brief.ts",
+    "lab:close": "tsx scripts/month-end-close.ts",
+    "lab:cpa": "tsx scripts/cpa-package.ts",
+    "db:generate": "prisma generate",
+    "db:push": "prisma db push",
+    "db:seed": "tsx scripts/db-seed.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.124.0",
+    "@prisma/client": "6.19.3",
+    "decimal.js": "^10.6.0",
+    "next": "15.5.25",
+    "openai": "^7.13.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.1.0",
+    "@types/node": "^22.20.2",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "eslint": "^9.39.0",
+    "eslint-config-next": "15.5.25",
+    "prisma": "6.19.3",
+    "tailwindcss": "^4.1.0",
+    "tsx": "^4.23.0",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.7"
+  },
+  "engines": { "node": ">=20" }
+}
