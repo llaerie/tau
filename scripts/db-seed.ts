@@ -6,6 +6,7 @@
  * Audit history already in the database is retained (reset() never truncates audit_events).
  */
 import { generateSyntheticCompany } from "@/lib/synthetic";
+import { seedKnowledgeInto } from "@/lib/db/runtime";
 import { PrismaStore } from "@/lib/db/prisma-store";
 import { disconnectPrisma } from "@/lib/db/prisma-client";
 
@@ -14,7 +15,7 @@ async function main(): Promise<void> {
   const seed = Number(process.env.TAU_SYNTHETIC_SEED ?? "20260101");
   const asOfDate = process.env.TAU_AS_OF_DATE ?? new Date().toISOString().slice(0, 10);
 
-  const dataset = generateSyntheticCompany({ seed, asOfDate });
+  const dataset = seedKnowledgeInto(generateSyntheticCompany({ seed, asOfDate }));
   if (!dataset.profile.isSynthetic) throw new Error("Refusing to seed: dataset is not labelled synthetic");
 
   const store = new PrismaStore();
