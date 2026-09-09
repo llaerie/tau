@@ -1,0 +1,57 @@
+{
+  "name": "tau",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "FINANCE_DESK_MODE=${FINANCE_DESK_MODE:-demo} next dev",
+    "demo": "FINANCE_DESK_MODE=demo next dev",
+    "build": "next build",
+    "start": "next start",
+    "start:demo": "FINANCE_DESK_MODE=demo next start",
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "check": "pnpm test && pnpm typecheck && pnpm lint && pnpm build && pnpm test:e2e",
+    "db:seed": "FINANCE_DESK_MODE=demo tsx scripts/seed.ts",
+    "db:reset": "FINANCE_DESK_MODE=demo tsx scripts/reset.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.124.0",
+    "better-sqlite3": "^13.0.3",
+    "drizzle-orm": "^0.45.2",
+    "next": "15.5.25",
+    "papaparse": "^5.7.0",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "recharts": "^3.10.1",
+    "zod": "^4.5.4"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "^3",
+    "@playwright/test": "1.56.1",
+    "@tailwindcss/postcss": "^4",
+    "@types/better-sqlite3": "^9.6.0",
+    "@types/node": "^20",
+    "@types/papaparse": "^5.5.2",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@vitejs/plugin-react": "^6.1.1",
+    "drizzle-kit": "^0.31.10",
+    "eslint": "^9",
+    "eslint-config-next": "15.5.25",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "tailwindcss": "^4",
+    "tsx": "^4.23.13",
+    "typescript": "^5",
+    "vitest": "^5.0.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "better-sqlite3",
+      "esbuild",
+      "unrs-resolver"
+    ]
+  }
+}
