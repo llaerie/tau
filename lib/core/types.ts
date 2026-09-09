@@ -224,6 +224,8 @@ export interface Period {
   lockedBy?: string;
   lockApprovalId?: ID;
   closeChecklistId?: ID;
+  /** Lock/unlock/soft-close history entries */
+  tags?: string[];
 }
 
 // ---------------------------------------------------------------------------
