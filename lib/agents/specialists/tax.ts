@@ -3,7 +3,7 @@ import type { RouteRule } from "../intent";
 import { calculateWithRuleTool, cpaPackageTool, documentChecklistTool, fileReturnTool, shareholderSummaryTool, taxCalendarTool, taxQuestionTool, taxWorkpaperTool } from "../tools/tax-tools";
 import { Specialist } from "./shared";
 
-const TAX_WORDS = /\b(tax(es|able)?|1120-?s|100s|941|940|1099s?|k-?1|irs|ftb|edd|franchise|deduct(ible|ion)?|withholding|estimated (tax|payment)s?|s[\s-]?corp\w*|reasonable comp\w*|write[\s-]?off|cpa)\b/i;
+const TAX_WORDS = /\b(tax(es|able)?|1120-?s|100s|941|940|1099s?|k-?1|irs|ftb|edd|franchise|deduct(ible|ion)?|withholding|estimated (tax|payment)s?|s[\s-]?corp\w*|reasonable\s+(comp\w*|salary|pay|wages?)|write[\s-]?off|cpa)\b/i;
 
 const rules: RouteRule[] = [
   { kind: "tax.file_return", weight: 3.6, any: [/\b(file|e-?file|submit|transmit|sign|lodge)\b[^.?!]{0,30}\b(tax )?(return|returns|taxes|1120-?s|100s|941|940|1099s?|extension|form \d+)\b/i, /\bfile (my|our|the) taxes\b/i], none: [/\b(when|deadline|due|calendar|checklist|what do (i|we) need)\b/i], params: (m) => ({ description: m }) },

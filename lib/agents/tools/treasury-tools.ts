@@ -186,7 +186,7 @@ export const runwayTool = defineTool({
     const positive = D(burn).lte(0);
     return ok({
       answer: positive ? `Over the trailing ${months} month(s) the company generated cash (net burn ${burn}); runway is unbounded at the current trend. Cash is ${cash}.` : `Cash ${cash} ÷ average monthly burn ${burn} = ${runway.value === null ? "UNKNOWN" : `${runway.value.toFixed(1)} months`} of runway (trailing ${months} months).`,
-      numbers: [moneyFigure("Cash", cash), moneyFigure("Monthly burn", burn, calcs[0]?.id), figure("Runway", runway)],
+      numbers: [moneyFigure("Cash", cash), moneyFigure("Monthly burn", burn, calcs[0]?.id), positive ? { label: "Runway", value: "Unbounded (cash-flow positive)", calcId: runway.id } : figure("Runway", runway)],
       why: ["Burn = average monthly decrease in ledger cash over the trailing window; runway = cash ÷ burn. Lumpy items (tax payments, annual prepaids) distort short windows."],
       risks: runway.value !== null && runway.value < 6 ? ["Runway under six months — treat as a liquidity warning."] : [],
       educationKey: "cash_runway",
