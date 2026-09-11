@@ -174,6 +174,7 @@ export const vendorCreateTool = defineTool({
   capabilityKey: "ap_bill_intake",
   inputSchema: TASKS["ap.vendor_create"].params,
   async execute(input, ctx) {
+    if (!input.name.trim()) return ok(insufficient(["vendor name"], "A vendor needs a name before a record can be created; nothing was created."));
     const existing = findVendorByName(ctx.dataset.vendors, input.name);
     if (existing) return ok({ answer: `Vendor "${existing.name}" already exists (${existing.id}); no new record is needed.`, confidence: 0.9, structured: { value: null, vendorId: existing.id, existing: true } }, { sourceIds: [existing.id] });
     const code = input.defaultAccountCode;

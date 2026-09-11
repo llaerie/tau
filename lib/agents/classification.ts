@@ -99,6 +99,9 @@ const EQUIPMENT_PATTERNS = [/\bapple store\b/i, /\bapple\.com\b/i, /\bdell\b/i, 
 const TRANSFER_PATTERNS = [/\btransfer\b/i, /\bxfer\b/i, /\bonline transfer\b/i, /\bto savings\b/i, /\bfrom savings\b/i, /\bto checking\b/i, /\bcard payment\b/i, /\bpayment thank you\b/i, /\bautopay payment\b/i];
 const P2P_PATTERNS = [/\bvenmo\b/i, /\bzelle\b/i, /\bcash app\b/i, /\bcashapp\b/i, /\bpaypal\b(?!.*\b(fee|subscription)\b)/i, /\bsq \*unknown\b/i, /\bunknown merchant\b/i, /\batm withdrawal\b/i, /\bcheck \d+\b/i, /\bcheck paid\b/i];
 const REFUND_PATTERNS = [/\brefund\b/i, /\breturn\b/i, /\bcredit memo\b/i, /\breversal\b/i];
+const WEEKEND_HINTS = [/\b(saturday|sunday|weekend|brunch)\b/i];
+const INTERNATIONAL_HINTS = [/\bchina\b/i, /\bchinese\b/i, /\(cn\)/i, /\bcn\b/, /\binternational\b/i, /\boverseas\b/i, /\babroad\b/i, /\bcross[- ]border\b/i, /\bforeign\b/i, /\bintl\b/i];
+const DUPLICATE_HINTS = [/\balready (posted|charged|paid|recorded|billed)\b/i, /\bidentical\b/i, /\bduplicate\b/i, /\bsecond (charge|time)\b/i, /\bcharged twice\b/i, /\btwice (this|in the same) month\b/i, /\bdouble[- ]charg/i];
 const PERSONAL_HINTS = [/\bpersonal\b/i, /\bfamily\b/i, /\bkids?\b/i, /\bwife\b/i, /\bhusband\b/i, /\bspouse\b/i, /\bgroceries\b/i, /\bwhole foods\b/i, /\btrader joe/i, /\bsafeway\b/i, /\bgym\b/i, /\bnetflix\b/i, /\bspotify\b/i, /\bapartment\b/i, /\bhome\b/i, /\bvacation\b/i, /\bdisney\b/i, /\bbirthday\b/i];
 const DISTRIBUTION_HINTS = [/\bowner draw\b/i, /\bdistribution\b/i, /\bshareholder\b/i, /\bto owner\b/i];
 
@@ -142,9 +145,13 @@ export function classifyTransaction(dataset: CompanyDataset, input: Classificati
   const vendor = input.counterpartyVendorId ? dataset.vendors.find((v) => v.id === input.counterpartyVendorId) : findVendor(dataset, normalized, raw);
   const isInflow = amount !== null && D(amount).gt(0);
   const isCardCredit = input.sourceKind === "CARD" && isInflow;
+  const ownerNames = dataset.workers.filter((w) => w.isOwner).flatMap((w) => w.displayName.replace(/\(.*?\)/g, "").split(/\s+/).filter((t) => t.length > 2).map((t) => t.toUpperCase()));
+  const rawWords = new Set(raw.toUpperCase().split(/[^A-Z]+/).filter(Boolean));
+  const namesOwner = ownerNames.length > 0 && ownerNames.every((n) => rawWords.has(n));
+  const ownerTransfer = /\btransfer\b/i.test(hay) && (namesOwner || /\bpersonal\b/i.test(hay) || /\bowner\b/i.test(hay));
 
-  // Transfers between company accounts
-  if (TRANSFER_PATTERNS.some((p) => p.test(hay)) && !P2P_PATTERNS.some((p) => p.test(hay))) {
+  // Transfers between company accounts (a transfer to the owner is a distribution, handled below)
+  if (!ownerTransfer && TRANSFER_PATTERNS.some((p) => p.test(hay)) && !P2P_PATTERNS.some((p) => p.test(hay))) {
     flags.add("TRANSFER");
     return {
       accountCode: null,
@@ -184,9 +191,11 @@ export function classifyTransaction(dataset: CompanyDataset, input: Classificati
   }
 
   // Owner distributions / draws
-  if (DISTRIBUTION_HINTS.some((p) => p.test(hay))) {
+  if (ownerTransfer || DISTRIBUTION_HINTS.some((p) => p.test(hay))) {
     flags.add("RELATED_PARTY");
     flags.add("REVIEW_REQUIRED");
+    if (/\bpersonal\b/i.test(hay)) flags.add("POSSIBLE_PERSONAL");
+    if (amount !== null && D(abs(amount)).mod(500).isZero()) flags.add("LARGE_UNUSUAL");
     return {
       accountCode: ACCT.DISTRIBUTIONS,
       accountId: accountIdForCode(ACCT.DISTRIBUTIONS),
@@ -278,7 +287,7 @@ export function classifyTransaction(dataset: CompanyDataset, input: Classificati
   // Personal / mixed-use heuristics
   const personalHint = PERSONAL_HINTS.some((p) => p.test(hay));
   const isMeal = code === ACCT.MEALS;
-  const weekend = input.date ? isWeekend(input.date) : false;
+  const weekend = (input.date ? isWeekend(input.date) : false) || WEEKEND_HINTS.some((p) => p.test(hay));
   const noPurpose = !(input.notes && /\b(client|customer|meeting|team|prospect|business purpose|attendees?|lunch with|dinner with|recruit|interview|conference|roadmap|review with)\b/i.test(input.notes));
   if (personalHint || (isMeal && (weekend || input.hasReceipt === false || noPurpose))) {
     flags.add("POSSIBLE_PERSONAL");
@@ -297,6 +306,25 @@ export function classifyTransaction(dataset: CompanyDataset, input: Classificati
   }
   if (input.hasReceipt === false) flags.add("MISSING_RECEIPT");
   if (amount !== null && gte(abs(amount), "5000.0000") && !recurringApproved) flags.add("LARGE_UNUSUAL");
+  if (code === ACCT.INTL_WORKERS || INTERNATIONAL_HINTS.some((p) => p.test(hay))) {
+    flags.add("INTERNATIONAL");
+    flags.add("REVIEW_REQUIRED");
+    if (code === ACCT.INTL_WORKERS) reasons.push("Payment to an international worker: held in 6060 (classification pending) until the attorney/CPA review resolves the worker's status.");
+  }
+  if (DUPLICATE_HINTS.some((p) => p.test(input.notes ?? ""))) {
+    flags.add("POSSIBLE_DUPLICATE");
+    flags.add("REVIEW_REQUIRED");
+    reasons.push("Notes indicate the same charge was already posted this month; flagged as a possible duplicate.");
+  }
+  if (amount !== null && input.date) {
+    const target = abs(amount);
+    const dup = dataset.transactions.find((t) => t.date !== input.date || t.descriptionRaw !== input.description ? eq(abs(t.amount), target) && normalizeMerchant(t.merchantNormalized ?? t.descriptionRaw) === normalized && Math.abs(daysBetween(t.date, input.date!)) <= DUPLICATE_WINDOW_DAYS && !(t.date === input.date && t.descriptionRaw === input.description) : false);
+    if (dup) {
+      flags.add("POSSIBLE_DUPLICATE");
+      flags.add("REVIEW_REQUIRED");
+      reasons.push(`Matches ${dup.id} (${dup.date}, ${dup.amount}) within ${DUPLICATE_WINDOW_DAYS} days; possible duplicate.`);
+    }
+  }
 
   if (!code) {
     flags.add("UNCATEGORIZED");

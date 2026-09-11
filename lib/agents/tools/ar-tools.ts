@@ -61,6 +61,18 @@ export const matchPaymentTool = defineTool({
     if (exact) {
       matchType = "EXACT";
       applications.push({ invoiceId: exact.id, number: exact.number, amount, remaining: "0.0000" });
+    } else if (!input.customerId && !input.invoiceId) {
+      // Unknown payer and no exact match: never allocate across invoices by guesswork.
+      const calc = makeCalc<DecimalString>({ name: "payment_applied", value: "0.0000", unit: "USD", formula: "applied = 0 when the payer is unknown and no open invoice matches the amount exactly", inputs: { paymentAmount: amount, paymentDate, openInvoices: candidates.map((i) => ({ id: i.id, open: openOf(i) })) }, asOfDate: paymentDate });
+      return ok({
+        answer: `No open invoice matches ${amount} exactly and the payer is unknown, so the payment is left unapplied (held as an unidentified receipt, not revenue) until the customer or remittance advice identifies it.`,
+        escalation: esc("CANNOT_CLASSIFY", `Payment of ${amount} could not be matched: unknown payer and no exact open-invoice match.`, { missingItems: ["customer / remittance reference"] }),
+        numbers: [moneyFigure("Payment", amount), moneyFigure("Applied", "0.0000", calc.id), moneyFigure("Unapplied", amount)],
+        why: [`Open invoices considered: ${candidates.map((i) => `${i.number} ${openOf(i)}`).join(", ")}.`],
+        recommendation: "Identify the payer (bank memo, remittance advice) and re-run the match with the customer id.",
+        confidence: 0.6,
+        structured: { value: "0.0000", values: { payment: amount, applied: "0.0000", unapplied: amount }, matchType: "NONE", applications: [] },
+      }, { calcs: [calc] });
     } else if (input.invoiceId || candidates.length === 1) {
       const inv = sorted[0];
       const open = openOf(inv);

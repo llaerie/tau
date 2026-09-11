@@ -176,20 +176,37 @@ export const employerCostTool = defineTool({
     if (rs.missingEmployerRates.length) {
       return ok({ ...insufficient(rs.missingEmployerRates.map((k) => `payroll rate ${k}`), `Gross ${period.toLowerCase()} wages are ${gross}, but I can't compute employer payroll taxes: ${RATE_ESCALATION}`, { numbers: [moneyFigure("Gross wages", gross)], structured: { values: { gross }, rateSource: rs.source } }), escalation: esc("INSUFFICIENT_INFORMATION", RATE_ESCALATION, { missingItems: rs.missingEmployerRates, requiredRole: "CPA" }) }, { assumptions: rateAssumptions(rs) });
     }
-    const taxes = employerTaxesUncapped(gross, rs, ctx.asOfDate);
-    const total = D(gross).plus(D(taxes.value)).toFixed(4);
-    const calcs: CalcResult[] = [taxes];
     const annualGross = period === "ANNUAL" ? gross : mul(gross, 12);
-    const capped = fullyLoadedCost({ compensation: { type: "SALARY", amount: annualGross, currency: "USD", period: "ANNUAL", basis: "GROSS", status: input.rateSetStatus ?? "UNCONFIRMED" }, rates: rs.rates, benefits: null, overhead: null, asOfDate: ctx.asOfDate });
-    if (capped.value) calcs.push(capped);
+    const status: FieldStatus = rs.source === "PROVIDED" ? (input.rateSetStatus ?? "UNCONFIRMED") : rs.allConfirmed ? "CONFIRMED" : "UNCONFIRMED";
+    const capped = fullyLoadedCost({ compensation: { type: "SALARY", amount: annualGross, currency: "USD", period: "ANNUAL", basis: "GROSS", status }, rates: rs.rates, benefits: null, overhead: null, asOfDate: ctx.asOfDate });
+    const calcs: CalcResult[] = [];
+    const flagged = !rs.allConfirmed || status !== "CONFIRMED";
+    const rateNote = rs.allConfirmed && status === "CONFIRMED" ? "Rates are CONFIRMED (supplied as confirmed / from approved tax rules)." : `Rates are ${rs.source === "PROVIDED" ? "supplied with the request and NOT CONFIRMED" : "partly unconfirmed"}; every rate assumption is flagged for professional review — verify against an authoritative source before relying on them.`;
+    if (capped.value) {
+      const v = capped.value;
+      calcs.push(capped);
+      const monthlyTaxes = period === "MONTHLY" ? D(v.employerTaxes).div(12).toFixed(4) : null;
+      return ok({
+        answer: `On ${annualGross} of annual gross wages${period === "MONTHLY" ? ` (${gross}/month)` : ""}, employer payroll taxes are ${v.employerTaxes} (Social Security ${v.socialSecurity}, Medicare ${v.medicare}, FUTA ${v.futa}, SUI ${v.sui}, ETT ${v.ett}; wage-base caps applied; effective ${pct(v.employerTaxRate, 2)}), for wages plus employer taxes of ${v.wagesPlusEmployerTaxes}${monthlyTaxes ? ` — about ${monthlyTaxes} of employer taxes per month` : ""}. ${rateNote}`,
+        numbers: [moneyFigure("Annual gross wages", v.annualGrossWages), moneyFigure("Employer taxes", v.employerTaxes, capped.id), moneyFigure("Social Security (employer)", v.socialSecurity), moneyFigure("Medicare (employer)", v.medicare), moneyFigure("FUTA", v.futa), moneyFigure("SUI", v.sui), moneyFigure("ETT", v.ett), moneyFigure("Wages + employer taxes", v.wagesPlusEmployerTaxes)],
+        why: [capped.formula],
+        risks: flagged ? ["Rates are assumptions, not authoritative; do not use for filings or deposits until confirmed."] : [],
+        confidence: flagged ? 0.6 : 0.85,
+        structured: { value: v.wagesPlusEmployerTaxes, values: { gross, annualGross: v.annualGrossWages, employerTaxes: v.employerTaxes, socialSecurity: v.socialSecurity, medicare: v.medicare, futa: v.futa, sui: v.sui, ett: v.ett, totalEmployerCost: v.wagesPlusEmployerTaxes, wagesPlusEmployerTaxes: v.wagesPlusEmployerTaxes, employerTaxRate: v.employerTaxRate, monthlyEmployerTaxes: monthlyTaxes }, rateSource: rs.source, ratesConfirmed: rs.allConfirmed && status === "CONFIRMED" },
+      }, { calcs, assumptions: rateAssumptions(rs) });
+    }
+    // Wage bases unknown: uncapped estimate on the period amount.
+    const taxes = employerTaxesUncapped(gross, rs, ctx.asOfDate);
+    calcs.push(taxes);
+    const total = D(gross).plus(D(taxes.value)).toFixed(4);
     return ok({
-      answer: `On ${gross} gross (${period.toLowerCase()}), employer payroll taxes are ${taxes.value} (effective ${pct(D(taxes.value).div(D(gross)).toNumber(), 2)}), for a total employer cost of ${total}.${capped.value ? ` Annualized with wage-base caps: wages ${capped.value.annualGrossWages} + employer taxes ${capped.value.employerTaxes} = ${capped.value.wagesPlusEmployerTaxes}.` : ""} Rates are ${rs.allConfirmed ? "CONFIRMED from tax rules" : `${rs.source === "PROVIDED" ? "supplied with the request" : "partly unconfirmed"} and require professional confirmation`}.`,
-      numbers: [moneyFigure("Gross wages", gross), moneyFigure("Employer taxes", taxes.value, taxes.id), moneyFigure("Total employer cost", total), ...(capped.value ? [moneyFigure("Annual wages + employer taxes (capped)", capped.value.wagesPlusEmployerTaxes, capped.id)] : [])],
+      answer: `On ${gross} gross (${period.toLowerCase()}), employer payroll taxes are about ${taxes.value} (effective ${pct(D(taxes.value).div(D(gross)).toNumber(), 2)}; wage-base caps NOT applied because the wage bases were not supplied), for a total employer cost of ${total}. ${rateNote}`,
+      numbers: [moneyFigure("Gross wages", gross), moneyFigure("Employer taxes (uncapped)", taxes.value, taxes.id), moneyFigure("Total employer cost", total)],
       why: [`Employer taxes = gross × sum of employer rates (${EMPLOYER_RATE_KEYS.map((k) => `${k} ${rs.rates[k].value}`).join(", ")}).`],
-      risks: rs.allConfirmed ? [] : ["Rates are assumptions, not authoritative; do not use for filings or deposits."],
-      confidence: rs.allConfirmed ? 0.85 : 0.6,
-      structured: { value: taxes.value, values: { gross, employerTaxes: taxes.value, totalEmployerCost: total, effectiveRate: D(taxes.value).div(D(gross)).toNumber() }, rateSource: rs.source, ratesConfirmed: rs.allConfirmed },
-    }, { calcs });
+      risks: ["Wage-base caps not applied; the figure overstates taxes for wages above the Social Security / FUTA / SUI bases.", ...(flagged ? ["Rates are assumptions, not authoritative; do not use for filings or deposits."] : [])],
+      confidence: 0.55,
+      structured: { value: total, values: { gross, employerTaxes: taxes.value, totalEmployerCost: total, effectiveRate: D(taxes.value).div(D(gross)).toNumber() }, rateSource: rs.source, ratesConfirmed: false, capsApplied: false },
+    }, { calcs, assumptions: rateAssumptions(rs) });
   },
 });
 
@@ -290,8 +307,17 @@ export const internationalReviewTool = defineTool({
   capabilityKey: "international_worker_compliance",
   inputSchema: TASKS["payroll.international_review"].params,
   async execute(input, ctx) {
-    const workers = ctx.dataset.workers.filter((w) => (input.workerId ? w.id === input.workerId : w.country !== "US"));
-    if (!workers.length) return ok(insufficient([input.workerId ? `worker ${input.workerId}` : "non-US workers"], input.workerId ? `No worker ${input.workerId}.` : "No non-US workers are on record."));
+    const requested = input.workerId ? ctx.dataset.workers.find((w) => w.id === input.workerId) : undefined;
+    if (input.workerId && !requested) return ok(insufficient([`worker ${input.workerId}`], `No worker ${input.workerId}.`));
+    if (requested && requested.country === "US") {
+      return ok({
+        answer: `${requested.displayName} is a US-based (domestic) ${requested.workerType.toLowerCase()} — not an international worker, so the cross-border review is not applicable. Domestic classification and payroll documentation still follow the normal US process.`,
+        confidence: 0.9,
+        structured: { value: null, workerId: requested.id, country: requested.country, international: false, applicable: false },
+      }, { sourceIds: [requested.id] });
+    }
+    const workers = requested ? [requested] : ctx.dataset.workers.filter((w) => w.country !== "US");
+    if (!workers.length) return ok(insufficient(["non-US workers"], "No non-US workers are on record; the international review is not applicable."));
     const rows = workers.map((w) => {
       const fields = w.internationalReview?.fields ?? [];
       const confirmed = fields.filter((f) => f.status === "CONFIRMED").length;
@@ -370,10 +396,11 @@ export const ownerCompensationTool = defineTool({
     let taxLine = "Employer payroll taxes: UNKNOWN (no authoritative rates available).";
     let employerTaxes: DecimalString | null = null;
     if (!rs.missingEmployerRates.length) {
-      const t = employerTaxesUncapped(annual, rs, ctx.asOfDate);
+      const capped = fullyLoadedCost({ compensation: { type: "SALARY", amount: annual, currency: "USD", period: "ANNUAL", basis: "GROSS", status: "PROFESSIONAL_REVIEW_REQUIRED" }, rates: rs.rates, benefits: null, overhead: null, asOfDate: ctx.asOfDate });
+      const t = capped.value ? capped : employerTaxesUncapped(annual, rs, ctx.asOfDate);
       calcs.push(t);
-      employerTaxes = t.value;
-      taxLine = `Employer payroll taxes on ${annual}: ${t.value} (rates ${rs.allConfirmed ? "confirmed" : "supplied/unconfirmed"}).`;
+      employerTaxes = capped.value ? capped.value.employerTaxes : (t.value as DecimalString);
+      taxLine = `Employer payroll taxes on ${annual}: ${employerTaxes} (${capped.value ? "wage-base caps applied; " : "uncapped; "}rates ${rs.allConfirmed ? "confirmed" : "supplied/unconfirmed"}).`;
     }
     const totalCost = employerTaxes ? D(annual).plus(D(employerTaxes)).toFixed(4) : null;
     queue.addUnique({ topic: "reasonable_compensation", question: `Is ${proposed}/month (${annual}/year) reasonable compensation for the owner?`, context: facts.join(" | "), urgency: "HIGH" });

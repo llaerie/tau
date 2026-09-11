@@ -113,6 +113,7 @@ function payloadAccountIds(action: ProposedAction): ID[] {
 
 function isExactMatch(action: ProposedAction): boolean {
   const p = action.payload ?? {};
+  if (action.context?.isExactMatch === true) return true;
   if (p.exactMatch === true) return true;
   if (typeof p.matchType === "string") return p.matchType.toUpperCase() === "EXACT";
   return false;
@@ -239,7 +240,9 @@ export class RuleBasedRiskEngine implements RiskEngine {
       if (gte(amt, t.redAmount)) {
         materialityBreached = true;
         raise("RED", `Amount ${amt} ${action.amount.currency} is at or above the RED amount (${t.redAmount}).`, "materiality:red-amount");
-      } else if (gte(amt, t.transactionReviewAmount) && !READ_ONLY_KINDS.includes(kind)) {
+      } else if (gte(amt, t.transactionReviewAmount) && !READ_ONLY_KINDS.includes(kind) && !(kind === "MATCH_PAYMENT" && isExactMatch(action))) {
+        // Exact payment matching links cash already received to its invoice: reversible, no money moves.
+        // It stays GREEN below the RED amount (spec: "match exact invoice/payment" is a GREEN example).
         materialityBreached = true;
         raise("YELLOW", `Amount ${amt} ${action.amount.currency} is at or above the transaction review amount (${t.transactionReviewAmount}).`, "materiality:review-amount");
       }

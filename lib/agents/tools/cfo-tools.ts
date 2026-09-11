@@ -50,6 +50,15 @@ export const healthSummaryTool = defineTool({
   },
 });
 
+/** Deterministic glossary for concepts the education library does not cover (no rates, no legal conclusions). */
+const GLOSSARY: { keys: RegExp[]; title: string; text: string; educationKey?: EducationConceptKey }[] = [
+  { keys: [/retained earnings/i, /closing entr/i, /year[- ]end clos/i, /close the books/i, /temporary accounts?/i], title: "Closing entries and retained earnings", text: "At year end the revenue and expense accounts (temporary accounts) are closed: their balances are reset to zero by closing entries, and the net income (or loss) they produced is transferred into Retained Earnings in equity on the balance sheet. Retained earnings therefore accumulate every year's profit less any distributions paid to the shareholder; the income statement starts the new year from zero." },
+  { keys: [/cash (vs|versus|and|or) accrual/i, /accrual (vs|versus|and|or) cash/i, /accrual accounting/i, /cash basis/i], title: "Cash vs. accrual accounting", text: "Cash-basis accounting records revenue when cash is received and expenses when cash is paid. Accrual-basis accounting records revenue when it is earned and expenses when they are incurred, using receivables, payables, prepaids and accruals to place activity in the right period. Accrual books give a truer picture of profitability; cash books track liquidity. The method the company uses for its books and its tax return is a confirmed company fact (see the finance setup), and a change of method is a CPA decision.", educationKey: "accrual_basis" },
+  { keys: [/capital allocation/i, /allocat\w* .*(budget|capital|money|funds)/i, /split .* between .* projects?/i, /which project/i], title: "Capital allocation between projects", text: "Money is allocated between projects by comparing the return each one is expected to generate: the NPV and IRR of each project's cash flows, the payback period, and the risk around those estimates. Without an expected return (cash flows, timing and a discount rate) for each project there is no basis to split a budget, so the inputs need to be gathered first. Nothing is allocated by default." },
+  { keys: [/double[- ]entry/i, /debits? (and|&) credits?/i], title: "Double-entry bookkeeping", text: "Every transaction is recorded twice, as equal debits and credits, so the books always balance: assets = liabilities + equity. Debits increase assets and expenses; credits increase liabilities, equity and revenue." },
+  { keys: [/materiality/i], title: "Materiality", text: "Materiality is the size of an amount or error at which a reasonable reader's decision would change. The company sets materiality thresholds (transaction review amount, RED amount, variance ratio) that decide when an item needs human review or approval; until the owner confirms them, the lab defaults are labelled unconfirmed." },
+];
+
 export const explainConceptTool = defineTool({
   name: "explain_concept",
   description: "Explain a finance concept briefly from the education library (no rates, no legal conclusions).",
@@ -57,20 +66,29 @@ export const explainConceptTool = defineTool({
   capabilityKey: "education",
   inputSchema: TASKS["cfo.explain_concept"].params,
   async execute(input) {
-    const q = input.concept.toLowerCase().replace(/[^a-z0-9 ]+/g, " ").trim();
+    const raw = input.concept.trim();
+    if (!raw) return ok(insufficient(["a concept to explain"], "Tell me which finance concept you want explained."));
+    const q = raw.toLowerCase().replace(/[^a-z0-9 ]+/g, " ").trim();
+    const glossary = GLOSSARY.find((g) => g.keys.some((k) => k.test(raw)));
+    if (glossary) {
+      const edu = glossary.educationKey ? educationFor(glossary.educationKey) : undefined;
+      return ok({ answer: `${glossary.title}: ${glossary.text}${edu ? ` ${edu.whyItMatters}` : ""}`, educationKey: glossary.educationKey, confidence: 0.9, sourceLayers: ["EDUCATION"], structured: { value: glossary.title, concept: glossary.title, title: glossary.title, source: "glossary" } });
+    }
     const key = q.replace(/\s+/g, "_") as EducationConceptKey;
     let snippet = educationFor(key);
     if (!snippet) {
-      const words = q.split(/\s+/).filter((w) => w.length > 2);
+      const words = q.split(/\s+/).filter((w) => w.length > 2 && !["what", "does", "mean", "the", "and", "with", "between", "our", "how", "explain"].includes(w));
       let best: { s: (typeof EDUCATION_SNIPPETS)[number]; score: number } | null = null;
       for (const s of EDUCATION_SNIPPETS) {
         const hay = `${s.key.replace(/_/g, " ")} ${s.title.toLowerCase()}`;
+        const hayWords = hay.split(/[^a-z0-9]+/).filter(Boolean);
         const score = words.filter((w) => hay.includes(w)).length;
-        if (score > 0 && (!best || score > best.score)) best = { s, score };
+        const coverage = hayWords.filter((h) => h.length > 2 && words.includes(h)).length / Math.max(1, hayWords.filter((h) => h.length > 2).length);
+        if (score > 0 && coverage >= 0.5 && (!best || score > best.score)) best = { s, score };
       }
       snippet = best?.s;
     }
-    if (!snippet) return ok({ answer: `I don't have an education note for "${input.concept}". Available topics: ${EDUCATION_SNIPPETS.map((s) => s.title).join(", ")}.`, escalation: esc("OUT_OF_SCOPE", `No education snippet for "${input.concept}".`), confidence: 0.5, structured: { value: null, available: EDUCATION_SNIPPETS.map((s) => s.key) } });
+    if (!snippet) return ok({ answer: `I don't have an education note for "${raw}" and I won't improvise one. Available topics: ${EDUCATION_SNIPPETS.map((s) => s.title).join(", ")}, plus ${GLOSSARY.map((g) => g.title).join(", ")}.`, escalation: esc("OUT_OF_SCOPE", `No education snippet for "${raw}".`), confidence: 0.5, structured: { value: null, available: EDUCATION_SNIPPETS.map((s) => s.key) } });
     return ok({ answer: `${snippet.title}: ${snippet.whyItMatters}`, educationKey: snippet.key, confidence: 0.95, sourceLayers: ["EDUCATION"], structured: { value: snippet.key, concept: snippet.key, title: snippet.title, topics: snippet.topics } });
   },
 });

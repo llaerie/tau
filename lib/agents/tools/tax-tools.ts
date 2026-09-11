@@ -90,12 +90,19 @@ export const calculateWithRuleTool = defineTool({
     let usable: boolean;
     let reason: string;
     let escalation = null as ReturnType<typeof esc> | null;
+    const overrideSource = input.ruleOverride?.sourceId ? store.getSource(input.ruleOverride.sourceId) : undefined;
+    const overrideUsable = Boolean(input.ruleOverride && input.ruleOverride.status === "CONFIRMED" && overrideSource);
     if (input.ruleOverride) {
       const seed = store.find(input.ruleKey, taxYear);
       rule = { id: `rule_${input.ruleKey}_${taxYear}_override`, jurisdiction: seed?.jurisdiction ?? "OTHER", taxYear, key: input.ruleKey, title: seed?.title ?? input.ruleKey, normalizedRule: seed?.normalizedRule ?? "override supplied with request", parameters: input.ruleOverride.parameters, sourceId: input.ruleOverride.sourceId ?? seed?.sourceId ?? "src_request_override", status: input.ruleOverride.status as TaxRule["status"], confidence: 0.5, reviewBy: ctx.asOfDate, approvedBy: undefined };
       usable = false;
       reason = `Rule parameters were supplied with the request (status ${input.ruleOverride.status}); a request-supplied rule is never authoritative.`;
-      escalation = esc("CPA_REVIEW_REQUIRED", reason, { requiredRole: "CPA" });
+      escalation = null;
+      if (!overrideUsable) escalation = esc("CPA_REVIEW_REQUIRED", reason, { requiredRole: "CPA" });
+      else {
+        usable = true;
+        reason = `Rule parameters confirmed by the CPA with source ${overrideSource!.id} (${overrideSource!.layer}, ${overrideSource!.status}).`;
+      }
     } else {
       const res = store.resolveRule(input.ruleKey, taxYear, ctx.asOfDate);
       rule = res.rule;
@@ -104,10 +111,26 @@ export const calculateWithRuleTool = defineTool({
       if (!usable) escalation = esc(res.escalation ?? "CPA_REVIEW_REQUIRED", reason, { requiredRole: "CPA", missingItems: [input.ruleKey] });
     }
     if (!rule) return ok({ ...insufficient([`tax rule ${input.ruleKey}`], `No tax rule "${input.ruleKey}" is registered for ${taxYear}; I can't calculate without a sourced rule.`), escalation: escalation ?? esc("INSUFFICIENT_INFORMATION", reason) });
-    const { calc, missing } = computeWithRule(rule, input.inputs, ctx.asOfDate, []);
     const facts = Object.entries(input.inputs).map(([k, v]) => `${k}: ${v}`);
+    if (input.ruleOverride && !overrideUsable) {
+      // A rate or amount supplied in the request without a professional confirmation AND a registered source is not an approved rule: nothing is computed with it.
+      const registered = Boolean(overrideSource);
+      const why = input.ruleOverride.status !== "CONFIRMED" ? `status ${input.ruleOverride.status}: the figure has not been confirmed by a professional` : !input.ruleOverride.sourceId ? "the confirmation cites no KnowledgeSource" : !registered ? `source ${input.ruleOverride.sourceId} is not a registered, reviewed KnowledgeSource` : "the override is not usable";
+      const type = input.ruleOverride.status === "CONFIRMED" && !input.ruleOverride.sourceId ? "INSUFFICIENT_INFORMATION" : "CPA_REVIEW_REQUIRED";
+      cpaQueueFor(ctx.dataset).addUnique({ topic: input.ruleKey, question: `Confirm rule ${input.ruleKey} for ${taxYear} (requester supplied parameters ${JSON.stringify(input.ruleOverride.parameters)})`, context: facts.join(" | "), urgency: "MEDIUM" });
+      return ok({
+        answer: `I can't apply the ${input.ruleKey} figure you supplied: ${why}. Tax rules are data that must come from an approved, sourced TaxRule — a value from memory, a website or the request itself is never used in a calculation, so no amount is computed. The rule has been queued for CPA confirmation.`,
+        escalation: esc(type, `Requester-supplied rule parameters for ${input.ruleKey} are not an approved rule (${why}).`, { requiredRole: "CPA", missingItems: [`approved TaxRule ${input.ruleKey} with a registered KnowledgeSource`] }),
+        why: [why, `Registered rule status: ${rule.status}; ${reason}`],
+        recommendation: "Ask the CPA to confirm the rate against its authoritative source; once the TaxRule is CURRENT and approved the calculation runs deterministically.",
+        confidence: 0.6,
+        highRisk: { facts, calculations: ["None — requester-supplied parameters are never used."], assumptions: [`Requester-supplied parameters ${JSON.stringify(input.ruleOverride.parameters)} (NOT USED)`], professionalJudgment: CPA_JUDGMENT },
+        structured: { value: null, ruleKey: input.ruleKey, ruleStatus: rule.status, usable: false, overrideRejected: true, reason: why },
+      }, { sourceIds: [rule.id] });
+    }
+    const { calc, missing } = computeWithRule(rule, input.inputs, ctx.asOfDate, []);
     const assumptions = calc.assumptions.map((a) => `[${a.status}] ${a.description}`);
-    if (!usable && !input.ruleOverride) {
+    if (!usable) {
       return ok({
         answer: `I can't compute ${input.ruleKey} for ${taxYear}: ${reason} The rule exists but is not usable, so no number is produced.`,
         escalation: escalation!,
@@ -118,16 +141,18 @@ export const calculateWithRuleTool = defineTool({
       }, { calcs: [calc], sourceIds: [rule.id, rule.sourceId] });
     }
     if (calc.value === null) return ok({ ...insufficient(missing, `Rule ${input.ruleKey} is available but ${missing.join("; ")}.`), highRisk: { facts, calculations: [], assumptions, professionalJudgment: CPA_JUDGMENT } }, { calcs: [calc] });
+    const layer = overrideSource?.layer ?? store.getSource(rule.sourceId)?.layer;
     return ok({
-      answer: `Using rule ${rule.key} (${rule.status}${input.ruleOverride ? ", supplied with the request" : ", approved"}): ${calc.formula} = ${calc.value}.${input.ruleOverride ? " Because the rule parameters came from the request rather than an approved source, this is preliminary and needs CPA confirmation." : ""}`,
-      escalation: escalation ?? undefined,
+      answer: `Using rule ${rule.key} (${input.ruleOverride ? `confirmed with source ${overrideSource!.id}` : rule.status}): ${calc.formula} = ${calc.value}. The CPA still reviews the workpaper before the figure is used for a filing.`,
+      escalation: escalation ?? esc("CPA_REVIEW_REQUIRED", "Tax calculations are preliminary until the CPA reviews the workpaper.", { requiredRole: "CPA" }),
+      sourceRefs: overrideSource ? [{ id: overrideSource.id, kind: "KNOWLEDGE" as const, label: overrideSource.title, status: overrideSource.status }] : undefined,
       numbers: [moneyFigure(`${rule.key} result`, calc.value, calc.id), ...facts.map((f) => textFigure(f.split(":")[0], f.split(":")[1].trim()))],
       why: [calc.formula, `Rule source ${rule.sourceId}; review by ${rule.reviewBy}.`],
       confidence: usable ? 0.85 : 0.55,
-      sourceLayers: usable ? ["AUTHORITATIVE"] : ["COMPANY"],
+      sourceLayers: [layer ?? (usable ? "AUTHORITATIVE" : "COMPANY")],
       highRisk: { facts, calculations: [`${calc.formula} = ${calc.value} [${calc.id}]`], assumptions, professionalJudgment: CPA_JUDGMENT },
-      structured: { value: calc.value, values: { result: calc.value }, ruleKey: input.ruleKey, ruleStatus: rule.status, usable, ruleId: rule.id },
-    }, { calcs: [calc], sourceIds: [rule.id, rule.sourceId] });
+      structured: { value: calc.value, values: { result: calc.value }, ruleKey: input.ruleKey, ruleStatus: rule.status, usable, ruleId: rule.id, sourceId: overrideSource?.id ?? rule.sourceId },
+    }, { calcs: [calc], sourceIds: [rule.id, overrideSource?.id ?? rule.sourceId] });
   },
 });
 

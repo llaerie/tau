@@ -6,6 +6,7 @@ import { POLICY_KEYS, policyByKey } from "@/lib/knowledge/policies";
 import { abs, D } from "@/lib/core/money";
 import type { ProposedAction } from "@/lib/core/types";
 import { classifyTransaction, detectDuplicates, exceptionQueue, matchTransfers } from "../classification";
+import type { TransactionFlag } from "@/lib/core/types";
 import { TASKS } from "../task-catalog";
 import { defineTool } from "../types";
 import { accountName, esc, insufficient, moneyFigure, ok, propose, textFigure } from "./common";
@@ -36,6 +37,25 @@ export const classifyTransactionTool = defineTool({
       notes,
       counterpartyVendorId: tx?.counterpartyRef?.type === "VENDOR" ? tx.counterpartyRef.id : undefined,
     });
+    if (tx) {
+      // Dataset context: existing flags, duplicate detection against the ledger, worker/country context.
+      const carried: TransactionFlag[] = tx.flags.filter((f) => ["POSSIBLE_DUPLICATE", "INTERNATIONAL", "RELATED_PARTY", "MISSING_RECEIPT", "LARGE_UNUSUAL", "REFUND", "TRANSFER", "SPLIT"].includes(f)) as TransactionFlag[];
+      for (const f of carried) if (!result.flags.includes(f)) result.flags.push(f);
+      if (!result.flags.includes("TRANSFER")) {
+        const dupes = detectDuplicates(ctx.dataset, { transactionIds: [tx.id] }).filter((d) => d.transactionId === tx.id || d.duplicateOfId === tx.id);
+        if (dupes.length && !result.flags.includes("POSSIBLE_DUPLICATE")) {
+          result.flags.push("POSSIBLE_DUPLICATE", "REVIEW_REQUIRED");
+          result.reason += ` Possible duplicate of ${dupes[0].duplicateOfId === tx.id ? dupes[0].transactionId : dupes[0].duplicateOfId} (${dupes[0].kind.toLowerCase().replace(/_/g, " ")}).`;
+        }
+      }
+      const ref = tx.counterpartyRef;
+      const worker = ref && (ref.type === "EMPLOYEE" || ref.type === "CONTRACTOR") ? ctx.dataset.workers.find((w) => w.id === ref.id) : undefined;
+      if (worker && worker.country !== "US" && !result.flags.includes("INTERNATIONAL")) {
+        result.flags.push("INTERNATIONAL", "REVIEW_REQUIRED");
+        result.reason += ` Counterparty ${worker.displayName} is based in ${worker.country}; cross-border review applies.`;
+      }
+      result.flags = [...new Set(result.flags)];
+    }
     const personal = result.flags.includes("POSSIBLE_PERSONAL");
     const policy = policyByKey(ctx.dataset.policies, POLICY_KEYS.PERSONAL_BUSINESS_SEPARATION);
     const mealsPolicy = policyByKey(ctx.dataset.policies, POLICY_KEYS.MEALS);
@@ -98,7 +118,7 @@ export const detectDuplicatesTool = defineTool({
       risks: dupes.length ? ["Duplicates overstate expenses and may indicate a double charge to dispute with the merchant."] : [],
       recommendation: dupes.length ? "Confirm with the merchant/card statement; mark confirmed duplicates so they are excluded from the ledger." : "Nothing to do.",
       confidence: 0.85,
-      structured: { value: dupes.length, values: { duplicateCount: dupes.length, amountAtStake: total }, duplicates: dupes },
+      structured: { value: dupes.length, values: { duplicateCount: dupes.length, count: dupes.length, amountAtStake: total }, duplicates: dupes },
     }, { sourceIds: dupes.flatMap((d) => [d.transactionId, d.duplicateOfId]) });
   },
 });
@@ -132,16 +152,17 @@ export const exceptionQueueTool = defineTool({
   async execute(input, ctx) {
     const items = exceptionQueue(ctx.dataset, input.asOf ?? ctx.asOfDate);
     const shown = items.slice(0, input.limit ?? 200);
+    const priority = [...shown].sort((a, b) => Number(b.reasons.includes("uncategorized")) - Number(a.reasons.includes("uncategorized")) || b.flags.length - a.flags.length);
     const total = items.reduce((acc, i) => acc.plus(D(abs(i.amount))), D(0)).toFixed(4);
     const byReason: Record<string, number> = {};
     for (const i of items) for (const r of i.reasons) byReason[r] = (byReason[r] ?? 0) + 1;
     return ok({
       answer: items.length ? `${items.length} transaction(s) need review (${total} in total): ${Object.entries(byReason).map(([r, n]) => `${n} ${r}`).join(", ")}.` : "The exception queue is empty.",
       numbers: [textFigure("Items", items.length), moneyFigure("Amount in queue", total)],
-      why: shown.slice(0, 10).map((i) => `${i.date} ${i.description} ${i.amount}: ${i.reasons.join(", ")}`),
+      why: priority.slice(0, 15).map((i) => `${i.date} ${i.description} ${i.amount}: ${i.reasons.join(", ")}`),
       recommendation: items.length ? "Work the queue oldest-first; personal/mixed items go to 7990 pending review." : "Nothing to review.",
       confidence: 0.9,
-      structured: { value: items.length, values: { count: items.length, amount: total }, items: shown, byReason },
+      structured: { value: items.length, values: { count: items.length, exceptions: items.length, amount: total }, items: shown, exceptions: shown.map((i) => i.transactionId), byReason },
     }, { sourceIds: shown.map((i) => i.transactionId) });
   },
 });

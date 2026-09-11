@@ -14,7 +14,14 @@ import type { FlowCategory } from "@/lib/forecasting/drivers";
 import { MATERIALITY_CONFIG_KEYS } from "@/lib/risk/materiality";
 import { TASKS } from "../task-catalog";
 import { defineTool } from "../types";
-import { figure, insufficient, moneyFigure, monthsBefore, ok, textFigure, toDec } from "./common";
+import { esc, figure, insufficient, moneyFigure, monthsBefore, ok, textFigure, toDec } from "./common";
+
+export function hasLedgerActivity(ctx: ToolContext, asOf: string): boolean {
+  return ctx.dataset.journalEntries.some((e) => (e.status === "POSTED" || e.status === "REVERSED") && e.date <= asOf);
+}
+
+/** Provenance note appended to cash answers: Phase One has no live bank connection. */
+export const DATA_PROVENANCE = "Source: posted ledger entries in the Phase One lab — this is synthetic data, not a live bank feed; no bank connection exists and balances are not pulled from any bank.";
 
 export function ledgerCash(ctx: ToolContext, asOf: string): { total: DecimalString; byAccount: { accountId: string; code: string; name: string; balance: DecimalString }[] } {
   const cashAccounts = ctx.dataset.accounts.filter((a) => a.subtype === "CASH" && a.isActive);
@@ -37,15 +44,18 @@ export const cashPositionTool = defineTool({
     const asOf = input.asOf ?? ctx.asOfDate;
     if (!ctx.dataset.bankAccounts.length && ctx.dataset.accounts.every((a) => a.subtype !== "CASH")) return ok(insufficient(["bank accounts"], "No bank accounts or cash accounts are configured, so the cash position is unknown."));
     const cash = ledgerCash(ctx, asOf);
+    const active = hasLedgerActivity(ctx, asOf);
     const calc = makeCalc<DecimalString>({ name: "cash_position", value: cash.total, unit: "USD", formula: "sum(cash account balances) from posted journal entries", inputs: { asOf, accounts: cash.byAccount }, asOfDate: asOf, sourceIds: cash.byAccount.map((b) => b.accountId) });
     const card = ctx.dataset.accounts.find((a) => a.subtype === "CREDIT_CARD");
     const cardBalance = card ? ctx.ledger.accountBalance(card.id, asOf) : null;
     return ok({
-      answer: `Cash as of ${asOf}: ${cash.total} across ${cash.byAccount.length} account(s) (${cash.byAccount.map((b) => `${b.name} ${b.balance}`).join("; ")})${cardBalance ? `; card balance owed ${cardBalance}` : ""}.`,
+      answer: active ? `Cash as of ${asOf}: ${cash.total} across ${cash.byAccount.length} account(s) (${cash.byAccount.map((b) => `${b.name} ${b.balance}`).join("; ")})${cardBalance ? `; card balance owed ${cardBalance}` : ""}. ${DATA_PROVENANCE}` : `The ledger has no posted entries as of ${asOf} (empty books, no bank activity recorded), so cash is ${cash.total} by construction — not a measured balance. ${DATA_PROVENANCE}`,
       numbers: [figure("Total cash", calc), ...cash.byAccount.map((b) => moneyFigure(b.name, b.balance)), ...(cardBalance ? [moneyFigure("Credit card owed", cardBalance)] : [])],
-      why: ["Balances are ledger balances from posted entries; unreconciled bank activity is not included until categorized."],
-      confidence: 0.9,
-      structured: { value: cash.total, values: { totalCash: cash.total, cardOwed: cardBalance }, byAccount: cash.byAccount },
+      why: ["Balances are ledger balances from posted entries; unreconciled bank activity is not included until categorized.", "No live bank connection exists in Phase One; figures cannot be forwarded as a bank-confirmed balance."],
+      risks: active ? [] : ["Empty books: import and post bank activity before relying on any cash figure."],
+      confidence: active ? 0.9 : 0.5,
+      sourceLayers: ["COMPANY"],
+      structured: { value: cash.total, values: { totalCash: cash.total, cardOwed: cardBalance }, byAccount: cash.byAccount, ledgerHasActivity: active, dataProvenance: "SYNTHETIC_LEDGER_NO_BANK_CONNECTION" },
     }, { calcs: [calc] });
   },
 });
@@ -78,7 +88,7 @@ function forecastPresentation(f: ThirteenWeekForecast, label: string) {
     numbers: [moneyFigure("Opening cash", f.openingCash), moneyFigure("Total receipts", f.totalReceipts), moneyFigure("Total disbursements", f.totalDisbursements), moneyFigure("Ending cash", f.endingCash, f.calc.id), moneyFigure(`Lowest cash (week ${f.lowestCashWeek}, ${f.lowestCashWeekStart})`, f.lowestCash), textFigure("Weeks below minimum", f.weeksBelowMinimum === null ? "UNKNOWN (no reserve policy)" : f.weeksBelowMinimum)],
     structured: {
       value: f.endingCash,
-      values: { openingCash: f.openingCash, totalReceipts: f.totalReceipts, totalDisbursements: f.totalDisbursements, endingCash: f.endingCash, lowestCash: f.lowestCash, lowestCashWeek: f.lowestCashWeek, weeksBelowMinimum: f.weeksBelowMinimum, firstWeekBelowMinimum: f.firstWeekBelowMinimum, minimumCash: f.minimumCash },
+      values: { openingCash: f.openingCash, totalReceipts: f.totalReceipts, totalDisbursements: f.totalDisbursements, endingCash: f.endingCash, lowestCash: f.lowestCash, lowestCashWeek: f.lowestCashWeek, weeksBelowMinimum: f.weeksBelowMinimum, firstWeekBelowMinimum: f.firstWeekBelowMinimum, minimumCash: f.minimumCash, weeks: f.weeks },
       [label]: { weeks: f.weeks, rows: f.rows.map((r) => ({ weekIndex: r.weekIndex, weekStart: r.weekStart, weekEnd: r.weekEnd, openingCash: r.openingCash, receipts: r.receipts, disbursements: r.disbursements, net: r.net, closingCash: r.closingCash, belowMinimum: r.belowMinimum })), excludedFlows: f.excludedFlows.length },
     },
   };
@@ -94,6 +104,18 @@ export const thirteenWeekTool = defineTool({
     const { input: twi, notes } = thirteenWeekInput(ctx, input);
     const f = buildThirteenWeekForecast(twi);
     const p = forecastPresentation(f, "forecast");
+    const emptyBooks = input.openingCash === undefined && !hasLedgerActivity(ctx, twi.asOfDate);
+    if (emptyBooks) {
+      return ok({
+        answer: `The ledger has no posted entries, so there is no measured opening cash and no invoices, bills or payroll history to project: every line of the ${f.weeks}-week forecast is zero by construction (receipts ${f.totalReceipts}, disbursements ${f.totalDisbursements}, ending ${f.endingCash}). Supply an opening balance and expected flows, or post the books first.`,
+        escalation: esc("INSUFFICIENT_INFORMATION", "No ledger activity: opening cash and flows are unknown.", { missingItems: ["opening cash balance", "expected receipts and disbursements"] }),
+        why: notes,
+        confidence: 0.4,
+        ...p,
+        numbers: [textFigure("Opening balance (no ledger activity)", "unknown — treated as 0.0000 only for the structure"), moneyFigure("Total receipts", f.totalReceipts), moneyFigure("Total disbursements", f.totalDisbursements), moneyFigure("Ending cash", f.endingCash, f.calc.id)],
+        structured: { ...p.structured, value: f.endingCash, missing: ["opening cash balance", "expected flows"] },
+      }, { calcs: [f.calc] });
+    }
     const risks: string[] = [];
     if (f.weeksBelowMinimum && f.weeksBelowMinimum > 0) risks.push(`Cash falls below the minimum reserve in ${f.weeksBelowMinimum} week(s), first in week ${f.firstWeekBelowMinimum}.`);
     if (D(f.lowestCash).lt(0)) risks.push(`Cash goes negative (lowest ${f.lowestCash} in week ${f.lowestCashWeek}).`);
@@ -117,6 +139,7 @@ export const delayedReceiptTool = defineTool({
   capabilityKey: "thirteen_week_cash",
   inputSchema: TASKS["cash.delayed_receipt"].params,
   async execute(input, ctx) {
+    if (!Number.isFinite(input.delayDays) || input.delayDays < 0 || !Number.isInteger(input.delayDays)) return ok(insufficient(["a delay in whole days (0 or more)"], `A delay of ${input.delayDays} days is not a valid late-payment scenario; give the number of days the receipt slips.`));
     const { input: twi, notes } = thirteenWeekInput(ctx, input);
     if (!twi.receipts.length) return ok(insufficient(["expected receipts (open invoices or recurring revenue)"], "There are no expected receipts to delay; the forecast has no inflows."));
     const base = buildThirteenWeekForecast(twi);
@@ -143,6 +166,8 @@ export const stressTestTool = defineTool({
   capabilityKey: "scenario_analysis",
   inputSchema: TASKS["cash.stress_test"].params,
   async execute(input, ctx) {
+    if (input.receiptHaircut !== undefined && (!Number.isFinite(input.receiptHaircut) || input.receiptHaircut < 0 || input.receiptHaircut > 1)) return ok(insufficient(["a receipt haircut between 0 and 1 (0% to 100%)"], `A haircut of ${input.receiptHaircut * 100}% is not meaningful — receipts cannot fall by more than 100%. Give a fraction between 0 and 1.`));
+    if (input.extraDisbursement !== undefined && D(input.extraDisbursement).lt(0)) return ok(insufficient(["a non-negative extra disbursement"], "An extra disbursement must be a positive outflow."));
     const { input: twi, notes } = thirteenWeekInput(ctx, input);
     const base = buildThirteenWeekForecast(twi);
     const extra = toDec(input.extraDisbursement);
@@ -206,6 +231,12 @@ export const reserveCoverageTool = defineTool({
     const asOf = input.asOf ?? ctx.asOfDate;
     const cash = ledgerCash(ctx, asOf).total;
     const minimum = toDec(input.minimumCash) ?? ctx.thresholds.minimumCashReserve;
+    if (minimum !== null && D(minimum).lte(0)) {
+      return ok({
+        ...insufficient(["a positive minimum cash reserve policy"], `A minimum reserve of ${minimum} is not a policy — coverage against zero is undefined and would make every balance look adequate. Cash is ${cash}; set a real reserve amount (owner decision) and I will compute coverage.`, { numbers: [moneyFigure("Cash", cash)] }),
+        structured: { value: null, values: { cash, minimumReserve: minimum, coverageRatio: null, surplus: null, meetsPolicy: null }, missing: ["positive minimum cash reserve policy"] },
+      });
+    }
     const calc = cashReserveCoverage({ cash, minimumReserve: minimum, asOfDate: asOf, policyStatus: input.minimumCash ? "UNCONFIRMED" : ctx.thresholds.status === "CONFIRMED" ? "CONFIRMED" : "UNCONFIRMED" });
     if (calc.value === null) {
       return ok({

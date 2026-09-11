@@ -5,7 +5,7 @@ import path from "node:path";
 const compat = new FlatCompat({ baseDirectory: path.dirname(fileURLToPath(import.meta.url)) });
 
 export default [
-  { ignores: [".next/**", "node_modules/**", "evals/results/**", ".tau/**"] },
+  { ignores: [".next/**", "node_modules/**", "evals/results/**", ".tau/**", "next-env.d.ts"] },
   ...compat.extends("next/core-web-vitals", "next/typescript"),
   {
     rules: {

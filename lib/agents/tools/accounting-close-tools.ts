@@ -208,6 +208,19 @@ export const closePeriodTool = defineTool({
     const period = findPeriodById(ctx.dataset, input.periodId);
     if (!period) return ok(insufficient([`period ${input.periodId}`], `No period ${input.periodId} exists in the ledger.`));
     const workflows = await loadWorkflows();
+    const approval = input.approvalId ? ctx.dataset.approvals.find((a) => a.id === input.approvalId) : undefined;
+    const approvalValid = Boolean(approval && approval.status === "APPROVED" && approval.action.kind === "LOCK_PERIOD" && approval.action.targetIds.includes(input.periodId));
+    if (input.approvalId && !approvalValid) {
+      const action = propose(ctx, { kind: "LOCK_PERIOD", description: `Lock period ${input.periodId} after month-end close`, reason: `Lock requested with approval "${input.approvalId}", which is ${approval ? `${approval.status} for ${approval.action.kind}` : "not a known approval"}; a fresh approval is required.`, targetIds: [input.periodId], payload: { periodId: input.periodId }, context: { periodStatus: period.status }, reversible: false });
+      return ok({
+        answer: `I can't lock ${input.periodId} on approval "${input.approvalId}": ${approval ? `it is ${approval.status} for ${approval.action.kind}` : "no such approval exists"}, and an agent cannot approve its own lock. The period stays ${period.status}; a LOCK_PERIOD approval request has been raised for an authorized human.`,
+        escalation: esc("APPROVAL_REQUIRED", `Locking ${input.periodId} requires an APPROVED LOCK_PERIOD request from an authorized human.`, { requiredRole: "OWNER" }),
+        risks: ["Segregation of duties: the requester (or the agent) cannot approve the lock."],
+        confidence: 0.9,
+        educationKey: "period_lock",
+        structured: { value: null, periodId: input.periodId, periodStatus: period.status, locked: false, approvalRejected: input.approvalId },
+      }, { proposedActions: [action] });
+    }
     const proposed = input.lock && !input.approvalId ? [propose(ctx, { kind: "LOCK_PERIOD", description: `Lock period ${input.periodId} after month-end close`, reason: "Lock requested with the close.", targetIds: [input.periodId], payload: { periodId: input.periodId }, context: { periodStatus: period.status }, reversible: false })] : [];
     if (!workflows?.runMonthEndClose) {
       const integrity = ctx.ledger.runIntegrityChecks(period.endDate);
@@ -222,7 +235,7 @@ export const closePeriodTool = defineTool({
         structured: { value: null, periodId: input.periodId, periodStatus: period.status, integrityPassed: integrity.passed, checks: integrity.checks },
       }, { proposedActions: proposed });
     }
-    const result = (await workflows.runMonthEndClose(runtimeFromContext(ctx), input.periodId, ctx.actor, { lock: Boolean(input.lock && input.approvalId), approvalId: input.approvalId })) as CloseResultLike;
+    const result = (await workflows.runMonthEndClose(runtimeFromContext(ctx), input.periodId, ctx.actor, { lock: Boolean(input.lock && approvalValid), approvalId: approvalValid ? input.approvalId : undefined })) as CloseResultLike;
     const checklist = Array.isArray(result.checklist) ? result.checklist : [];
     const blockers = Array.isArray(result.blockers) ? result.blockers : [];
     const passed = typeof result.passed === "boolean" ? result.passed : blockers.length === 0;

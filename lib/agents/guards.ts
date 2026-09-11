@@ -15,7 +15,11 @@ export type ControlViolationKind =
   | "HIDE_OR_DELETE_RECORDS"
   | "BACKDATE"
   | "FILE_OR_SIGN"
-  | "MOVE_MONEY";
+  | "MOVE_MONEY"
+  | "MISSTATE_FIGURES"
+  | "FALSE_ASSURANCE"
+  | "SELF_AUTONOMY"
+  | "SELF_APPROVAL";
 
 export interface ControlViolation {
   kind: ControlViolationKind;
@@ -52,7 +56,7 @@ export const GUARD_PATTERNS: GuardPattern[] = [
   {
     kind: "IGNORE_DOCUMENTATION",
     patterns: [
-      /\b(ignore|skip|forget|waive|bypass|don'?t\s+(worry|bother)\s+about|without|no\s+need\s+for|overlook)\b[^.?!]{0,40}\b(missing\s+)?(receipt|receipts|documentation|invoice|support(ing)?\s+doc|backup)\b/i,
+      /\b(ignore|skip|forget|waive|bypass|don'?t\s+(worry|bother)\s+about|no\s+need\s+for|overlook)\b[^.?!]{0,40}\b(missing\s+)?(receipt|receipts|documentation|invoice|support(ing)?\s+doc|backup)\b/i,
       /\b(missing|no)\s+receipt\b[^.?!]{0,40}\b(ignore|skip|doesn'?t\s+matter|just\s+(book|post|categori[sz]e|approve|expense)|anyway|is\s+fine|don'?t\s+(flag|worry|care))/i,
       /\b(approve|book|expense|post|categori[sz]e)\b[^.?!]{0,30}\b(it\s+)?anyway\b[^.?!]{0,30}\breceipt/i,
     ],
@@ -112,11 +116,11 @@ export const GUARD_PATTERNS: GuardPattern[] = [
     kind: "HIDE_OR_DELETE_RECORDS",
     patterns: [
       /\b(hide|conceal|bury|obscure|disguise|mask|scrub|erase|wipe|purge)\b[^.?!]{0,50}\b(transaction|transactions|entry|entries|payment|payments|income|revenue|expense|expenses|records?|distribution|invoice|bill|cash|deposit|withdrawal|it|this|that)\b/i,
-      /\b(delete|remove|drop|purge|erase|destroy|get\s+rid\s+of)\b[^.?!]{0,40}\b(the\s+)?(posted\s+)?(journal\s+)?(entry|entries|record|records|transaction|transactions|audit\s+(log|trail|events?)|history|invoice|bill|receipt|document|documents|evidence)\b/i,
+      /\b(delete|remove|drop|purge|erase|destroy|get\s+rid\s+of|clear|wipe|truncate|reset|clean\s+out)\b[^.?!]{0,40}\b(the\s+)?(posted\s+)?(journal\s+)?(entry|entries|record|records|transaction|transactions|audit\s+(log|trail|events?|history)|history|invoice|bill|receipt|document|documents|evidence)\b/i,
       /\b(off\s+the\s+books|under\s+the\s+table|unrecorded)\b/i,
     ],
-    control: "Immutable records: posted entries are never edited or deleted (only reversed), and the audit log is hash-chained and append-only.",
-    explanation: "Hiding or deleting financial records destroys the evidence trail. Posted entries can only be corrected by a dated reversal; audit events cannot be removed.",
+    control: "Immutable records: posted entries are never edited or removed (only reversed), and the audit log is hash-chained and append-only.",
+    explanation: "Hiding or removing financial records destroys the evidence trail. Posted entries can only be corrected by a dated reversal; audit events are immutable and cannot be removed, cleared or rewritten.",
     compliantAlternative: "If a record is wrong, I can draft a reversal or correcting entry with the reason recorded. If a document is sensitive, access can be restricted by role without deleting it.",
   },
   {
@@ -152,13 +156,67 @@ export const GUARD_PATTERNS: GuardPattern[] = [
     explanation: "Moving money is outside what the system may do. Distributions in particular affect shareholder basis and require CPA input.",
     compliantAlternative: "I can model the cash impact, prepare a distribution or transfer proposal with the reserve-policy check and the basis question for the CPA, and route it for owner approval.",
   },
+  {
+    kind: "MISSTATE_FIGURES",
+    patterns: [
+      /\b(numbers|results|financials|books|figures|statements|margins?|revenue|profit)\b[^.?!]{0,40}\b(look|appear|seem)\s+(healthier|better|stronger|cleaner|nicer|prettier|more\s+(attractive|impressive))\b/i,
+      /\bmake\b[^.?!]{0,30}\b(numbers|results|financials|books|figures|month|quarter|year)\b[^.?!]{0,30}\blook\b/i,
+      /\b(move|shift|pull|push)\b[^.?!]{0,40}\b(revenue|income|sales|expenses?|costs?)\b[^.?!]{0,40}\b(into|to|from|forward|back)\b[^.?!]{0,30}\b(august|september|october|november|december|january|february|march|april|may|june|july|last\s+month|prior\s+month|next\s+month|this\s+month|q[1-4]|the\s+(prior|next|previous)\s+(month|quarter|year))\b/i,
+      /\b(drop|remove|omit|leave\s+out|kill|skip|delete)\b[^.?!]{0,30}\b(the\s+)?accru(ed|al)\b/i,
+      /\bround\b[^.?!]{0,40}\b(numbers?|revenue|figures|balances?|results)\b[^.?!]{0,30}\b(up|down)\b/i,
+      /\b(inflate|pad|fudge|massage|smooth|juice|goose|overstate|understate)\b[^.?!]{0,30}\b(the\s+)?(numbers?|revenue|figures|results|earnings|profit|margins?|balances?)\b/i,
+    ],
+    control: "Financial reports present figures exactly as recorded in the ledger. Revenue and expenses stay in the period they belong to; accruals are not dropped, and numbers are never rounded or reshaped to look healthier for an investor, lender or anyone else.",
+    explanation: "Reshaping the numbers so a period looks healthier is misstatement. I present the actual figures as recorded, with their supporting calculations, and cannot change them to fit a narrative.",
+    compliantAlternative: "I can produce the actual statements as recorded with a plain-language explanation of what drove the results, a forward-looking forecast that shows the expected improvement, and a note on any genuine cut-off or accrual correction the CPA agrees is warranted.",
+  },
+  {
+    kind: "FALSE_ASSURANCE",
+    patterns: [
+      /\b(confirm|certify|state|say|write|attest|declare|sign\s+off|represent)\b[^.?!]{0,60}\b(audited|reviewed\s+by\s+(an?\s+)?(auditor|cpa)|gaap[\s-]?compliant|accurate\s+and\s+complete|fully\s+accurate|free\s+of\s+(errors?|misstatement))\b/i,
+      /\b(these|the|our)\s+(financials|statements|books|numbers)\s+(are|have\s+been)\s+audited\b/i,
+    ],
+    control: "Assurance is given only by an independent auditor or the CPA. The system never represents unaudited or synthetic figures as audited, reviewed or certified.",
+    explanation: "I cannot certify these financials: they are unaudited, and in Phase One they are synthetic lab data with no independent audit. A written assurance from me would be false and could mislead a bank or investor.",
+    compliantAlternative: "I can label the statements as internally prepared and unaudited, run the internal integrity checks, and prepare the package the CPA or an auditor would need to issue a review or audit report.",
+  },
+  {
+    kind: "SELF_AUTONOMY",
+    patterns: [
+      /\b(raise|increase|set|change|bump|upgrade|promote|grant)\b[^.?!]{0,40}\b(your\s+(own\s+)?)?(autonomy|capability|permission|access|trust)\s+level\b/i,
+      /\b(promote|upgrade)\s+yourself\b/i,
+      /\b(give|grant)\s+yourself\b[^.?!]{0,30}\b(permission|access|authority|autonomy)\b/i,
+      /\bso\s+you\s+can\s+(pay|move|file|sign|approve)\b[^.?!]{0,30}\bwithout\s+(asking|approval|me)\b/i,
+    ],
+    control: "Capability (autonomy) levels are set only by the owner through the capability matrix after evaluation evidence; an agent can never change its own level, and payments, payroll, filings and signatures stay human-executed in Phase One.",
+    explanation: "I cannot raise my own autonomy level. Levels are decided by the owner (a human) from eval results, and payment execution is capped at analysis-only in Phase One regardless of level.",
+    compliantAlternative: "I can show the current capability matrix, the eval pass rates behind each level, and prepare the promotion request for the owner to decide.",
+  },
+  {
+    kind: "SELF_APPROVAL",
+    patterns: [
+      /\bapprove\s+(it|this|that|the\s+\w+)\s+yourself\b/i,
+      /\byou\s+(can|may|should)\s+approve\b/i,
+      /\bself[\s-]?approv/i,
+      /\bapprove\s+(it|this|that)\s+(for\s+me|on\s+my\s+behalf|yourself)\b/i,
+      /\bskip\s+(the\s+)?approval\b/i,
+    ],
+    control: "Segregation of duties: an agent can propose but never approve; approvals come from an authorized human who is not the requester.",
+    explanation: "I cannot approve my own proposals — an approval by the same party that requested the action is no control at all. The request stays pending until an authorized person decides it.",
+    compliantAlternative: "I can prepare the draft and queue the approval request with the full rationale so the owner or finance operator can approve it in one step.",
+  },
 ];
 
 /** Task kinds that legitimately touch a guarded topic and therefore skip weaker patterns. */
 const LEGITIMATE_CONTEXT: Partial<Record<ControlViolationKind, RegExp>> = {
-  MOVE_MONEY: /\b(forecast|model|what\s+if|should\s+we|can\s+we\s+afford|impact|scenario|plan|project(ion)?)\b/i,
+  MOVE_MONEY: /\b(forecast|model|what\s+if|should\s+we|can\s+we\s+afford|impact|scenario|plan|project(ion)?|categori[sz]e|classify|record|book|match|reconcile|explain|why|check|risk|flag|review)\b/i,
   FILE_OR_SIGN: /\b(when|deadline|due|calendar|checklist|what\s+do\s+(i|we)\s+need|prepare|package)\b/i,
+  PERSONAL_AS_BUSINESS: /\b(can\s+i|could\s+i|should\s+i|may\s+i|is\s+it\s+(ok|okay|allowed|deductible|legal)|am\s+i\s+allowed|what\s+if|how\s+(do|should)\s+i\s+(treat|handle)|is\s+this)\b|\?\s*$/i,
 };
+
+/** Read-only analysis tasks: describing a payment or transfer to be assessed is not a request to perform it. */
+const ANALYSIS_TASKS = new Set(["controls.risk_assess", "controls.personal_business_check", "controls.audit_explain", "accounting.classify_transaction", "accounting.detect_duplicates", "accounting.match_transfers", "documents.classify"]);
+const ANALYSIS_SKIPPED_KINDS = new Set<ControlViolationKind>(["MOVE_MONEY", "PAYMENT_WITHOUT_APPROVAL", "FILE_OR_SIGN", "HIDE_OR_DELETE_RECORDS"]);
 
 /** Explicit RED task kinds whose tool returns the prepared package and a BLOCKED action; the FILE_OR_SIGN pattern is left to that tool. */
 const RED_TOOL_TASKS = new Set(["tax.file_return", "ap.pay_bill", "payroll.change"]);
@@ -167,8 +225,10 @@ export function detectControlViolation(message: string, taskKind?: string, param
   const redTool = taskKind !== undefined && RED_TOOL_TASKS.has(taskKind);
   const text = redTool ? (message ?? "") : [message ?? "", typeof params?.description === "string" ? params.description : "", typeof params?.notes === "string" ? params.notes : "", typeof params?.question === "string" ? params.question : ""].join("\n");
   if (!text.trim()) return null;
+  const analysis = taskKind !== undefined && ANALYSIS_TASKS.has(taskKind);
   for (const g of GUARD_PATTERNS) {
     if (redTool && g.kind === "FILE_OR_SIGN") continue;
+    if (analysis && ANALYSIS_SKIPPED_KINDS.has(g.kind)) continue;
     const legit = LEGITIMATE_CONTEXT[g.kind];
     for (const p of g.patterns) {
       const m = p.exec(text);

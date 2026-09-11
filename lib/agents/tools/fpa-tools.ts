@@ -10,14 +10,15 @@ import { D, money, sub } from "@/lib/core/money";
 import { makeCalc } from "@/lib/finance/calc-result";
 import { fullyLoadedCost } from "@/lib/finance/headcount";
 import { currentRatio, quickRatio, workingCapital } from "@/lib/finance/cash";
+import { netMargin, operatingMargin } from "@/lib/finance/margins";
 import { ratioPack } from "@/lib/finance/ratios";
 import { budgetVariance, cagr, forecastVariance, growthRate, type VarianceReport } from "@/lib/finance/variance";
 import { actualsByAccountMonth, buildBudget } from "@/lib/forecasting/budget";
-import { buildDefaultDrivers, makeDriver, type DriverSet } from "@/lib/forecasting/drivers";
+import { DRIVER_KEYS, buildDefaultDrivers, makeDriver, type DriverSet } from "@/lib/forecasting/drivers";
 import { applyScenario, rollingForecast } from "@/lib/forecasting/forecast";
 import { TASKS } from "../task-catalog";
 import { defineTool } from "../types";
-import { figure, insufficient, moneyFigure, ok, pct, propose, textFigure, toDec } from "./common";
+import { esc, figure, insufficient, moneyFigure, ok, pct, propose, textFigure, toDec } from "./common";
 import { buildRateSet, rateAssumptions } from "./payroll-tools";
 
 function simpleVariance(ctx: ToolContext, label: string, plan: DecimalString, actual: DecimalString, accountType: "REVENUE" | "EXPENSE" | undefined, month?: string) {
@@ -101,10 +102,13 @@ export const rollingForecastTool = defineTool({
   capabilityKey: "rolling_forecast",
   inputSchema: TASKS["fpa.rolling_forecast"].params,
   async execute(input, ctx) {
-    const base = buildDefaultDrivers(ctx.dataset, ctx.asOfDate);
-    const drivers = driverOverrides(base.drivers, input.driverOverrides);
-    if (!Object.keys(drivers).length) return ok(insufficient(["revenue, payroll or recurring expense history"], "No drivers could be derived from history and none were supplied."));
     const horizon = input.horizonMonths ?? 12;
+    if (!Number.isInteger(horizon) || horizon < 1 || horizon > 60) return ok(insufficient(["a forecast horizon between 1 and 60 months"], `A horizon of ${input.horizonMonths} months is not a forecast; give a whole number of months (1–60).`));
+    const base = buildDefaultDrivers(ctx.dataset, ctx.asOfDate);
+    const unknownKeys = Object.keys(input.driverOverrides ?? {}).filter((k) => !base.drivers[k] && !/^(expense|event):/.test(k) && !Object.values(DRIVER_KEYS).includes(k as never));
+    if (unknownKeys.length) return ok(insufficient(unknownKeys.map((k) => `driver ${k}`), `Unknown driver(s) ${unknownKeys.join(", ")}: the forecast model has no such driver, so the override cannot be applied.`), { assumptions: base.assumptions });
+    const drivers = driverOverrides(base.drivers, input.driverOverrides);
+    if (!Object.keys(drivers).length) return ok(insufficient(["revenue, payroll or recurring expense history"], "No drivers could be derived from history and none were supplied."), { assumptions: base.assumptions });
     const { forecast, calcs } = rollingForecast(ctx.dataset, ctx.asOfDate, horizon, drivers);
     const s = calcs[0].value;
     const active = ctx.dataset.forecasts.find((f) => f.status === "ACTIVE");
@@ -132,8 +136,10 @@ export const buildBudgetTool = defineTool({
   async execute(input, ctx) {
     const base = buildDefaultDrivers(ctx.dataset, ctx.asOfDate);
     const drivers = driverOverrides(base.drivers, input.drivers);
-    if (!Object.keys(drivers).length) return ok(insufficient(["drivers (revenue, payroll, recurring expenses)"], "No drivers are available to build a budget."));
-    const budget = buildBudget(input.fiscalYear, drivers, ctx.dataset.accounts, { workers: ctx.dataset.workers });
+    const noDriverAssumption = { key: "budget_drivers", description: "No revenue, payroll or recurring-expense drivers could be derived from history and none were supplied; a budget cannot be built without them.", value: null, status: "UNCONFIRMED" as const, requiresProfessionalReview: false };
+    if (!Object.keys(drivers).length || !Object.keys(drivers).some((k) => k !== "revenue:growth_rate_monthly")) return ok(insufficient(["drivers (revenue, payroll, recurring expenses)"], "No drivers are available to build a budget: the ledger has no invoice, payroll or recurring-vendor history and no drivers were supplied. Give me MRR, monthly gross wages and recurring expenses and I will build it."), { assumptions: [...base.assumptions, noDriverAssumption] });
+    const hasPayrollDriver = Object.keys(drivers).some((k) => k.startsWith("payroll:"));
+    const budget = buildBudget(input.fiscalYear, drivers, ctx.dataset.accounts, hasPayrollDriver ? {} : { workers: ctx.dataset.workers });
     const type = new Map(ctx.dataset.accounts.map((a) => [a.id, a.type]));
     let rev = D(0);
     let exp = D(0);
@@ -147,7 +153,7 @@ export const buildBudgetTool = defineTool({
       numbers: [moneyFigure("Budget revenue", rev.toFixed(4)), moneyFigure("Budget expenses", exp.toFixed(4)), moneyFigure("Budget net", calc.value, calc.id)],
       why: budget.assumptions.slice(0, 8).map((a) => `[${a.status}] ${a.description}`),
       confidence: 0.75,
-      structured: { value: calc.value, values: { revenue: rev.toFixed(4), expense: exp.toFixed(4), net: calc.value }, budgetId: budget.id, lines: budget.lines.length },
+      structured: { value: calc.value, values: { revenue: rev.toFixed(4), expense: exp.toFixed(4), expenses: exp.toFixed(4), net: calc.value, annualRevenue: rev.toFixed(4), annualExpense: exp.toFixed(4) }, budgetId: budget.id, lines: budget.lines.length, lineCount: budget.lines.length },
     }, { calcs: [calc], assumptions: budget.assumptions });
   },
 });
@@ -159,7 +165,13 @@ export const scenarioTool = defineTool({
   capabilityKey: "scenario_analysis",
   inputSchema: TASKS["fpa.scenario"].params,
   async execute(input, ctx) {
-    let base = ctx.dataset.forecasts.find((f) => f.status === "ACTIVE");
+    const badAccounts = (input.events ?? []).map((e) => e.accountCode).filter((code) => !ctx.ledger.getAccount(code));
+    if (badAccounts.length) return ok(insufficient(badAccounts.map((c) => `account ${c}`), `Scenario events reference account code(s) ${badAccounts.join(", ")} that do not exist in the chart of accounts; the scenario was not modelled.`));
+    const activeForScenario = ctx.dataset.forecasts.find((f) => f.status === "ACTIVE");
+    const knownDriverKeys = new Set([...Object.values(DRIVER_KEYS), ...Object.keys(activeForScenario?.drivers ?? {}), ...Object.keys(buildDefaultDrivers(ctx.dataset, ctx.asOfDate).drivers)]);
+    const unknownDrivers = Object.keys(input.driverOverrides ?? {}).filter((k) => !knownDriverKeys.has(k) && !/^(expense|event):/.test(k));
+    if (unknownDrivers.length) return ok(insufficient(unknownDrivers.map((k) => `driver ${k}`), `The forecast model has no driver ${unknownDrivers.join(", ")} (e.g. churn is not modelled — revenue is driven by MRR and a growth rate), so this sensitivity is unknown rather than zero. Modelled drivers: ${[...knownDriverKeys].slice(0, 8).join(", ")}.`));
+    let base = activeForScenario;
     let baseCalcs: CalcResult[] = [];
     if (!base) {
       const d = buildDefaultDrivers(ctx.dataset, ctx.asOfDate);
@@ -196,15 +208,17 @@ export const growthRateTool = defineTool({
     const end = toDec(input.end) ?? series[series.length - 1] ?? null;
     if (start === null || end === null) return ok(insufficient(["start and end values (or a series)"], "I need at least two values to compute growth."));
     const periods = input.periods ?? Math.max(1, series.length - 1);
-    const g = growthRate({ current: end, prior: start, asOfDate: ctx.asOfDate });
+    const total = growthRate({ current: end, prior: start, asOfDate: ctx.asOfDate, label: "first to last" });
     const c = cagr({ beginning: start, ending: end, periods, asOfDate: ctx.asOfDate });
     const stepwise = series.length > 1 ? series.slice(1).map((v, i) => growthRate({ current: v, prior: series[i], asOfDate: ctx.asOfDate, label: `period ${i + 1}→${i + 2}` })) : [];
+    // For a series the headline figure is the most recent period-over-period growth (last vs previous).
+    const latest = stepwise.length ? stepwise[stepwise.length - 1] : total;
     return ok({
-      answer: `From ${start} to ${end}: total growth ${g.value === null ? "undefined" : pct(g.value, 2)}${periods > 1 ? `; compound growth per period over ${periods} periods ${c.value === null ? "undefined" : pct(c.value, 2)}` : ""}.`,
-      numbers: [figure("Total growth", g), figure(`CAGR (${periods} periods)`, c), ...stepwise.map((s, i) => figure(`Growth period ${i + 1}`, s))],
+      answer: series.length > 2 ? `Latest period growth (${series[series.length - 2]} → ${series[series.length - 1]}): ${latest.value === null ? "undefined" : pct(latest.value, 2)}. Over the whole series (${start} → ${end}) growth is ${total.value === null ? "undefined" : pct(total.value, 2)}, or ${c.value === null ? "undefined" : pct(c.value, 2)} compounded per period over ${periods} periods.` : `From ${start} to ${end}: growth ${latest.value === null ? "undefined" : pct(latest.value, 2)}${periods > 1 ? `; compound growth per period over ${periods} periods ${c.value === null ? "undefined" : pct(c.value, 2)}` : ""}.`,
+      numbers: [figure("Latest period growth", latest), figure("Total growth (first → last)", total), figure(`CAGR (${periods} periods)`, c), ...stepwise.slice(0, -1).map((s, i) => figure(`Growth period ${i + 1}`, s))],
       confidence: 0.95,
-      structured: { value: g.value, values: { growthRate: g.value, cagr: c.value, periods, start, end }, stepwise: stepwise.map((s) => s.value) },
-    }, { calcs: [g, c, ...stepwise] });
+      structured: { value: latest.value, values: { latestGrowth: latest.value, growthRate: total.value, totalGrowth: total.value, cagr: c.value, periods, start, end }, stepwise: stepwise.map((s) => s.value) },
+    }, { calcs: [latest, ...(latest === total ? [] : [total]), c, ...stepwise.slice(0, -1)] });
   },
 });
 
@@ -216,7 +230,7 @@ export const headcountPlanTool = defineTool({
   inputSchema: TASKS["fpa.headcount_plan"].params,
   async execute(input, ctx) {
     const annual = toDec(input.grossAnnual) ?? (input.grossMonthly !== undefined ? D(input.grossMonthly).times(12).toFixed(4) : null);
-    if (annual === null) return ok(insufficient(["gross annual or monthly salary"], "Tell me the gross salary for the role."));
+    if (annual === null) return ok(insufficient(["gross annual or monthly salary"], "Tell me the gross salary for the role. A net (take-home) figure is not enough: net pay depends on the employee's withholding elections, and grossing it up would require withholding tables I do not invent — the offer letter or payroll provider has the gross."));
     const rs = buildRateSet(ctx, input.rateSet, "UNCONFIRMED");
     const benefits = input.benefitsMonthly === undefined ? null : D(input.benefitsMonthly).times(12).toFixed(4);
     const overhead = input.overheadMonthly === undefined ? null : D(input.overheadMonthly).times(12).toFixed(4);
@@ -248,23 +262,50 @@ export const ratiosTool = defineTool({
     const asOf = input.asOf ?? input.to ?? ctx.asOfDate;
     const from = input.from ?? `${asOf.slice(0, 4)}-01-01`;
     const to = input.to ?? asOf;
+    const inp = input.inputs ?? {};
+    const explicit = Object.keys(inp).length > 0;
     const is = ctx.ledger.incomeStatement(from, to);
     const bs = ctx.ledger.balanceSheet(asOf);
-    const ar = bs.lines.find((l) => l.code === "1100")?.amount ?? "0.0000";
-    const ap = bs.lines.find((l) => l.code === "2000")?.amount ?? "0.0000";
-    const inp = input.inputs ?? {};
+    const arBs = bs.lines.find((l) => l.code === "1100")?.amount ?? "0.0000";
+    const apBs = bs.lines.find((l) => l.code === "2000")?.amount ?? "0.0000";
+    // Explicit inputs are used as given; when inputs are supplied, figures that are missing stay unknown (never filled from the ledger).
+    const pick = (key: string, ledgerValue: DecimalString): DecimalString | null => (explicit ? toDec(inp[key]) : ledgerValue);
+    const revenue = pick("revenue", is.revenue);
+    const costOfRevenue = pick("costOfRevenue", is.costOfRevenue);
+    const operatingExpenses = pick("operatingExpenses", is.operatingExpenses);
+    const currentAssets = pick("currentAssets", bs.currentAssets);
+    const currentLiabilities = pick("currentLiabilities", bs.currentLiabilities);
+    const cash = pick("cash", bs.cash);
+    const receivables = toDec(inp.receivables) ?? pick("accountsReceivable", arBs);
+    const payables = pick("accountsPayable", apBs);
     const headcount = ctx.dataset.workers.filter((w) => !w.endDate || w.endDate > asOf).length || null;
-    const pack = ratioPack({ asOfDate: asOf, periodDays: daysBetween(from, to) + 1, revenue: toDec(inp.revenue) ?? is.revenue, costOfRevenue: toDec(inp.costOfRevenue) ?? is.costOfRevenue, operatingExpenses: toDec(inp.operatingExpenses) ?? is.operatingExpenses, headcount: inp.headcount !== undefined ? Number(inp.headcount) : headcount, accountsReceivable: toDec(inp.accountsReceivable) ?? ar, accountsPayable: toDec(inp.accountsPayable) ?? ap });
-    const wc = workingCapital(bs);
-    const cr = currentRatio(bs);
-    const qr = quickRatio(bs);
-    const all = [...pack.ratios, wc, cr, qr];
+    const meta = { asOfDate: asOf };
+    const pack = ratioPack({ asOfDate: asOf, periodDays: daysBetween(from, to) + 1, revenue, costOfRevenue, operatingExpenses, headcount: inp.headcount !== undefined ? Number(inp.headcount) : headcount, accountsReceivable: receivables, accountsPayable: payables });
+    const operatingIncome = revenue !== null && costOfRevenue !== null && operatingExpenses !== null ? D(revenue).minus(D(costOfRevenue)).minus(D(operatingExpenses)).toFixed(4) : explicit ? null : is.operatingIncome;
+    const netIncome = explicit ? operatingIncome : is.netIncome;
+    const om = operatingMargin({ revenue, operatingIncome }, meta);
+    const nm = netMargin({ revenue, netIncome }, meta);
+    const liq = { currentAssets, currentLiabilities, cash, accountsReceivable: receivables, asOfDate: asOf };
+    const wc = workingCapital(liq);
+    const cr = currentRatio(liq);
+    const qr = quickRatio(liq);
+    const all = [...pack.ratios, om, nm, wc, cr, qr];
+    const missing = [...new Set(all.flatMap((c) => c.assumptions.filter((a) => a.key.startsWith("missing:")).map((a) => a.description.replace(/^Unknown input: /, ""))))];
+    const values: Record<string, unknown> = Object.fromEntries(all.map((c) => [c.name, c.value]));
+    values.grossMargin = values.gross_margin;
+    values.operatingMargin = values.operating_margin;
+    values.netMargin = values.net_margin;
+    values.workingCapital = values.working_capital;
+    values.currentRatio = values.current_ratio;
+    values.quickRatio = values.quick_ratio;
+    const fmt = (c: CalcResult) => (c.value === null ? "n/a (unknown input)" : typeof c.value === "number" ? (c.unit === "RATIO" ? c.value.toFixed(3) : c.value.toFixed(1)) : String(c.value));
     return ok({
-      answer: `Ratios for ${from}–${to}: ${all.map((c) => `${c.name.replace(/_/g, " ")} ${c.value === null ? "n/a" : typeof c.value === "number" ? (c.unit === "RATIO" ? c.value.toFixed(3) : c.value.toFixed(1)) : c.value}`).join("; ")}.`,
+      answer: `Ratios ${explicit ? "from the supplied figures" : `for ${from}–${to}`}: ${all.map((c) => `${c.name.replace(/_/g, " ")} ${fmt(c)}`).join("; ")}.${missing.length ? ` Unknown inputs (${missing.join(", ")}) leave the affected ratios undefined rather than zero.` : ""}`,
       numbers: all.map((c) => figure(c.name.replace(/_/g, " "), c)),
-      why: ["Margins use the income statement for the period; DSO/DPO use period-end AR/AP against period revenue/purchases; liquidity ratios use the balance sheet at the as-of date."],
-      confidence: 0.85,
-      structured: { value: pack.ratios[0].value, values: Object.fromEntries(all.map((c) => [c.name, c.value])) },
+      why: ["Margins use revenue, cost of revenue and operating expenses; DSO/DPO use AR/AP against period revenue/purchases; working capital, current and quick ratios use current assets, current liabilities, cash and receivables."],
+      escalation: missing.length && (revenue === null || currentLiabilities === null) ? esc("INSUFFICIENT_INFORMATION", `Missing inputs: ${missing.join(", ")}.`, { missingItems: missing }) : undefined,
+      confidence: missing.length ? 0.6 : 0.85,
+      structured: { value: pack.ratios[0].value, values, missing },
     }, { calcs: [...all, pack.summary] });
   },
 });

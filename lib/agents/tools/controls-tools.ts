@@ -17,6 +17,9 @@ import { classifyTransaction } from "../classification";
 import { TASKS } from "../task-catalog";
 import { defineTool } from "../types";
 import { esc, insufficient, moneyFigure, ok, textFigure } from "./common";
+import { extractEntities } from "../intent";
+
+const KNOWN_ACTION_KINDS = new Set<string>(["CALCULATE", "GENERATE_REPORT", "RUN_RECONCILIATION", "UPDATE_FORECAST", "CATEGORIZE_TRANSACTION", "MATCH_PAYMENT", "FLAG_MISSING_RECEIPT", "CREATE_JOURNAL_ENTRY", "POST_JOURNAL_ENTRY", "REVERSE_JOURNAL_ENTRY", "CREATE_VENDOR", "CREATE_CUSTOMER", "RECORD_BILL", "RECORD_INVOICE", "SCHEDULE_PAYMENT", "EXECUTE_PAYMENT", "REIMBURSEMENT", "PROPOSE_DISTRIBUTION", "RUN_PAYROLL", "CHANGE_PAYROLL", "SET_COMPENSATION_POLICY", "FILE_TAX_RETURN", "PAY_TAX", "RESPOND_TO_TAX_AUTHORITY", "CHANGE_ACCOUNTING_POLICY", "CHANGE_ENTITY", "CLASSIFY_INTERNATIONAL_WORKER", "DELETE_RECORD", "MODIFY_CLOSED_PERIOD", "LOCK_PERIOD", "UNLOCK_PERIOD", "SEND_COLLECTION_REMINDER", "UPDATE_POLICY", "UPDATE_CONFIG", "SIGN_DOCUMENT", "OTHER"]);
 
 export const integrityCheckTool = defineTool({
   name: "integrity_check",
@@ -49,8 +52,10 @@ export const riskAssessTool = defineTool({
   inputSchema: TASKS["controls.risk_assess"].params,
   async execute(input, ctx) {
     const kind = input.kind.toUpperCase().replace(/[\s-]+/g, "_") as ActionKind;
-    const action: ProposedAction = { id: newId("pa"), kind, agent: ctx.agent, description: input.description, amount: input.amount === undefined ? undefined : { amount: money(input.amount), currency: "USD" }, targetIds: [], payload: (input.context?.payload as Record<string, unknown> | undefined) ?? {}, reason: "risk assessment request", sourceDocumentIds: [], confidence: 1, reversible: true, createdAt: nowISO(), context: (input.context ?? {}) as ProposedAction["context"] };
-    const r = ctx.risk.assess(action, { thresholds: ctx.thresholds });
+    const action: ProposedAction = { id: newId("pa"), kind, agent: ctx.agent, description: input.description, amount: input.amount === undefined ? undefined : { amount: money(input.amount), currency: "USD" }, targetIds: [], payload: { ...((input.context?.payload as Record<string, unknown> | undefined) ?? {}), ...(input.context?.exactMatch !== undefined ? { exactMatch: input.context.exactMatch } : {}), ...(input.context?.matchType !== undefined ? { matchType: input.context.matchType } : {}) }, reason: "risk assessment request", sourceDocumentIds: [], confidence: 1, reversible: true, createdAt: nowISO(), context: { ...((input.context ?? {}) as ProposedAction["context"]), ...(input.context?.exactMatch === true ? { isExactMatch: true } : {}) } };
+    const assessed = ctx.risk.assess(action, { thresholds: ctx.thresholds });
+    const known = KNOWN_ACTION_KINDS.has(kind);
+    const r = known ? assessed : { ...assessed, level: (assessed.level === "RED" ? "RED" : "YELLOW") as "RED" | "YELLOW", autoExecutable: false, requiredApproverRoles: assessed.requiredApproverRoles.length ? assessed.requiredApproverRoles : ["OWNER" as const], reasons: [`"${kind}" is not a recognized action kind; unknown actions are never auto-executed and default to YELLOW review.`, ...assessed.reasons] };
     const prohibited = (PHASE_ONE_PROHIBITED_KINDS as readonly string[]).includes(kind);
     return ok({
       answer: `"${input.description}" (${kind}${input.amount !== undefined ? `, ${money(input.amount)}` : ""}) is ${r.level}${prohibited ? " and prohibited from executing in Phase One" : ""}: ${r.reasons.join(" ")} ${r.level === "GREEN" ? "No approval is required." : `Approvers: ${r.requiredApproverRoles.join(", ")}.`}`,
@@ -59,7 +64,7 @@ export const riskAssessTool = defineTool({
       risks: prohibited ? [`${kind} never executes in Phase One (simulation only).`] : [],
       confidence: 0.95,
       sourceRefs: r.policyRefs.map((p) => ({ id: p, kind: "POLICY" as const, label: p })),
-      structured: { value: r.level, riskLevel: r.level, assessment: { level: r.level, reasons: r.reasons, requiredApproverRoles: r.requiredApproverRoles, materialityBreached: r.materialityBreached, autoExecutable: r.autoExecutable, policyRefs: r.policyRefs }, phaseOneProhibited: prohibited, actionKind: kind },
+      structured: { value: r.level, riskLevel: r.level, assessment: { level: r.level, reasons: r.reasons, requiredApproverRoles: r.requiredApproverRoles, materialityBreached: r.materialityBreached, autoExecutable: r.autoExecutable, policyRefs: r.policyRefs }, phaseOneProhibited: prohibited, actionKind: kind, knownActionKind: known },
     });
   },
 });
@@ -75,20 +80,22 @@ export const personalBusinessCheckTool = defineTool({
     if (input.transactionId && !tx) return ok(insufficient([`transaction ${input.transactionId}`], `No transaction ${input.transactionId}.`));
     const description = input.description ?? tx?.descriptionRaw ?? "";
     if (!description && !input.merchant) return ok(insufficient(["transaction description"], "Describe the transaction (merchant, amount, date, purpose)."));
-    const r = classifyTransaction(ctx.dataset, { description, merchant: input.merchant ?? tx?.merchantNormalized, amount: input.amount ?? tx?.amount ?? null, date: tx?.date, sourceKind: tx?.sourceKind, hasReceipt: tx ? tx.documentIds.length > 0 : undefined, notes: input.notes });
-    const personal = r.flags.includes("POSSIBLE_PERSONAL") || r.accountCode === "7990";
+    const ents = extractEntities(`${description} ${input.notes ?? ""}`, ctx.asOfDate);
+    const r = classifyTransaction(ctx.dataset, { description, merchant: input.merchant ?? tx?.merchantNormalized, amount: input.amount ?? tx?.amount ?? null, date: tx?.date ?? ents.dates[0], sourceKind: tx?.sourceKind, hasReceipt: tx ? tx.documentIds.length > 0 : /\b(no|without|missing) receipt\b/i.test(input.notes ?? "") ? false : undefined, notes: input.notes });
+    const relatedParty = r.flags.includes("RELATED_PARTY");
+    const personal = r.flags.includes("POSSIBLE_PERSONAL") || r.accountCode === "7990" || relatedParty;
     const sep = policyByKey(ctx.dataset.policies, POLICY_KEYS.PERSONAL_BUSINESS_SEPARATION);
     const meals = policyByKey(ctx.dataset.policies, POLICY_KEYS.MEALS);
     const sourceRefs = [sep, ...(r.accountCode === "7300" ? [meals] : [])].filter((p): p is NonNullable<typeof p> => Boolean(p)).map((p) => ({ id: p.id, kind: "POLICY" as const, label: p.title, status: p.status }));
-    const verdict = personal ? "POSSIBLE_PERSONAL" : r.escalation ? "UNDETERMINED" : "BUSINESS";
+    const verdict = relatedParty ? "RELATED_PARTY" : personal ? "POSSIBLE_PERSONAL" : r.escalation ? "UNDETERMINED" : "BUSINESS";
     const amountStr: DecimalString | null = input.amount !== undefined ? money(input.amount) : tx?.amount ?? null;
     return ok({
-      answer: verdict === "POSSIBLE_PERSONAL" ? `This looks personal or mixed-use: ${r.reason} Under the separation policy it is categorized to 7990 Non-Deductible / Personal (Review) unless a business purpose is documented — it is never booked as a business expense on instruction alone.` : verdict === "UNDETERMINED" ? `I can't tell whether this is business or personal: ${r.reason}` : `No personal-use indicators found: ${r.reason} Suggested account ${r.accountCode}.`,
+      answer: verdict === "RELATED_PARTY" ? `This is a payment to the owner / a related party: ${r.reason} It is a shareholder distribution (restricted account 3100), a reimbursement or a loan repayment — never a business expense — and requires owner approval on file plus CPA visibility for basis.` : verdict === "POSSIBLE_PERSONAL" ? `This looks personal or mixed-use: ${r.reason} Under the separation policy it is categorized to 7990 Non-Deductible / Personal (Review) unless a business purpose is documented — it is never booked as a business expense on instruction alone.` : verdict === "UNDETERMINED" ? `I can't tell whether this is business or personal: ${r.reason}` : `No personal-use indicators found: ${r.reason} Suggested account ${r.accountCode}.`,
       numbers: [textFigure("Verdict", verdict), textFigure("Suggested account", r.accountCode ?? "none"), ...(amountStr ? [moneyFigure("Amount", amountStr)] : [])],
       why: [r.reason, ...(sep ? [`Policy: ${sep.title} (${sep.status}) — ${sep.body.slice(0, 160)}…`] : []), ...(r.accountCode === "7300" && meals ? [`Policy: ${meals.title} (${meals.status}) — business purpose and attendees required.`] : [])],
       risks: personal ? ["Treating personal spend as business misstates profit and the tax return."] : [],
       escalation: r.escalation ? esc("CANNOT_CLASSIFY", r.reason) : undefined,
-      recommendation: personal ? "Document the business purpose and attendees, or confirm it is personal so it is booked to 7990 and, if paid by the company, treated as a shareholder item for the CPA." : "Proceed with the suggested categorization.",
+      recommendation: relatedParty ? "Record it as a shareholder distribution only with an approval on file; otherwise treat it as due from shareholder pending review." : personal ? "Document the business purpose and attendees, or confirm it is personal so it is booked to 7990 and, if paid by the company, treated as a shareholder item for the CPA." : "Proceed with the suggested categorization.",
       educationKey: "personal_business_separation",
       confidence: personal ? 0.8 : r.confidence,
       sourceRefs,

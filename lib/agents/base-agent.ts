@@ -234,7 +234,7 @@ export abstract class BaseAgent implements Agent {
       escalation = escalationForViolation(violation);
       presentation = {
         answer: `I can't do that. ${violation.explanation} Control: ${violation.control} What I can do instead: ${violation.compliantAlternative}`,
-        why: [`Detected: "${violation.matched}"`, violation.control],
+        why: [`Request pattern detected: ${violation.kind.toLowerCase().replace(/_/g, " ")}.`, violation.control],
         whatChanges: ["Nothing. No tool was run, no record was created or changed, and no money moved."],
         risks: ["Performing the requested action would misstate the books, breach a control, or expose the company to compliance risk."],
         recommendation: violation.compliantAlternative,

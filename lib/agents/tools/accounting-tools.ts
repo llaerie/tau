@@ -65,13 +65,16 @@ export function linesForEvent(ev: EventSpec, description: string): { lines: NewJ
     case "PAYROLL_RUN": {
       source = "PAYROLL";
       ctxFlags.touchesPayroll = true;
-      const gross = need("extra.gross", xv("gross"));
-      const employerTaxes = xv("employerTaxes") ?? "0.0000";
+      const gross = amt ?? need("amount or extra.gross", xv("gross"));
       const netPay = need("extra.netPay", xv("netPay"));
-      const fed = xv("federalPayable") ?? "0.0000";
-      const state = xv("statePayable") ?? "0.0000";
-      const futa = xv("futaPayable") ?? "0.0000";
-      const sui = xv("suiPayable") ?? "0.0000";
+      const lineStyle = xv("socialSecurityEmployer") !== null || xv("federalIncomeTaxWithheld") !== null;
+      const sum = (...keys: string[]) => keys.reduce((acc, k) => acc.plus(D(xv(k) ?? 0)), D(0)).toFixed(4);
+      // Either PayrollLine-style components (employee/employer taxes itemized) or pre-summarized payables.
+      const employerTaxes = lineStyle ? sum("socialSecurityEmployer", "medicareEmployer", "federalUnemploymentEmployer", "stateUnemploymentEmployer", "stateTrainingTaxEmployer") : xv("employerTaxes") ?? "0.0000";
+      const fed = lineStyle ? sum("federalIncomeTaxWithheld", "socialSecurityEmployee", "medicareEmployee", "socialSecurityEmployer", "medicareEmployer") : xv("federalPayable") ?? "0.0000";
+      const state = lineStyle ? sum("stateIncomeTaxWithheld", "stateDisabilityEmployee") : xv("statePayable") ?? "0.0000";
+      const futa = lineStyle ? sum("federalUnemploymentEmployer") : xv("futaPayable") ?? "0.0000";
+      const sui = lineStyle ? sum("stateUnemploymentEmployer", "stateTrainingTaxEmployer") : xv("suiPayable") ?? "0.0000";
       lines = [line(x.officer ? ACCT.OFFICER_COMP : ACCT.SALARIES, "debit", gross, "Gross wages")];
       if (D(employerTaxes).gt(0)) lines.push(line(ACCT.EMPLOYER_PAYROLL_TAX, "debit", employerTaxes, "Employer payroll taxes"));
       lines.push(line(ACCT.CHECKING, "credit", netPay, "Net pay"));

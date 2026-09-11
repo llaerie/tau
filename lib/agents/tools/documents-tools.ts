@@ -46,6 +46,7 @@ export const classifyDocumentTool = defineTool({
   capabilityKey: "document_classification",
   inputSchema: TASKS["documents.classify"].params,
   async execute(input) {
+    if (!input.title.trim() && !(input.extracted && Object.keys(input.extracted).length)) return ok({ ...insufficient(["document title or extracted content"], "There is nothing to classify: no title and no extracted content were provided."), escalation: esc("CANNOT_CLASSIFY", "No document content to classify.", { missingItems: ["title or extracted fields"] }) });
     const r = classifyDocument({ title: input.title, extracted: input.extracted });
     return ok({
       answer: `"${input.title}" classifies as ${r.kind} (confidence ${r.confidence}; rules: ${r.matchedRules.join(", ") || "none"}).`,
