@@ -1,0 +1,177 @@
+/**
+ * Shared, side-effect-free helpers for monitors and workflows: item construction, cash position,
+ * 13-week forecast assembly, tax obligation resolution and policy lookups that never guess.
+ */
+import type { LedgerEngine, MaterialityThresholds } from "@/lib/core/contracts";
+import type { BankAccount, CalcResult, CompanyDataset, ConfigField, DecimalString, ID, ISODate, Policy, TaxObligation, Transaction } from "@/lib/core/types";
+import { yearOf } from "@/lib/core/dates";
+import { deterministicId } from "@/lib/core/ids";
+import { D, add, money } from "@/lib/core/money";
+import { makeCalc } from "@/lib/finance/calc-result";
+import { buildThirteenWeekForecast, flowsFromDataset, type DerivedFlows, type ThirteenWeekForecast } from "@/lib/forecasting/thirteen-week";
+import { POLICY_KEYS, policyParameter } from "@/lib/knowledge/policies";
+import { buildTaxCalendar } from "@/lib/tax/calendar";
+import type { TaxRuleStore } from "@/lib/tax/rule-store";
+import { SEVERITY_RANK, type AttentionItem, type AttentionSeverity, type MonitorContext } from "./types";
+
+export const RECEIPT_THRESHOLD_CONFIG_KEY = "expense_policy.receipt_required_above";
+
+export interface ItemSpec {
+  kind: string;
+  severity: AttentionSeverity;
+  title: string;
+  detail: string;
+  amount?: DecimalString | number;
+  dueDate?: ISODate;
+  relatedIds?: ID[];
+  suggestedTask?: AttentionItem["suggestedTask"];
+  calcIds?: ID[];
+  sourceIds?: ID[];
+}
+
+/** Build an attention item with a deterministic id (kind + title + related ids; independent of the day). */
+export function makeItem(ctx: Pick<MonitorContext, "asOf">, spec: ItemSpec): AttentionItem {
+  const relatedIds = uniq(spec.relatedIds ?? []);
+  return {
+    id: deterministicId("attn", spec.kind, spec.title, ...relatedIds),
+    kind: spec.kind,
+    severity: spec.severity,
+    title: spec.title,
+    detail: spec.detail,
+    amount: spec.amount === undefined ? undefined : money(spec.amount),
+    dueDate: spec.dueDate,
+    relatedIds,
+    suggestedTask: spec.suggestedTask,
+    calcIds: uniq(spec.calcIds ?? []),
+    sourceIds: uniq(spec.sourceIds ?? relatedIds),
+    createdAt: `${ctx.asOf}T00:00:00.000Z`,
+  };
+}
+
+export function uniq<T>(xs: readonly T[]): T[] {
+  return Array.from(new Set(xs));
+}
+
+/** Deterministic ordering: severity desc, then kind, then id. */
+export function sortItems(items: AttentionItem[]): AttentionItem[] {
+  return [...items].sort((a, b) => SEVERITY_RANK[b.severity] - SEVERITY_RANK[a.severity] || a.kind.localeCompare(b.kind) || a.id.localeCompare(b.id));
+}
+
+export function median(values: readonly DecimalString[]): DecimalString {
+  const sorted = values.map(D).sort((a, b) => a.cmp(b));
+  const n = sorted.length;
+  if (!n) return money(0);
+  return n % 2 ? money(sorted[(n - 1) / 2]) : money(sorted[n / 2 - 1].plus(sorted[n / 2]).div(2));
+}
+
+export function merchantKey(tx: Transaction): string {
+  return (tx.merchantNormalized ?? tx.descriptionRaw).trim().toLowerCase();
+}
+
+/** Outflows that are real spend: negative, not transfers, not marked duplicates. */
+export function isSpendOutflow(tx: Transaction): boolean {
+  return D(tx.amount).lt(0) && !tx.flags.includes("TRANSFER") && !tx.transferPairId && !tx.duplicateOfId;
+}
+
+// ---------------------------------------------------------------------------
+// Cash position
+// ---------------------------------------------------------------------------
+
+export interface CashAccountBalance {
+  bankAccountId: ID;
+  name: string;
+  glAccountId: ID;
+  balance: DecimalString;
+}
+
+export interface CashPosition {
+  asOf: ISODate;
+  accounts: CashAccountBalance[];
+  total: DecimalString;
+  calc: CalcResult<{ accounts: CashAccountBalance[]; total: DecimalString }>;
+}
+
+/** Cash per bank account from the ledger (GL balances of each account's cash GL). */
+export function cashPosition(dataset: CompanyDataset, ledger: LedgerEngine, asOf: ISODate): CashPosition {
+  const accounts: CashAccountBalance[] = dataset.bankAccounts.map((b: BankAccount) => ({ bankAccountId: b.id, name: b.name, glAccountId: b.glAccountId, balance: ledger.accountBalance(b.glAccountId, asOf) }));
+  // Cash GL accounts not mapped to a bank account still count as cash.
+  const mapped = new Set(accounts.map((a) => a.glAccountId));
+  for (const a of dataset.accounts) {
+    if (a.subtype === "CASH" && a.isActive && !mapped.has(a.id)) {
+      const bal = ledger.accountBalance(a.id, asOf);
+      if (!D(bal).isZero()) accounts.push({ bankAccountId: a.id, name: `${a.code} ${a.name} (no bank account mapped)`, glAccountId: a.id, balance: bal });
+    }
+  }
+  const total = accounts.reduce((acc, a) => add(acc, a.balance), money(0));
+  const calc = makeCalc({
+    name: "cash_position",
+    value: { accounts, total },
+    unit: "USD",
+    formula: "cash_total = sum(GL balance of every cash account as of date)",
+    inputs: { asOf, balances: accounts.map((a) => ({ glAccountId: a.glAccountId, balance: a.balance })) },
+    sourceIds: accounts.map((a) => a.glAccountId),
+    asOfDate: asOf,
+  });
+  return { asOf, accounts, total, calc };
+}
+
+// ---------------------------------------------------------------------------
+// 13-week forecast from the dataset
+// ---------------------------------------------------------------------------
+
+export interface ThirteenWeekBundle {
+  forecast: ThirteenWeekForecast;
+  flows: DerivedFlows;
+  cash: CashPosition;
+}
+
+export function thirteenWeekFor(dataset: CompanyDataset, ledger: LedgerEngine, thresholds: MaterialityThresholds, asOf: ISODate): ThirteenWeekBundle {
+  const cash = cashPosition(dataset, ledger, asOf);
+  const flows = flowsFromDataset(dataset, asOf);
+  const forecast = buildThirteenWeekForecast({
+    asOfDate: asOf,
+    openingCash: cash.total,
+    receipts: flows.receipts,
+    disbursements: flows.disbursements,
+    minimumCash: thresholds.minimumCashReserve,
+    assumptions: flows.assumptions,
+    sourceIds: [cash.calc.id],
+  });
+  return { forecast, flows, cash };
+}
+
+// ---------------------------------------------------------------------------
+// Tax obligations (never invent due dates)
+// ---------------------------------------------------------------------------
+
+/** Dataset obligations when present; otherwise the calendar derived from the rule store for the prior and current tax years. */
+export function taxObligationsFor(dataset: CompanyDataset, taxRules: TaxRuleStore, asOf: ISODate): TaxObligation[] {
+  if (dataset.taxObligations.length) return dataset.taxObligations;
+  const year = yearOf(asOf);
+  return [...buildTaxCalendar(dataset, year - 1, taxRules, asOf), ...buildTaxCalendar(dataset, year, taxRules, asOf)];
+}
+
+// ---------------------------------------------------------------------------
+// Receipt threshold (null when nobody confirmed one)
+// ---------------------------------------------------------------------------
+
+export function receiptThresholdFor(configFields: ConfigField[], policies: Policy[]): DecimalString | null {
+  const confirmed = configFields.find((f) => f.key === RECEIPT_THRESHOLD_CONFIG_KEY && f.status === "CONFIRMED" && f.value !== null && f.value !== undefined);
+  if (confirmed && (typeof confirmed.value === "string" || typeof confirmed.value === "number")) {
+    try {
+      return money(confirmed.value);
+    } catch {
+      return null;
+    }
+  }
+  const param = policyParameter<string>(policies, POLICY_KEYS.EXPENSE_DOCUMENTATION, "receiptThreshold");
+  if (param.status === "CONFIRMED" && param.value !== null) return money(param.value);
+  return null;
+}
+
+/** Latest APPROVED budget for a fiscal year (highest version). */
+export function approvedBudgetFor(dataset: CompanyDataset, fiscalYear: number) {
+  return dataset.budgets
+    .filter((b) => b.status === "APPROVED" && b.fiscalYear === fiscalYear)
+    .sort((a, b) => b.version - a.version)[0];
+}
