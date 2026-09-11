@@ -149,6 +149,12 @@ export const TASKS = {
     description: "Identify transfer pairs between company accounts",
     params: z.object({ from: isoDate.optional(), to: isoDate.optional() }),
   },
+  "accounting.exception_queue": {
+    agent: "bookkeeping",
+    capability: "transaction_categorization",
+    description: "Transactions needing review: uncategorized, flagged, low-confidence or in suspense",
+    params: z.object({ asOf: isoDate.optional(), limit: z.number().optional() }),
+  },
   "accounting.bank_reconciliation": {
     agent: "controller",
     capability: "bank_reconciliation",

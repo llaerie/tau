@@ -1,0 +1,12 @@
+export { Specialist, type SpecialistSpec } from "./shared";
+export { createControllerAgent } from "./controller";
+export { createBookkeepingAgent } from "./bookkeeping";
+export { createFpaAgent } from "./fpa";
+export { createTreasuryAgent } from "./treasury";
+export { createApAgent } from "./ap";
+export { createArAgent } from "./ar";
+export { createPayrollAgent } from "./payroll";
+export { createTaxAgent } from "./tax";
+export { createDocumentsAgent } from "./documents";
+export { createStrategyAgent } from "./strategy";
+export { createAuditorAgent } from "./auditor";
