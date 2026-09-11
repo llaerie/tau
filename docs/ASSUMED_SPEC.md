@@ -5,6 +5,11 @@
 > application was built against, reconstructed from the request text. Where the real SPEC.md
 > differs, treat this file as the thing to diff against and file follow-ups.
 
+> **Superseded in part (2026-09-11).** The assistant-first rebuild prompt supplied later takes
+> precedence where it differs: the assistant is the default route, there are five destinations,
+> the $8,000 allocation, compulsory travel goal and imposed budgets are gone, and take-home is
+> derived from FICA + SDI + entered withholding. See `docs/ASSISTANT_FIRST_PLAN.md`.
+
 ## 1. Product
 
 Finance Desk is a premium, mobile-friendly finance dashboard and AI assistant for three kinds of

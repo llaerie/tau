@@ -137,13 +137,16 @@ export async function register(_prev: ActionResult | undefined, fd: FormData): P
         { id: newId("perm"), spaceId: household, userId, role: "owner" },
         { id: newId("perm"), spaceId: mine, userId, role: "owner" },
       ]).run();
-      tx.insert(s.assumptions).values({ workspaceId, json: JSON.stringify(defaultAssumptions(personIds)), updatedAt: createdAt, updatedBy: userId }).run();
-      // Bills, budgets and goals from the plan. Personal records apply to people whose name matches the plan.
-      applyTemplateRecords(tx, workspaceId, spaces, [{ id: me, name: input.name }, ...(partnerId ? [{ id: partnerId, name: input.partnerName }] : [])]);
+      const initial = JSON.stringify(defaultAssumptions(personIds));
+      tx.insert(s.assumptions).values({ workspaceId, json: initial, updatedAt: createdAt, updatedBy: userId }).run();
+      tx.insert(s.assumptionHistory).values({ id: newId("ah"), workspaceId, json: initial, provenance: "owner_stated", note: "Owner-stated planning facts as of 2026-09-11 (template defaults)", effectiveFrom: createdAt, supersededAt: null, changedBy: userId }).run();
+      tx.insert(s.userPreferences).values({ userId, theme: "system", spokenReplies: false, sharePersonalSummary: true, updatedAt: createdAt }).onConflictDoNothing().run();
+      // Company-paid household bills, planned subscriptions and purchase plans from the stated plan.
+      applyTemplateRecords(tx, workspaceId, spaces, [{ id: me, name: input.name }, ...(partnerId ? [{ id: partnerId, name: input.partnerName }] : [])], "template");
     });
     await createSession(userId);
   });
-  if (result.ok) redirect("/onboarding");
+  if (result.ok) redirect("/");
   return result;
 }
 

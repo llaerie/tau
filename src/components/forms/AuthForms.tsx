@@ -60,7 +60,7 @@ export function LiveAuthForms({ inviteCode }: { inviteCode: string }) {
                 <label className="block text-sm"><span className="label">Partner&apos;s first name</span><input name="partnerName" className="input mt-1" placeholder="Arielle" /></label>
                 <label className="block text-sm"><span className="label">Partner&apos;s role</span><input name="partnerTitle" className="input mt-1" placeholder="Creative Director" /></label>
               </div>
-              <p className="text-xs text-ink-3">Your partner gets a private personal space you cannot see. Invite them from Settings afterwards. Using the names Will and Arielle pre-fills the plan you described (travel goal, spending plan, household bills).</p>
+              <p className="text-xs text-ink-3">Your partner gets a private personal space you cannot see. Invite them from Settings afterwards. Using the names Will and Arielle pre-fills the owner-stated plan (two $3,000 salaries, company-paid rent and cars, subscriptions to confirm). No budgets or goals are imposed.</p>
             </>
           )}
           {regState && !regState.ok && <p className="text-sm text-bad">{regState.error}</p>}

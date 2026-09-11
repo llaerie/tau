@@ -6,10 +6,9 @@ import * as s from "./schema";
 import { applyTemplateRecords, TEMPLATE } from "./template";
 
 /**
- * Synthetic demo data for Will and Arielle. Every id is deterministic so the
- * seed is idempotent and the e2e tests can rely on it. Balances, rent and the
- * like are invented and labelled as such; the plan figures come from the
- * template.
+ * Synthetic demo data for Will and Arielle. Plan facts come from the template;
+ * balances, deposits and purchases are fictional and reconcile in cents. Ids
+ * are deterministic so the seed is idempotent and tests can rely on it.
  */
 export const DEMO = {
   workspaceId: "ws_demo",
@@ -21,24 +20,22 @@ export const DEMO = {
   spaces: { company: "sp_demo_company", household: "sp_demo_household", will: "sp_demo_will", arielle: "sp_demo_arielle" },
   accounts: {
     coOperating: "acc_demo_co_operating",
-    coTaxReserve: "acc_demo_co_tax",
     coCard: "acc_demo_co_card",
     hhChecking: "acc_demo_hh_checking",
-    hhSavings: "acc_demo_hh_savings",
     willChecking: "acc_demo_will_checking",
     willCard: "acc_demo_will_card",
     arielleChecking: "acc_demo_arielle_checking",
-    arielleTravel: "acc_demo_arielle_travel",
+    arielleSavings: "acc_demo_arielle_savings",
     arielleCard: "acc_demo_arielle_card",
   },
 } as const;
 
+/** Bump when the synthetic data set changes so existing DEMO databases are refreshed. Live workspaces are never touched. */
+export const DEMO_SEED_VERSION = "3";
+
 export function demoWorkspaceExists(db: Db): boolean {
   return db.select({ id: s.workspaces.id }).from(s.workspaces).where(eq(s.workspaces.id, DEMO.workspaceId)).get() !== undefined;
 }
-
-/** Bump when the synthetic data set changes so existing demo databases are refreshed. */
-export const DEMO_SEED_VERSION = "2";
 
 export function ensureDemoWorkspace(db: Db): void {
   const stored = db.select().from(s.meta).where(eq(s.meta.key, "demo_seed_version")).get()?.value;
@@ -48,9 +45,10 @@ export function ensureDemoWorkspace(db: Db): void {
   db.insert(s.meta).values({ key: "demo_seed_version", value: DEMO_SEED_VERSION }).onConflictDoUpdate({ target: s.meta.key, set: { value: DEMO_SEED_VERSION } }).run();
 }
 
+/** Only ever called for the demo workspace (guarded by the caller). */
 export function resetDemoWorkspace(db: Db): void {
-  // Deleting the workspace cascades to every record inside it. Demo users and
-  // their sessions are kept so whoever pressed "reset" stays signed in.
+  const ws = db.select().from(s.workspaces).where(eq(s.workspaces.id, DEMO.workspaceId)).get();
+  if (ws && !ws.isDemo) throw new Error("Refusing to reset a non-demo workspace");
   db.delete(s.workspaces).where(eq(s.workspaces.id, DEMO.workspaceId)).run();
   seedDemoWorkspace(db);
 }
@@ -61,24 +59,24 @@ export function seedDemoWorkspace(db: Db): void {
   const createdAt = nowIso();
   const A = DEMO.accounts;
   const S = DEMO.spaces;
+  const P = DEMO.persons;
 
   db.transaction((tx) => {
-    tx.insert(s.workspaces).values({ id: DEMO.workspaceId, name: `${TEMPLATE.companyName} (synthetic demo)`, isDemo: true, createdAt }).run();
+    tx.insert(s.workspaces).values({ id: DEMO.workspaceId, name: `${TEMPLATE.companyName} (demo)`, isDemo: true, createdAt }).run();
     for (const u of Object.values(DEMO.users)) {
       tx.insert(s.users).values({ id: u.id, email: u.email, name: u.name, passwordHash: null, isDemo: true, createdAt }).onConflictDoNothing().run();
-      tx.insert(s.memberships).values({ id: `mem_${u.id}`, workspaceId: DEMO.workspaceId, userId: u.id, role: "owner", createdAt }).run();
+      tx.insert(s.memberships).values({ id: `mem_${u.id}`, workspaceId: DEMO.workspaceId, userId: u.id, role: u.id === DEMO.users.will.id ? "owner" : "member", createdAt }).run();
     }
-    const will = TEMPLATE.persons[0];
-    const arielle = TEMPLATE.persons[1];
+    const [will, arielle] = TEMPLATE.persons;
     tx.insert(s.persons).values([
-      { id: DEMO.persons.will, workspaceId: DEMO.workspaceId, slug: will.slug, name: will.name, title: will.title, userId: DEMO.users.will.id },
-      { id: DEMO.persons.arielle, workspaceId: DEMO.workspaceId, slug: arielle.slug, name: arielle.name, title: arielle.title, userId: DEMO.users.arielle.id },
+      { id: P.will, workspaceId: DEMO.workspaceId, slug: will.slug, name: will.name, title: will.title, userId: DEMO.users.will.id },
+      { id: P.arielle, workspaceId: DEMO.workspaceId, slug: arielle.slug, name: arielle.name, title: arielle.title, userId: DEMO.users.arielle.id },
     ]).run();
     tx.insert(s.spaces).values([
       { id: S.company, workspaceId: DEMO.workspaceId, kind: "company", name: TEMPLATE.companyName, personId: null },
       { id: S.household, workspaceId: DEMO.workspaceId, kind: "household", name: "Household", personId: null },
-      { id: S.will, workspaceId: DEMO.workspaceId, kind: "personal", name: will.name, personId: DEMO.persons.will },
-      { id: S.arielle, workspaceId: DEMO.workspaceId, kind: "personal", name: arielle.name, personId: DEMO.persons.arielle },
+      { id: S.will, workspaceId: DEMO.workspaceId, kind: "personal", name: will.name, personId: P.will },
+      { id: S.arielle, workspaceId: DEMO.workspaceId, kind: "personal", name: arielle.name, personId: P.arielle },
     ]).run();
     tx.insert(s.spacePermissions).values([
       { id: "perm_demo_1", spaceId: S.company, userId: DEMO.users.will.id, role: "owner" },
@@ -88,138 +86,138 @@ export function seedDemoWorkspace(db: Db): void {
       { id: "perm_demo_5", spaceId: S.will, userId: DEMO.users.will.id, role: "owner" },
       { id: "perm_demo_6", spaceId: S.arielle, userId: DEMO.users.arielle.id, role: "owner" },
     ]).run();
+    tx.insert(s.userPreferences).values([
+      { userId: DEMO.users.will.id, theme: "system", spokenReplies: false, sharePersonalSummary: true, updatedAt: createdAt },
+      { userId: DEMO.users.arielle.id, theme: "system", spokenReplies: false, sharePersonalSummary: true, updatedAt: createdAt },
+    ]).onConflictDoNothing().run();
 
     const asOf = "2026-06-01";
     tx.insert(s.accounts).values([
       { id: A.coOperating, spaceId: S.company, name: "Operating checking", type: "checking", institution: "Demo Bank", openingBalanceCents: 4200000, openingBalanceAsOf: asOf },
-      { id: A.coTaxReserve, spaceId: S.company, name: "Tax reserve savings", type: "savings", institution: "Demo Bank", openingBalanceCents: null, openingBalanceAsOf: null },
-      { id: A.coCard, spaceId: S.company, name: "Company card", type: "credit_card", institution: "Demo Card", openingBalanceCents: -120000, openingBalanceAsOf: asOf },
+      { id: A.coCard, spaceId: S.company, name: "Company card", type: "credit_card", institution: "Demo Card", openingBalanceCents: 0, openingBalanceAsOf: asOf },
       { id: A.hhChecking, spaceId: S.household, name: "Joint checking", type: "checking", institution: "Demo Bank", openingBalanceCents: 310000, openingBalanceAsOf: asOf },
-      { id: A.hhSavings, spaceId: S.household, name: "Joint savings", type: "savings", institution: "Demo Bank", openingBalanceCents: 200000, openingBalanceAsOf: asOf },
       { id: A.willChecking, spaceId: S.will, name: "Will checking", type: "checking", institution: "Demo Bank", openingBalanceCents: 520000, openingBalanceAsOf: asOf },
-      { id: A.willCard, spaceId: S.will, name: "Will card", type: "credit_card", institution: "Demo Card", openingBalanceCents: -64000, openingBalanceAsOf: asOf },
+      { id: A.willCard, spaceId: S.will, name: "Will card", type: "credit_card", institution: "Demo Card", openingBalanceCents: 0, openingBalanceAsOf: asOf },
       { id: A.arielleChecking, spaceId: S.arielle, name: "Arielle checking", type: "checking", institution: "Demo Bank", openingBalanceCents: 410000, openingBalanceAsOf: asOf },
-      { id: A.arielleTravel, spaceId: S.arielle, name: "Travel fund", type: "savings", institution: "Demo Bank", openingBalanceCents: 150000, openingBalanceAsOf: asOf },
-      { id: A.arielleCard, spaceId: S.arielle, name: "Arielle card", type: "credit_card", institution: "Demo Card", openingBalanceCents: -31000, openingBalanceAsOf: asOf },
+      { id: A.arielleSavings, spaceId: S.arielle, name: "Arielle savings", type: "savings", institution: "Demo Bank", openingBalanceCents: null, openingBalanceAsOf: null },
+      { id: A.arielleCard, spaceId: S.arielle, name: "Arielle card", type: "credit_card", institution: "Demo Card", openingBalanceCents: 0, openingBalanceAsOf: asOf },
     ]).run();
 
-    const cat = (name: string, group: string) => ({ id: `cat_demo_${name.toLowerCase().replace(/[^a-z]+/g, "_")}`, workspaceId: DEMO.workspaceId, name, group });
-    const categories = [
-      cat("Service revenue", "company"), cat("Payroll — gross wages", "company"), cat("Software & tools", "company"), cat("Equipment", "company"),
-      cat("Apartment furnishing (household)", "company"), cat("Bookkeeping", "company"), cat("Owner distribution", "company"),
-      cat("Rent", "household"), cat("Tesla payments", "household"), cat("Utilities", "household"), cat("Car insurance", "household"), cat("Groceries", "household"), cat("Dining together", "household"), cat("Household savings", "household"),
-      cat("Salary (net)", "personal"), cat("Shopping", "personal"), cat("Massage", "personal"), cat("Pedicure", "personal"), cat("Arts & crafts", "personal"), cat("Coffee, snacks & eating out with friends", "personal"), cat("Fitness", "personal"), cat("Phone", "personal"), cat("Personal savings", "personal"),
-    ];
-    tx.insert(s.categories).values(categories).run();
-    const C = Object.fromEntries(categories.map((c) => [c.name, c.id]));
-
-    // Template records (goals, budgets, bills) with synthetic household amounts.
     applyTemplateRecords(
       tx,
       DEMO.workspaceId,
       [
         { id: S.company, kind: "company", personId: null },
         { id: S.household, kind: "household", personId: null },
-        { id: S.will, kind: "personal", personId: DEMO.persons.will },
-        { id: S.arielle, kind: "personal", personId: DEMO.persons.arielle },
+        { id: S.will, kind: "personal", personId: P.will },
+        { id: S.arielle, kind: "personal", personId: P.arielle },
       ],
       [
-        { id: DEMO.persons.will, name: will.name },
-        { id: DEMO.persons.arielle, name: arielle.name },
+        { id: P.will, name: will.name },
+        { id: P.arielle, name: arielle.name },
       ],
-      { householdBills: { Rent: 320000, "Tesla payments": 140000, Utilities: 25000, "Car insurance": 28000 }, householdBudgets: { Groceries: 90000, "Dining together": 60000 } },
+      "demo",
     );
+    const cats = Object.fromEntries(tx.select().from(s.categories).where(eq(s.categories.workspaceId, DEMO.workspaceId)).all().map((c) => [c.name, c.id]));
+    const extra = [
+      ["Service revenue", "company"], ["Gross wages", "company"], ["Owner distribution", "company"], ["Bookkeeping", "company"],
+      ["Salary (net)", "personal"], ["Phone", "personal"], ["Fitness", "personal"], ["Shopping", "personal"], ["Personal savings", "personal"],
+    ] as const;
+    for (const [name, group] of extra) {
+      const id = `cat_demo_${name.toLowerCase().replace(/[^a-z]+/g, "_")}`;
+      tx.insert(s.categories).values({ id, workspaceId: DEMO.workspaceId, name, group }).run();
+      cats[name] = id;
+    }
+    const C = cats;
+    const bills = tx.select().from(s.bills).all();
+    const bill = (name: string) => bills.find((b) => b.name === name)?.id ?? null;
     tx.insert(s.bills).values([
-      { id: "bill_demo_co_bookkeeping", spaceId: S.company, name: "Bookkeeping", amountCents: 25000, cadence: "monthly", dueDay: 10, categoryId: C["Bookkeeping"], isActive: true },
-      { id: "bill_demo_will_phone", spaceId: S.will, name: "Phone", amountCents: 6000, cadence: "monthly", dueDay: 8, categoryId: C["Phone"], isActive: true },
-      { id: "bill_demo_will_gym", spaceId: S.will, name: "Gym", amountCents: 4500, cadence: "monthly", dueDay: 5, categoryId: C["Fitness"], isActive: true },
-      { id: "bill_demo_arielle_phone", spaceId: S.arielle, name: "Phone", amountCents: 6000, cadence: "monthly", dueDay: 8, categoryId: C["Phone"], isActive: true },
+      { id: "bill_demo_co_bookkeeping", spaceId: S.company, name: "Bookkeeping", amountCents: 25000, cadence: "monthly", dueDay: 10, categoryId: C["Bookkeeping"], isActive: true, payerSpaceId: null, beneficiary: "company", purpose: "business", treatment: "expense", source: "demo" },
+      { id: "bill_demo_will_phone", spaceId: S.will, name: "Phone", amountCents: 6000, cadence: "monthly", dueDay: 8, categoryId: C["Phone"], isActive: true, payerSpaceId: null, beneficiary: "person", purpose: "personal", treatment: "none", source: "demo" },
+      { id: "bill_demo_will_gym", spaceId: S.will, name: "Gym", amountCents: 4500, cadence: "monthly", dueDay: 5, categoryId: C["Fitness"], isActive: true, payerSpaceId: null, beneficiary: "person", purpose: "personal", treatment: "none", source: "demo" },
+      { id: "bill_demo_arielle_phone", spaceId: S.arielle, name: "Phone", amountCents: 6000, cadence: "monthly", dueDay: 8, categoryId: C["Phone"], isActive: true, payerSpaceId: null, beneficiary: "person", purpose: "personal", treatment: "none", source: "demo" },
     ]).run();
-    tx.insert(s.goals).values([
-      { id: "goal_demo_hh_emergency", spaceId: S.household, name: "Household emergency fund", monthlyTargetCents: 30000, priority: 1, targetTotalCents: 1000000, savedCents: 200000, rule: null, accountId: A.hhSavings },
-    ]).run();
-    // Link Arielle's travel goal to her travel fund account and her saved amount.
-    const travelGoal = tx.select().from(s.goals).where(eq(s.goals.spaceId, S.arielle)).get();
-    if (travelGoal) tx.update(s.goals).set({ accountId: A.arielleTravel, savedCents: 150000 }).where(eq(s.goals.id, travelGoal.id)).run();
-    const billIds = Object.fromEntries(tx.select().from(s.bills).all().map((b) => [`${b.spaceId}:${b.name}`, b.id]));
-    const bill = (spaceId: string, name: string) => billIds[`${spaceId}:${name}`] ?? null;
 
-    const assumptions = defaultAssumptions([DEMO.persons.will, DEMO.persons.arielle]);
-    assumptions.household.plannedCompanyDistributionCents = 600000; // synthetic
-    assumptions.onboardingCompleted = true;
-    assumptions.notes = "Synthetic demo workspace. Plan figures follow the stated plan; balances, rent, car payments and the $6,000 planned distribution are illustrative and were not taken from any real account.";
-    tx.insert(s.assumptions).values({ workspaceId: DEMO.workspaceId, json: JSON.stringify(assumptions), updatedAt: createdAt, updatedBy: null }).run();
+    // Assumptions: Will has a demo withholding estimate and a hypothetical food target (ready state);
+    // Arielle has neither (incomplete/attention state). Both are labelled demo values.
+    const a = defaultAssumptions([P.will, P.arielle]);
+    a.owners[P.will].withholding = { incomeTaxCents: 25000, incomeTaxLowCents: 15000, incomeTaxHighCents: 35000, source: "estimate" };
+    a.owners[P.will].foodTargetCents = 90000;
+    a.owners[P.will].allocations = [{ id: "will-savings", name: "Savings", monthlyCents: 60000, kind: "savings" }];
+    a.onboardingCompleted = true;
+    a.notes = "Demo workspace. Plan facts follow the owner's stated plan; balances, deposits, receipts, Will's $250 withholding estimate and $900 food target are illustrative and unverified.";
+    tx.insert(s.assumptions).values({ workspaceId: DEMO.workspaceId, json: JSON.stringify(a), updatedAt: createdAt, updatedBy: null }).run();
+    tx.insert(s.assumptionHistory).values({ id: "ah_demo_1", workspaceId: DEMO.workspaceId, json: JSON.stringify(a), provenance: "demo", note: "Demo seed v3", effectiveFrom: createdAt, supersededAt: null, changedBy: null }).run();
 
     const txns: TxnSeed[] = [];
+    const shares: (typeof s.expenseShares.$inferInsert)[] = [];
     const d = (month: string, day: number) => `${month}-${String(day).padStart(2, "0")}`;
     const fullMonths = ["2026-06", "2026-07", "2026-08"];
-    const revenue: Record<string, number> = { "2026-06": 2850000, "2026-07": 3000000, "2026-08": 3120000 };
-    const NET = 252050; // $3,000 gross − 7.65% FICA − $250 income tax estimate
-    const WITHHELD = 300000 - NET;
+    const NET_WILL = 248150; // 3,000 − 229.50 FICA − 39 SDI − 250 income-tax estimate (demo)
+    const NET_ARIELLE = 273150; // 3,000 − 229.50 − 39; income tax not yet configured, deposit shown as recorded
+    let n = 0;
+    const push = (t: TxnSeed) => {
+      n++;
+      const id = `txn_demo_${String(n).padStart(4, "0")}`;
+      txns.push({ ...t });
+      return id;
+    };
+    const foodShare = (txnId: string, eventId: string, personId: string, cents: number, date: string) => shares.push({ id: `shr_${txnId}_${personId.slice(-4)}`, transactionId: txnId, economicEventId: eventId, personId, cents, categoryId: C["Food & dining"], date, settledAt: null });
 
     for (const m of fullMonths) {
-      // Company
-      txns.push({ spaceId: S.company, accountId: A.coOperating, date: d(m, 5), amountCents: revenue[m], kind: "income", categoryId: C["Service revenue"], description: "Client retainer — invoice paid" });
-      txns.push({ spaceId: S.company, accountId: A.coOperating, date: d(m, 25), amountCents: 300000, kind: "expense", categoryId: C["Payroll — gross wages"], description: "Payroll — Will (gross)" });
-      txns.push({ spaceId: S.company, accountId: A.coOperating, date: d(m, 25), amountCents: 300000, kind: "expense", categoryId: C["Payroll — gross wages"], description: "Payroll — Arielle (gross)" });
-      txns.push({ spaceId: S.company, accountId: A.coCard, date: d(m, 5), amountCents: 20000, kind: "bill_payment", billId: bill(S.company, "Claude Max"), categoryId: C["Software & tools"], description: "Claude Max" });
-      txns.push({ spaceId: S.company, accountId: A.coCard, date: d(m, 5), amountCents: 20000, kind: "bill_payment", billId: bill(S.company, "ChatGPT Pro"), categoryId: C["Software & tools"], description: "ChatGPT Pro" });
-      txns.push({ spaceId: S.company, accountId: A.coOperating, date: d(m, 10), amountCents: 25000, kind: "bill_payment", billId: bill(S.company, "Bookkeeping"), categoryId: C["Bookkeeping"], description: "Bookkeeping" });
-      txns.push({ spaceId: S.company, accountId: A.coOperating, counterAccountId: A.coCard, date: d(m, 20), amountCents: 40000, kind: "cc_payment", description: "Company card payment" });
-      txns.push({ spaceId: S.company, accountId: A.coOperating, counterAccountId: A.hhChecking, date: d(m, 1), amountCents: 600000, kind: "transfer", categoryId: C["Owner distribution"], description: "Owner distribution to household" });
-      // Household
-      txns.push({ spaceId: S.household, accountId: A.hhChecking, date: d(m, 2), amountCents: 320000, kind: "bill_payment", billId: bill(S.household, "Rent"), categoryId: C["Rent"], description: "Rent" });
-      txns.push({ spaceId: S.household, accountId: A.hhChecking, date: d(m, 15), amountCents: 140000, kind: "bill_payment", billId: bill(S.household, "Tesla payments"), categoryId: C["Tesla payments"], description: "Tesla payments" });
-      txns.push({ spaceId: S.household, accountId: A.hhChecking, date: d(m, 12), amountCents: 25000, kind: "bill_payment", billId: bill(S.household, "Utilities"), categoryId: C["Utilities"], description: "Utilities" });
-      txns.push({ spaceId: S.household, accountId: A.hhChecking, date: d(m, 20), amountCents: 28000, kind: "bill_payment", billId: bill(S.household, "Car insurance"), categoryId: C["Car insurance"], description: "Car insurance" });
-      txns.push({ spaceId: S.household, accountId: A.hhChecking, counterAccountId: A.hhSavings, date: d(m, 3), amountCents: 30000, kind: "savings_allocation", goalId: "goal_demo_hh_emergency", categoryId: C["Household savings"], description: "Emergency fund allocation" });
-      for (const [day, amt] of [[6, 21200], [13, 19800], [20, 24600], [27, 22100]] as const) {
-        txns.push({ spaceId: S.household, accountId: A.hhChecking, date: d(m, day), amountCents: amt, kind: "expense", categoryId: C["Groceries"], description: "Groceries" });
+      // Company: receipt, payroll, company-paid household bills, API usage, bookkeeping.
+      push({ spaceId: S.company, accountId: A.coOperating, date: d(m, 5), amountCents: 3000000, kind: "income", categoryId: C["Service revenue"], description: "Service payment received (related party)", beneficiary: "company", purpose: "business", treatment: "none" });
+      push({ spaceId: S.company, accountId: A.coOperating, date: d(m, 25), amountCents: 300000, kind: "expense", categoryId: C["Gross wages"], description: "Payroll — Will, gross (net + withholding remitted)", beneficiary: "person", purpose: "business", treatment: "expense" });
+      push({ spaceId: S.company, accountId: A.coOperating, date: d(m, 25), amountCents: 300000, kind: "expense", categoryId: C["Gross wages"], description: "Payroll — Arielle, gross (net + withholding remitted)", beneficiary: "person", purpose: "business", treatment: "expense" });
+      push({ spaceId: S.company, accountId: A.coOperating, date: d(m, 1), amountCents: 580000, kind: "bill_payment", billId: bill("Apartment rent"), categoryId: C["Rent"], description: "Apartment rent (paid by company for the household)", beneficiary: "household", purpose: "personal", treatment: "review_required", reviewStatus: "review_required", economicEventId: `ev_rent_${m}` });
+      push({ spaceId: S.company, accountId: A.coOperating, date: d(m, 15), amountCents: 120000, kind: "bill_payment", billId: bill("Two Teslas"), categoryId: C["Vehicles"], description: "Two Teslas (paid by company for the household)", beneficiary: "household", purpose: "personal", treatment: "review_required", reviewStatus: "review_required", economicEventId: `ev_tesla_${m}` });
+      push({ spaceId: S.company, accountId: A.coOperating, date: d(m, 10), amountCents: 25000, kind: "bill_payment", billId: "bill_demo_co_bookkeeping", categoryId: C["Bookkeeping"], description: "Bookkeeping", beneficiary: "company", purpose: "business", treatment: "expense" });
+      push({ spaceId: S.company, accountId: A.coCard, date: d(m, 28), amountCents: m === "2026-06" ? 12400 : m === "2026-07" ? 16900 : 18400, kind: "expense", categoryId: C["API usage"], description: "Claude API usage (metered)", beneficiary: "company", purpose: "business", treatment: "expense" });
+      if (m !== "2026-06") push({ spaceId: S.company, accountId: A.coOperating, counterAccountId: A.coCard, date: d(m, 20), amountCents: m === "2026-07" ? 12400 : 16900, kind: "cc_payment", description: "Company card payment" });
+      push({ spaceId: S.company, accountId: A.coOperating, counterAccountId: A.hhChecking, date: d(m, 2), amountCents: 150000, kind: "transfer", categoryId: C["Owner distribution"], description: "Owner distribution to joint account", treatment: "shareholder_distribution", reviewStatus: "review_required", beneficiary: "household", purpose: "personal", economicEventId: `ev_dist_${m}` });
+      // Household: groceries from joint checking.
+      for (const [day, amt] of [[6, 18200], [13, 16900], [20, 21400], [27, 19100]] as const) push({ spaceId: S.household, accountId: A.hhChecking, date: d(m, day), amountCents: amt, kind: "expense", categoryId: C["Groceries"], description: "Groceries", beneficiary: "household", purpose: "personal", treatment: "none" });
+      // Will: net deposit, withholding (informational), bills, food, savings.
+      push({ spaceId: S.will, accountId: A.willChecking, date: d(m, 25), amountCents: NET_WILL, kind: "income", categoryId: C["Salary (net)"], description: "Payroll — net deposit" });
+      push({ spaceId: S.will, accountId: A.willChecking, date: d(m, 25), amountCents: 300000 - NET_WILL, kind: "payroll_withholding", description: "Payroll withholding on $3,000 gross (FICA, SDI, income tax)" });
+      push({ spaceId: S.will, accountId: A.willChecking, date: d(m, 8), amountCents: 6000, kind: "bill_payment", billId: "bill_demo_will_phone", categoryId: C["Phone"], description: "Phone" });
+      push({ spaceId: S.will, accountId: A.willChecking, date: d(m, 5), amountCents: 4500, kind: "bill_payment", billId: "bill_demo_will_gym", categoryId: C["Fitness"], description: "Gym" });
+      for (const [day, amt, desc] of [[3, 1450, "Coffee and pastry"], [9, 3200, "Lunch"], [16, 5400, "Takeout"], [22, 2800, "Lunch"]] as const) {
+        const id = push({ spaceId: S.will, accountId: A.willCard, date: d(m, day), amountCents: amt, kind: "expense", categoryId: C["Food & dining"], description: desc, beneficiary: "person", purpose: "personal", treatment: "none", payerPersonId: P.will, economicEventId: `ev_wfood_${m}_${day}` });
+        foodShare(id, `ev_wfood_${m}_${day}`, P.will, amt, d(m, day));
       }
-      for (const [day, amt] of [[8, 14200], [22, 17600]] as const) {
-        txns.push({ spaceId: S.household, accountId: A.hhChecking, date: d(m, day), amountCents: amt, kind: "expense", categoryId: C["Dining together"], description: "Dinner together" });
+      push({ spaceId: S.will, accountId: A.willChecking, counterAccountId: A.willCard, date: d(m, 20), amountCents: 12850, kind: "cc_payment", description: "Card payment" });
+      // Arielle: net deposit, withholding, bills, food, one shared dinner she paid and split.
+      push({ spaceId: S.arielle, accountId: A.arielleChecking, date: d(m, 25), amountCents: NET_ARIELLE, kind: "income", categoryId: C["Salary (net)"], description: "Payroll — net deposit (income-tax withholding not configured)" });
+      push({ spaceId: S.arielle, accountId: A.arielleChecking, date: d(m, 25), amountCents: 300000 - NET_ARIELLE, kind: "payroll_withholding", description: "Payroll withholding on $3,000 gross (FICA, SDI)" });
+      push({ spaceId: S.arielle, accountId: A.arielleChecking, date: d(m, 8), amountCents: 6000, kind: "bill_payment", billId: "bill_demo_arielle_phone", categoryId: C["Phone"], description: "Phone" });
+      for (const [day, amt, desc] of [[4, 1650, "Coffee"], [11, 2900, "Lunch with Maya"], [18, 4600, "Sushi takeout"]] as const) {
+        const id = push({ spaceId: S.arielle, accountId: A.arielleCard, date: d(m, day), amountCents: amt, kind: "expense", categoryId: C["Food & dining"], description: desc, beneficiary: "person", purpose: "personal", treatment: "none", payerPersonId: P.arielle, economicEventId: `ev_afood_${m}_${day}` });
+        foodShare(id, `ev_afood_${m}_${day}`, P.arielle, amt, d(m, day));
       }
-      // Will
-      txns.push({ spaceId: S.will, accountId: A.willChecking, date: d(m, 25), amountCents: NET, kind: "income", categoryId: C["Salary (net)"], description: "Payroll — net deposit" });
-      txns.push({ spaceId: S.will, accountId: A.willChecking, date: d(m, 25), amountCents: WITHHELD, kind: "payroll_withholding", description: "Payroll withholding (gross $3,000)" });
-      txns.push({ spaceId: S.will, accountId: A.willChecking, date: d(m, 8), amountCents: 6000, kind: "bill_payment", billId: bill(S.will, "Phone"), categoryId: C["Phone"], description: "Phone" });
-      txns.push({ spaceId: S.will, accountId: A.willChecking, date: d(m, 5), amountCents: 4500, kind: "bill_payment", billId: bill(S.will, "Gym"), categoryId: C["Fitness"], description: "Gym" });
-      txns.push({ spaceId: S.will, accountId: A.willCard, date: d(m, 11), amountCents: 8900, kind: "expense", categoryId: null, description: "Books" });
-      txns.push({ spaceId: S.will, accountId: A.willChecking, counterAccountId: A.willCard, date: d(m, 20), amountCents: 8900, kind: "cc_payment", description: "Card payment" });
-      // Arielle
-      txns.push({ spaceId: S.arielle, accountId: A.arielleChecking, date: d(m, 25), amountCents: NET, kind: "income", categoryId: C["Salary (net)"], description: "Payroll — net deposit" });
-      txns.push({ spaceId: S.arielle, accountId: A.arielleChecking, date: d(m, 25), amountCents: WITHHELD, kind: "payroll_withholding", description: "Payroll withholding (gross $3,000)" });
-      txns.push({ spaceId: S.arielle, accountId: A.arielleChecking, counterAccountId: A.arielleTravel, date: d(m, 26), amountCents: 100000, kind: "savings_allocation", goalId: travelGoal?.id ?? null, categoryId: C["Personal savings"], description: "Friends travel fund" });
-      txns.push({ spaceId: S.arielle, accountId: A.arielleChecking, date: d(m, 8), amountCents: 6000, kind: "bill_payment", billId: bill(S.arielle, "Phone"), categoryId: C["Phone"], description: "Phone" });
-      for (const [day, amt, desc, catName] of [
-        [4, 18900, "Boutique", "Shopping"],
-        [16, 23400, "Online order", "Shopping"],
-        [9, 15000, "Massage", "Massage"],
-        [12, 6000, "Pedicure", "Pedicure"],
-        [18, 8500, "Art supplies", "Arts & crafts"],
-        [3, 4200, "Coffee with Maya", "Coffee, snacks & eating out with friends"],
-        [21, 7800, "Brunch with friends", "Coffee, snacks & eating out with friends"],
-      ] as const) {
-        txns.push({ spaceId: S.arielle, accountId: A.arielleCard, date: d(m, day), amountCents: amt, kind: "expense", categoryId: C[catName], description: desc });
-      }
-      txns.push({ spaceId: S.arielle, accountId: A.arielleChecking, counterAccountId: A.arielleCard, date: d(m, 20), amountCents: 83800, kind: "cc_payment", description: "Card payment" });
+      const dinnerId = push({ spaceId: S.arielle, accountId: A.arielleCard, date: d(m, 14), amountCents: 9800, kind: "expense", categoryId: C["Food & dining"], description: "Dinner together (split equally)", beneficiary: "split", purpose: "personal", treatment: "none", payerPersonId: P.arielle, economicEventId: `ev_dinner_${m}` });
+      foodShare(dinnerId, `ev_dinner_${m}`, P.arielle, 4900, d(m, 14));
+      foodShare(dinnerId, `ev_dinner_${m}`, P.will, 4900, d(m, 14));
+      push({ spaceId: S.arielle, accountId: A.arielleCard, date: d(m, 21), amountCents: 12900, kind: "expense", categoryId: C["Shopping"], description: "Boutique", beneficiary: "person", purpose: "personal", treatment: "none" });
+      push({ spaceId: S.arielle, accountId: A.arielleChecking, counterAccountId: A.arielleCard, date: d(m, 20), amountCents: 31850, kind: "cc_payment", description: "Card payment" });
     }
-    // One-off allocation spending and the current month so far (September 2026).
-    txns.push({ spaceId: S.company, accountId: A.coCard, date: "2026-07-14", amountCents: 159900, kind: "expense", categoryId: C["Equipment"], description: "Mac mini (2026)" });
-    txns.push({ spaceId: S.company, accountId: A.coCard, date: "2026-08-09", amountCents: 240000, kind: "expense", categoryId: C["Apartment furnishing (household)"], description: "Sofa and dining table for the apartment" });
+    // September so far.
     const m = "2026-09";
-    txns.push({ spaceId: S.company, accountId: A.coOperating, counterAccountId: A.hhChecking, date: d(m, 1), amountCents: 600000, kind: "transfer", categoryId: C["Owner distribution"], description: "Owner distribution to household" });
-    txns.push({ spaceId: S.company, accountId: A.coCard, date: d(m, 5), amountCents: 20000, kind: "bill_payment", billId: bill(S.company, "Claude Max"), categoryId: C["Software & tools"], description: "Claude Max" });
-    txns.push({ spaceId: S.company, accountId: A.coCard, date: d(m, 5), amountCents: 20000, kind: "bill_payment", billId: bill(S.company, "ChatGPT Pro"), categoryId: C["Software & tools"], description: "ChatGPT Pro" });
-    txns.push({ spaceId: S.household, accountId: A.hhChecking, date: d(m, 2), amountCents: 320000, kind: "bill_payment", billId: bill(S.household, "Rent"), categoryId: C["Rent"], description: "Rent" });
-    txns.push({ spaceId: S.household, accountId: A.hhChecking, counterAccountId: A.hhSavings, date: d(m, 3), amountCents: 30000, kind: "savings_allocation", goalId: "goal_demo_hh_emergency", categoryId: C["Household savings"], description: "Emergency fund allocation" });
-    txns.push({ spaceId: S.household, accountId: A.hhChecking, date: d(m, 6), amountCents: 20700, kind: "expense", categoryId: C["Groceries"], description: "Groceries" });
-    txns.push({ spaceId: S.will, accountId: A.willChecking, date: d(m, 5), amountCents: 4500, kind: "bill_payment", billId: bill(S.will, "Gym"), categoryId: C["Fitness"], description: "Gym" });
-    txns.push({ spaceId: S.will, accountId: A.willChecking, date: d(m, 8), amountCents: 6000, kind: "bill_payment", billId: bill(S.will, "Phone"), categoryId: C["Phone"], description: "Phone" });
-    txns.push({ spaceId: S.arielle, accountId: A.arielleChecking, date: d(m, 8), amountCents: 6000, kind: "bill_payment", billId: bill(S.arielle, "Phone"), categoryId: C["Phone"], description: "Phone" });
-    txns.push({ spaceId: S.arielle, accountId: A.arielleCard, date: d(m, 4), amountCents: 4600, kind: "expense", categoryId: C["Coffee, snacks & eating out with friends"], description: "Coffee with Maya" });
-    txns.push({ spaceId: S.arielle, accountId: A.arielleCard, date: d(m, 7), amountCents: 12900, kind: "expense", categoryId: C["Shopping"], description: "Boutique" });
+    push({ spaceId: S.company, accountId: A.coOperating, date: d(m, 1), amountCents: 580000, kind: "bill_payment", billId: bill("Apartment rent"), categoryId: C["Rent"], description: "Apartment rent (paid by company for the household)", beneficiary: "household", purpose: "personal", treatment: "review_required", reviewStatus: "review_required", economicEventId: `ev_rent_${m}` });
+    push({ spaceId: S.company, accountId: A.coOperating, counterAccountId: A.hhChecking, date: d(m, 2), amountCents: 150000, kind: "transfer", categoryId: C["Owner distribution"], description: "Owner distribution to joint account", treatment: "shareholder_distribution", reviewStatus: "review_required", beneficiary: "household", purpose: "personal", economicEventId: `ev_dist_${m}` });
+    push({ spaceId: S.company, accountId: A.coOperating, date: d(m, 10), amountCents: 25000, kind: "bill_payment", billId: "bill_demo_co_bookkeeping", categoryId: C["Bookkeeping"], description: "Bookkeeping", beneficiary: "company", purpose: "business", treatment: "expense" });
+    push({ spaceId: S.household, accountId: A.hhChecking, date: d(m, 6), amountCents: 17300, kind: "expense", categoryId: C["Groceries"], description: "Groceries", beneficiary: "household", purpose: "personal", treatment: "none" });
+    push({ spaceId: S.will, accountId: A.willChecking, date: d(m, 5), amountCents: 4500, kind: "bill_payment", billId: "bill_demo_will_gym", categoryId: C["Fitness"], description: "Gym" });
+    push({ spaceId: S.will, accountId: A.willChecking, date: d(m, 8), amountCents: 6000, kind: "bill_payment", billId: "bill_demo_will_phone", categoryId: C["Phone"], description: "Phone" });
+    const wf = push({ spaceId: S.will, accountId: A.willCard, date: d(m, 4), amountCents: 2650, kind: "expense", categoryId: C["Food & dining"], description: "Lunch", beneficiary: "person", purpose: "personal", treatment: "none", payerPersonId: P.will, economicEventId: "ev_wfood_2026-09_4" });
+    foodShare(wf, "ev_wfood_2026-09_4", P.will, 2650, d(m, 4));
+    push({ spaceId: S.arielle, accountId: A.arielleChecking, date: d(m, 8), amountCents: 6000, kind: "bill_payment", billId: "bill_demo_arielle_phone", categoryId: C["Phone"], description: "Phone" });
+    const af = push({ spaceId: S.arielle, accountId: A.arielleCard, date: d(m, 3), amountCents: 1850, kind: "expense", categoryId: C["Food & dining"], description: "Coffee with Maya", beneficiary: "person", purpose: "personal", treatment: "none", payerPersonId: P.arielle, economicEventId: "ev_afood_2026-09_3" });
+    foodShare(af, "ev_afood_2026-09_3", P.arielle, 1850, d(m, 3));
+    const af2 = push({ spaceId: S.arielle, accountId: A.arielleCard, date: d(m, 9), amountCents: 3400, kind: "expense", categoryId: C["Food & dining"], description: "Lunch", beneficiary: "person", purpose: "personal", treatment: "none", payerPersonId: P.arielle, economicEventId: "ev_afood_2026-09_9" });
+    foodShare(af2, "ev_afood_2026-09_9", P.arielle, 3400, d(m, 9));
 
     tx.insert(s.transactions).values(txns.map((t, i) => ({ ...t, id: `txn_demo_${String(i + 1).padStart(4, "0")}`, source: "seed" as const, createdAt }))).run();
+    if (shares.length) tx.insert(s.expenseShares).values(shares).run();
   });
 }

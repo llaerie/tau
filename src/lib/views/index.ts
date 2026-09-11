@@ -1,25 +1,14 @@
 import type { Viewer, ViewerSpace } from "../auth/session";
 import { assertSpaceAccess } from "../auth/authorize";
-import { cardBalance, cashBalance, cashTotal, loadSpaceData, monthlyBillCents, toBillInputs, toBudgetInputs, toGoalInputs, toLedger, type SpaceData } from "../data/spaces";
-import {
-  billStatuses,
-  computeCompany,
-  computeHousehold,
-  computePersonal,
-  monthPeriod,
-  project,
-  summarizeFlows,
-  type BillPeriodStatus,
-  type CompanyResult,
-  type FlowSummary,
-  type HouseholdResult,
-  type PersonalResult,
-  type Projection,
-  type ProjectionInput,
-} from "../finance";
-import { amountFromNullable, isKnown, known, sumAmounts, unknown, type Amount, type Total } from "../finance/money";
-import { unresolvedAssumptions, type OwnerAssumptions, defaultOwnerAssumptions } from "../assumptions";
-import { currentMonth } from "../ids";
+import { cardBalance, cashBalance, cashTotal, foodSpentCents, loadPreferences, loadPurchasePlans, loadSpaceData, loadSubscriptions, monthlyBillCents, toBillInputs, toLedger, type SpaceData } from "../data/spaces";
+import type * as s from "../db/schema";
+import { expenseShares } from "../db/schema";
+import { getDb } from "../db";
+import { and, eq, gte, lte } from "drizzle-orm";
+import { billStatuses, computeCashPlan, computeFoodPlan, computeTakeHome, monthPeriod, project, subscriptionMonthly, summarizeFlows, type BillPeriodStatus, type CashPlanResult, type FlowSummary, type FoodPlanResult, type PlannedPurchase, type PlannedSubscription, type Projection, type ProjectionInput, type TakeHomeResult } from "../finance";
+import { amountFromNullable, formatCents, isKnown, known, sumAmounts, total, unknown, type Amount, type Total } from "../finance/money";
+import { defaultOwnerAssumptions, reviewItems, type OwnerAssumptions, type ReviewItem } from "../assumptions";
+import { currentMonth, todayIso } from "../ids";
 
 export const PROJECTION_MONTHS = 6;
 
@@ -30,55 +19,55 @@ export interface SpaceViewBase {
   flows: FlowSummary;
   previousFlows: FlowSummary;
   bills: BillPeriodStatus[];
-  unpaidCommittedCents: number;
   cash: Amount;
   cashTotal: Total;
   cards: Amount;
-  projection: Projection;
-  projectionInput: ProjectionInput;
+  cashAsOf: string | null;
 }
 
 export interface CompanyView extends SpaceViewBase {
   kind: "company";
-  result: CompanyResult;
+  plan: CashPlanResult;
+  subscriptions: s.Subscription[];
+  purchasePlans: s.PurchasePlan[];
+  projection: Projection;
+  projectionInput: ProjectionInput;
+  reviewCount: number;
 }
+
 export interface HouseholdView extends SpaceViewBase {
   kind: "household";
-  result: HouseholdResult;
+  /** Bills the company pays for the household: a benefit, not joint-account cash. */
+  companyPaidBills: (s.Bill & { monthlyCents: number | null; paid: boolean })[];
+  ownBills: (s.Bill & { monthlyCents: number | null; paid: boolean })[];
+  companyPaidTotal: Total;
+  ownBillsTotal: Total;
+  groceriesThisMonthCents: number;
 }
+
 export interface PersonalView extends SpaceViewBase {
   kind: "personal";
-  result: PersonalResult;
   personId: string;
   personName: string;
   personTitle: string | null;
-  /** Net deposits observed in the ledger last full month, as evidence for the withholding estimate. */
-  observedNetLastMonthCents: number | null;
-  observedWithholdingLastMonthCents: number | null;
+  takeHome: TakeHomeResult;
+  food: FoodPlanResult;
+  owner: OwnerAssumptions;
+  fixedBillsTotal: Total;
+  upcoming: Obligation[];
 }
 
 export type SpaceView = CompanyView | HouseholdView | PersonalView;
 
-function base(viewer: Viewer, space: ViewerSpace, month: string): Omit<SpaceViewBase, "projection" | "projectionInput"> {
-  const data = loadSpaceData(viewer, space);
-  const ledger = toLedger(data.transactions);
-  const period = monthPeriod(month);
-  const prev = monthPeriod(addMonth(month, -1));
-  const flows = summarizeFlows(ledger, { accountIds: data.accountIds }, period);
-  const previousFlows = summarizeFlows(ledger, { accountIds: data.accountIds }, prev);
-  const statuses = billStatuses(data.bills.map((b) => ({ id: b.id, monthlyCents: monthlyBillCents(b) })), ledger, period);
-  return {
-    space,
-    data,
-    month,
-    flows,
-    previousFlows,
-    bills: statuses.statuses,
-    unpaidCommittedCents: statuses.unpaidCommittedCents,
-    cash: cashBalance(data.accounts),
-    cashTotal: cashTotal(data.accounts),
-    cards: cardBalance(data.accounts),
-  };
+export interface Obligation {
+  id: string;
+  label: string;
+  dueDate: string;
+  amount: Amount;
+  kind: "bill" | "subscription" | "purchase_plan" | "payroll";
+  spaceId: string;
+  paid: boolean;
+  payer: string;
 }
 
 export function addMonth(month: string, n: number): string {
@@ -87,14 +76,33 @@ export function addMonth(month: string, n: number): string {
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
 }
 
+function base(viewer: Viewer, space: ViewerSpace, month: string): SpaceViewBase {
+  const data = loadSpaceData(viewer, space);
+  const ledger = toLedger(data.transactions);
+  const period = monthPeriod(month);
+  const prev = monthPeriod(addMonth(month, -1));
+  const flows = summarizeFlows(ledger, { accountIds: data.accountIds }, period);
+  const previousFlows = summarizeFlows(ledger, { accountIds: data.accountIds }, prev);
+  const statuses = billStatuses(data.bills.map((b) => ({ id: b.id, monthlyCents: monthlyBillCents(b) })), toLedger(data.billPayments), period);
+  return { space, data, month, flows, previousFlows, bills: statuses.statuses, cash: cashBalance(data.accounts), cashTotal: cashTotal(data.accounts), cards: cardBalance(data.accounts), cashAsOf: data.accounts[0]?.balanceAsOf ?? null };
+}
+
 function ownerOf(viewer: Viewer, personId: string): OwnerAssumptions {
   return viewer.assumptions.owners[personId] ?? defaultOwnerAssumptions();
 }
 
-function householdKindAllocations(viewer: Viewer): Amount {
-  const items = viewer.assumptions.company.allocations.filter((a) => a.kind === "household");
-  const t = sumAmounts(items.map((a) => amountFromNullable(a.amountCents, `${a.name} amount not entered`)));
-  return t.complete ? known(t.knownCents) : unknown(t.unknowns.join("; "));
+function billPaidThisMonth(payments: s.Transaction[], billId: string, month: string): boolean {
+  const p = monthPeriod(month);
+  return payments.some((t) => t.billId === billId && !t.voidedAt && t.date >= p.from && t.date <= p.to);
+}
+
+export function toPlannedSubscription(sub: s.Subscription): PlannedSubscription {
+  return { id: sub.id, provider: sub.provider, product: sub.product, tier: sub.tier, quantity: sub.quantity, unitPrice: amountFromNullable(sub.unitPriceCents, `${sub.provider} ${sub.product}: price not confirmed`), interval: sub.interval, kind: sub.kind, status: sub.status };
+}
+
+export function toPlannedPurchase(p: s.PurchasePlan): PlannedPurchase {
+  const price = p.unitPriceCents === null ? unknown(`${p.name}: price not entered`) : known(p.unitPriceCents * p.quantity + (p.taxShippingCents ?? 0));
+  return { id: p.id, name: p.name, price, targetMonth: p.targetMonth, status: p.status, beneficiary: p.beneficiary, purpose: p.purpose };
 }
 
 export function buildCompanyView(viewer: Viewer, month = currentMonth()): CompanyView {
@@ -103,30 +111,50 @@ export function buildCompanyView(viewer: Viewer, month = currentMonth()): Compan
   assertSpaceAccess(viewer, space.id, "view");
   const b = base(viewer, space, month);
   const a = viewer.assumptions;
-  const owners = viewer.persons.map((p) => ({ personId: p.id, name: p.name, grossMonthly: amountFromNullable(ownerOf(viewer, p.id).grossSalaryCents, `${p.name}'s gross salary not set`) }));
-  const result = computeCompany({
-    cashBalance: b.cash,
-    cashKnownSoFar: b.cashTotal,
-    cashAsOf: b.data.accounts[0]?.balanceAsOf ?? null,
-    anticipatedRevenue: amountFromNullable(a.company.anticipatedRevenueCents, "Monthly revenue not set"),
+  const subs = loadSubscriptions(viewer.workspace.id).filter((x) => x.spaceId === space.id);
+  const plans = loadPurchasePlans(viewer.workspace.id).filter((x) => x.payerSpaceId === space.id);
+  const period = monthPeriod(month);
+  const prev = monthPeriod(addMonth(month, -1));
+  const apiCat = b.data.categories.find((c) => c.name === "API usage")?.id;
+  const apiLastMonth = apiCat ? b.data.transactions.filter((t) => t.categoryId === apiCat && !t.voidedAt && t.kind === "expense" && t.date >= prev.from && t.date <= prev.to).reduce((x, t) => x + t.amountCents, 0) : 0;
+  const allPaid = [...b.data.bills, ...b.data.billsPaidForOthers];
+  const paymentsAll = [...b.data.billPayments, ...b.data.transactions.filter((t) => t.kind === "bill_payment")];
+  const plan = computeCashPlan({
+    month,
+    recordedCash: b.cashTotal,
+    cashAsOf: b.cashAsOf,
+    expectedRevenue: amountFromNullable(a.company.anticipatedRevenueCents, "Monthly service payment not set"),
     revenueBasis: a.company.revenueBasis,
-    allocations: a.company.allocations.map((al) => ({ id: al.id, name: al.name, amount: amountFromNullable(al.amountCents, `${al.name} amount not entered`), kind: al.kind, note: al.note })),
+    receivedThisMonthCents: b.flows.incomeCents,
+    grossWages: viewer.persons.map((p) => ({ name: p.name, gross: amountFromNullable(ownerOf(viewer, p.id).grossSalaryCents, `${p.name}'s gross salary not set`) })),
     employerPayrollCostRatePct: a.company.employerPayrollCostRatePct,
-    ownerSalaries: owners,
-    incomeTaxReserveRatePct: a.company.incomeTaxReserveRatePct,
-    bills: toBillInputs(b.data.bills),
+    companyPaidBills: allPaid.map((bill) => ({ id: bill.id, name: bill.name, amount: amountFromNullable(bill.amountCents, `${bill.name} amount not entered`), cadence: bill.cadence, dueDay: bill.dueDay, beneficiary: bill.beneficiary ?? (bill.spaceId === space.id ? "company" : "household"), purpose: bill.purpose ?? (bill.spaceId === space.id ? "business" : "unresolved"), treatment: bill.treatment ?? "review_required", paidThisPeriod: billPaidThisMonth(paymentsAll, bill.id, month) })),
+    subscriptions: subs.map(toPlannedSubscription),
+    apiUsageLastMonthCents: apiLastMonth || null,
     otherOverhead: amountFromNullable(a.company.otherOverheadCents, "Other overhead not entered"),
+    purchasePlans: plans.map(toPlannedPurchase),
+    taxReserve: { ratePct: a.company.taxes.reserveRatePct, reviewStatus: a.company.taxes.reviewStatus, note: a.company.taxes.note },
     cashReserveTargetMonths: a.company.cashReserveTargetMonths,
-    plannedHouseholdDistribution: amountFromNullable(a.household.plannedCompanyDistributionCents, "Planned distribution not set"),
   });
   const projectionInput: ProjectionInput = {
     startingCash: b.cash,
     startMonth: month,
     months: PROJECTION_MONTHS,
-    monthlyInflows: [{ label: result.revenue.label, amount: amountFromNullable(a.company.anticipatedRevenueCents, "revenue not set") }],
-    monthlyOutflows: result.lines.filter((l) => l.kind === "outflow" || l.kind === "reserve").map((l) => ({ label: l.label, amount: l.amount })),
+    monthlyInflows: [{ label: "Expected receipts", amount: amountFromNullable(a.company.anticipatedRevenueCents, "revenue not set") }],
+    monthlyOutflows: plan.lines.filter((l) => l.group !== "receipts" && l.group !== "one_time").map((l) => ({ label: l.label, amount: l.amount })),
+    events: plans
+      .filter((p) => p.status !== "cancelled" && p.status !== "purchased" && p.targetMonth && p.unitPriceCents !== null)
+      .map((p) => ({ monthOffset: monthOffset(month, p.targetMonth!), amountCents: -(p.unitPriceCents! * p.quantity + (p.taxShippingCents ?? 0)), label: p.name }))
+      .filter((e) => e.monthOffset >= 0 && e.monthOffset < PROJECTION_MONTHS),
   };
-  return { kind: "company", ...b, result, projection: project(projectionInput), projectionInput };
+  const reviewCount = b.data.transactions.filter((t) => t.reviewStatus === "review_required" && !t.voidedAt && t.date >= period.from && t.date <= period.to).length;
+  return { kind: "company", ...b, plan, subscriptions: subs, purchasePlans: plans, projection: project(projectionInput), projectionInput, reviewCount };
+}
+
+function monthOffset(from: string, to: string): number {
+  const [fy, fm] = from.split("-").map(Number);
+  const [ty, tm] = to.split("-").map(Number);
+  return (ty - fy) * 12 + (tm - fm);
 }
 
 export function buildHouseholdView(viewer: Viewer, month = currentMonth()): HouseholdView {
@@ -134,27 +162,21 @@ export function buildHouseholdView(viewer: Viewer, month = currentMonth()): Hous
   if (!space) throw new Error("No household space visible");
   assertSpaceAccess(viewer, space.id, "view");
   const b = base(viewer, space, month);
-  const a = viewer.assumptions;
+  const decorate = (bill: s.Bill) => ({ ...bill, monthlyCents: monthlyBillCents(bill), paid: billPaidThisMonth(b.data.billPayments, bill.id, month) });
+  const companyPaid = b.data.bills.filter((bill) => bill.payerSpaceId && bill.payerSpaceId !== space.id).map(decorate);
+  const own = b.data.bills.filter((bill) => !bill.payerSpaceId || bill.payerSpaceId === space.id).map(decorate);
+  const groceriesCat = b.data.categories.find((c) => c.name === "Groceries")?.id;
   const period = monthPeriod(month);
-  const result = computeHousehold({
-    contributions: viewer.persons.map((p) => ({ personId: p.id, name: p.name, amount: amountFromNullable(ownerOf(viewer, p.id).householdContributionCents, `${p.name}'s contribution not set`) })),
-    companyDistribution: amountFromNullable(a.household.plannedCompanyDistributionCents, "Planned company distribution not set"),
-    companyPaidItems: householdKindAllocations(viewer),
-    bills: toBillInputs(b.data.bills),
-    goals: toGoalInputs(b.data.goals),
-    budgets: toBudgetInputs(b.data.budgets, toLedger(b.data.transactions), b.data.accountIds, period),
-    cashBalance: b.cash,
-    cashKnownSoFar: b.cashTotal,
-    cashAsOf: b.data.accounts[0]?.balanceAsOf ?? null,
-  });
-  const projectionInput: ProjectionInput = {
-    startingCash: b.cash,
-    startMonth: month,
-    months: PROJECTION_MONTHS,
-    monthlyInflows: result.lines.filter((l) => l.kind === "inflow").map((l) => ({ label: l.label, amount: l.amount })),
-    monthlyOutflows: result.lines.filter((l) => l.kind === "outflow").map((l) => ({ label: l.label, amount: l.amount })),
+  const groceries = groceriesCat ? b.data.transactions.filter((t) => t.categoryId === groceriesCat && !t.voidedAt && t.kind === "expense" && t.date >= period.from && t.date <= period.to).reduce((x, t) => x + t.amountCents, 0) : 0;
+  return {
+    kind: "household",
+    ...b,
+    companyPaidBills: companyPaid,
+    ownBills: own,
+    companyPaidTotal: sumAmounts(companyPaid.map((bill) => amountFromNullable(bill.monthlyCents, `${bill.name} amount unknown`))),
+    ownBillsTotal: sumAmounts(own.map((bill) => amountFromNullable(bill.monthlyCents, `${bill.name} amount unknown`))),
+    groceriesThisMonthCents: groceries,
   };
-  return { kind: "household", ...b, result, projection: project(projectionInput), projectionInput };
 }
 
 export function buildPersonalView(viewer: Viewer, spaceId: string, month = currentMonth()): PersonalView {
@@ -165,53 +187,21 @@ export function buildPersonalView(viewer: Viewer, spaceId: string, month = curre
   const person = viewer.persons.find((p) => p.id === space.personId);
   const name = person?.name ?? "Unknown person";
   const period = monthPeriod(month);
-  const w = o.withholding;
-  const result = computePersonal({
+  const takeHome = computeTakeHome(amountFromNullable(o.grossSalaryCents, `${name}'s gross salary not set`), viewer.assumptions.payrollRules, o.withholding);
+  const fixedBills = sumAmounts(toBillInputs(b.data.bills).map((bill) => (isKnown(bill.amount) ? known(monthlyBillCents(b.data.bills.find((x) => x.id === bill.id)!) ?? 0) : bill.amount)));
+  const spent = foodSpentCents(b.data, period);
+  const food = computeFoodPlan({
     personId: space.personId,
     name,
-    grossSalary: amountFromNullable(o.grossSalaryCents, `${name}'s gross salary not set`),
-    withholding: {
-      ficaRatePct: w.ficaRatePct,
-      incomeTax: amountFromNullable(w.incomeTaxCents, "Income-tax withholding not estimated"),
-      incomeTaxRangeCents: w.incomeTaxLowCents !== null && w.incomeTaxHighCents !== null ? [w.incomeTaxLowCents, w.incomeTaxHighCents] : null,
-    },
-    otherNetIncome: amountFromNullable(o.otherNetIncomeCents, "Other income not set"),
-    householdContribution: amountFromNullable(o.householdContributionCents, `${name}'s household contribution not set`),
-    bills: toBillInputs(b.data.bills),
-    goals: toGoalInputs(b.data.goals),
-    budgets: toBudgetInputs(b.data.budgets, toLedger(b.data.transactions), b.data.accountIds, period),
-    cashBalance: b.cash,
-    cashKnownSoFar: b.cashTotal,
-    cashAsOf: b.data.accounts[0]?.balanceAsOf ?? null,
+    takeHome,
+    foodTargetCents: o.foodTargetCents,
+    foodSpentCents: spent.cents,
+    foodTransactionCount: spent.count,
+    allocations: o.allocations,
+    fixedBillsCents: fixedBills,
+    householdContributionCents: o.householdContributionCents ?? 0,
   });
-  const lastMonth = b.previousFlows;
-  const projectionInput: ProjectionInput = {
-    startingCash: b.cash,
-    startMonth: month,
-    months: PROJECTION_MONTHS,
-    monthlyInflows: [
-      { label: "Net take-home", amount: result.net.total.complete ? known(result.net.total.knownCents) : unknown("net take-home unknown") },
-      { label: "Other net income", amount: amountFromNullable(o.otherNetIncomeCents, "other income not set") },
-    ],
-    monthlyOutflows: [
-      { label: "Household contribution", amount: amountFromNullable(o.householdContributionCents, "contribution not set") },
-      { label: "Fixed bills", amount: result.lines.find((l) => l.id === "bills")!.amount },
-      { label: "Goals", amount: known(result.goals?.totalFundedCents ?? 0) },
-      { label: "Planned spending", amount: result.plannedSpending.complete ? known(result.plannedSpending.knownCents) : unknown("planned spending incomplete") },
-    ],
-  };
-  return {
-    kind: "personal",
-    ...b,
-    result,
-    personId: space.personId,
-    personName: name,
-    personTitle: person?.title ?? null,
-    observedNetLastMonthCents: lastMonth.incomeCents || null,
-    observedWithholdingLastMonthCents: lastMonth.withholdingCents || null,
-    projection: project(projectionInput),
-    projectionInput,
-  };
+  return { kind: "personal", ...b, personId: space.personId, personName: name, personTitle: person?.title ?? null, takeHome, food, owner: o, fixedBillsTotal: fixedBills, upcoming: upcomingObligations(viewer, [space.id], 30) };
 }
 
 export function buildSpaceView(viewer: Viewer, spaceId: string, month = currentMonth()): SpaceView {
@@ -221,39 +211,135 @@ export function buildSpaceView(viewer: Viewer, spaceId: string, month = currentM
   return buildPersonalView(viewer, spaceId, month);
 }
 
-export interface OverviewView {
-  month: string;
-  company: CompanyView | null;
-  household: HouseholdView | null;
-  personal: PersonalView[];
-  unresolved: { key: string; label: string; where: string }[];
-  /** Cash the viewer can see, per space; never summed across spaces. */
-  cashBySpace: { space: ViewerSpace; cash: Amount; cashTotal: Total; cards: Amount }[];
+/** Upcoming dated obligations across the given spaces, within a horizon in days. Read-only. */
+export function upcomingObligations(viewer: Viewer, spaceIds: string[], horizonDays: number): Obligation[] {
+  const today = todayIso();
+  const end = new Date(Date.parse(today) + horizonDays * 86400_000).toISOString().slice(0, 10);
+  const out: Obligation[] = [];
+  const spaceName = (id: string) => viewer.spaces.find((sp) => sp.id === id)?.name ?? "another space";
+  for (const sid of spaceIds) {
+    const sp = viewer.spaces.find((x) => x.id === sid);
+    if (!sp) continue;
+    const data = loadSpaceData(viewer, sp);
+    const billsHere = [...data.bills, ...data.billsPaidForOthers.filter((bill) => !data.bills.some((x) => x.id === bill.id))];
+    for (const bill of billsHere) {
+      if (!bill.dueDay) continue;
+      for (const m of [today.slice(0, 7), addMonth(today.slice(0, 7), 1)]) {
+        const due = `${m}-${String(Math.min(bill.dueDay, 28)).padStart(2, "0")}`;
+        if (due < today || due > end) continue;
+        const paid = billPaidThisMonth(bill.spaceId === sid ? data.billPayments : data.transactions.filter((t) => t.kind === "bill_payment"), bill.id, m);
+        out.push({ id: `${bill.id}-${m}`, label: bill.name, dueDate: due, amount: amountFromNullable(monthlyBillCents(bill), "amount unknown"), kind: "bill", spaceId: sid, paid, payer: bill.payerSpaceId ? spaceName(bill.payerSpaceId) : spaceName(bill.spaceId) });
+      }
+    }
+    if (sp.kind === "company") {
+      for (const p of viewer.persons) {
+        for (const m of [today.slice(0, 7), addMonth(today.slice(0, 7), 1)]) {
+          const due = `${m}-25`;
+          if (due < today || due > end) continue;
+          out.push({ id: `payroll-${p.id}-${m}`, label: `Payroll — ${p.name} (gross)`, dueDate: due, amount: amountFromNullable(ownerOf(viewer, p.id).grossSalaryCents, "salary not set"), kind: "payroll", spaceId: sid, paid: false, payer: sp.name });
+        }
+      }
+      for (const sub of loadSubscriptions(viewer.workspace.id).filter((x) => x.spaceId === sid && x.status !== "cancelled" && x.renewalDate)) {
+        if (sub.renewalDate! >= today && sub.renewalDate! <= end) out.push({ id: `sub-${sub.id}`, label: `${sub.provider} ${sub.product}`, dueDate: sub.renewalDate!, amount: subscriptionMonthly(toPlannedSubscription(sub)), kind: "subscription", spaceId: sid, paid: false, payer: sp.name });
+      }
+      for (const plan of loadPurchasePlans(viewer.workspace.id).filter((x) => x.payerSpaceId === sid && x.status === "approved" && x.targetMonth)) {
+        const due = `${plan.targetMonth}-15`;
+        if (due >= today && due <= end) out.push({ id: `plan-${plan.id}`, label: plan.name, dueDate: due, amount: toPlannedPurchase(plan).price, kind: "purchase_plan", spaceId: sid, paid: false, payer: sp.name });
+      }
+    }
+  }
+  return out.sort((x, y) => x.dueDate.localeCompare(y.dueDate));
 }
 
-export function buildOverview(viewer: Viewer, month = currentMonth()): OverviewView {
-  const company = viewer.spaces.some((sp) => sp.kind === "company") ? buildCompanyView(viewer, month) : null;
-  const household = viewer.spaces.some((sp) => sp.kind === "household") ? buildHouseholdView(viewer, month) : null;
-  const personal = viewer.spaces.filter((sp) => sp.kind === "personal").map((sp) => buildPersonalView(viewer, sp.id, month));
-  const names = Object.fromEntries(viewer.persons.map((p) => [p.id, p.name]));
-  const all: SpaceView[] = [...(company ? [company] : []), ...(household ? [household] : []), ...personal];
-  return {
-    month,
-    company,
-    household,
-    personal,
-    unresolved: unresolvedAssumptions(viewer.assumptions, names).filter((u) => {
-      // Hide other people's personal assumptions the viewer cannot see anyway.
-      const pid = viewer.persons.find((p) => u.key.startsWith(`${p.id}-`))?.id;
-      if (!pid) return true;
-      return viewer.spaces.some((sp) => sp.personId === pid) || u.key.endsWith("-contribution");
-    }),
-    cashBySpace: all.map((v) => ({ space: v.space, cash: v.cash, cashTotal: v.cashTotal, cards: v.cards })),
-  };
+// ---------- Briefing, partner summary ----------
+
+export interface Briefing {
+  greeting: string;
+  personName: string;
+  summary: string[];
+  nextStep: ReviewItem | null;
+  attention: ReviewItem[];
+  scope: "me" | "company" | "household";
+  moneyLine: { label: string; value: string; caveat: string | null } | null;
+  upcoming: Obligation[];
+  asOf: string;
+  isDemo: boolean;
+  incomplete: boolean;
+}
+
+export function buildBriefing(viewer: Viewer): Briefing {
+  const now = new Date();
+  const hour = now.getUTCHours();
+  const name = viewer.person?.name ?? viewer.user.name;
+  const greeting = `${hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening"}, ${name}.`;
+  const canSeeCompany = viewer.spaces.some((sp) => sp.kind === "company");
+  const items = reviewItems(viewer.assumptions, { personId: viewer.person?.id ?? null, personNames: Object.fromEntries(viewer.persons.map((p) => [p.id, p.name])), visiblePersonIds: viewer.persons.map((p) => p.id), canSeeCompany });
+  const mine = viewer.spaces.find((sp) => sp.kind === "personal" && sp.personId === viewer.person?.id);
+  const summary: string[] = [];
+  let moneyLine: Briefing["moneyLine"] = null;
+  let incomplete = false;
+  if (mine) {
+    const v = buildPersonalView(viewer, mine.id);
+    incomplete = !v.takeHome.takeHome.complete || v.food.foodTarget === null;
+    if (v.food.foodTarget === null) summary.push(`Food this month so far: ${formatCents(v.food.foodSpentCents)} across ${v.data.shares.length ? "your shares of " : ""}${v.food.foodSpentCents ? "recorded meals" : "no recorded meals"}. No food target yet.`);
+    else summary.push(`Food: ${formatCents(v.food.foodSpentCents)} of ${formatCents(v.food.foodTarget)} used this month; ${formatCents(v.food.foodRemainingCents!)} left.`);
+    moneyLine = {
+      label: v.takeHome.status === "verified" ? "Take-home" : v.takeHome.status === "estimate" ? "Take-home estimate" : "Take-home so far",
+      value: v.takeHome.takeHome.complete ? formatCents(v.takeHome.takeHome.knownCents) : `${formatCents(v.takeHome.beforeIncomeTax.knownCents)} before income tax`,
+      caveat: v.takeHome.status === "verified" ? null : v.takeHome.status === "estimate" ? "estimate, not a verified paycheck" : "income-tax withholding not confirmed",
+    };
+  }
+  const upcoming = upcomingObligations(viewer, viewer.spaces.filter((sp) => sp.kind !== "personal" || sp.id === mine?.id).map((sp) => sp.id), 14).filter((o) => !o.paid).slice(0, 4);
+  const attention = items.filter((i) => i.severity === "attention").slice(0, 3);
+  return { greeting, personName: name, summary, nextStep: items[0] ?? null, attention, scope: "me", moneyLine, upcoming, asOf: todayIso(), isDemo: viewer.isDemo, incomplete };
+}
+
+export interface PartnerSummary {
+  personId: string;
+  name: string;
+  month: string;
+  foodTargetSet: boolean;
+  foodStatus: FoodPlanResult["foodStatus"] | "not_shared";
+  takeHomeStatus: "verified" | "estimate" | "incomplete" | "not_shared";
+  /** Optional allocations to savings/investment, rounded to the nearest $50. */
+  savingsAllocationRoundedCents: number | null;
+  shared: boolean;
+}
+
+/**
+ * Pre-approved aggregate fields only, at month granularity. No merchants,
+ * dates, categories, amounts of individual purchases, or filters. Returns a
+ * "not shared" summary when the partner has switched sharing off.
+ */
+export function buildPartnerSummary(viewer: Viewer, personId: string, month = currentMonth()): PartnerSummary | null {
+  const person = viewer.persons.find((p) => p.id === personId);
+  if (!person || person.id === viewer.person?.id) return null;
+  const prefs = person.userId ? loadPreferences(person.userId) : null;
+  if (!prefs || !prefs.sharePersonalSummary) return { personId, name: person.name, month, foodTargetSet: false, foodStatus: "not_shared", takeHomeStatus: "not_shared", savingsAllocationRoundedCents: null, shared: false };
+  const o = ownerOf(viewer, personId);
+  const takeHome = computeTakeHome(amountFromNullable(o.grossSalaryCents, "not set"), viewer.assumptions.payrollRules, o.withholding);
+  // Food status needs the partner's shares; computed here server-side and reduced to a coarse status only.
+  const partnerSpace = viewer.persons.find((p) => p.id === personId) ? { id: `partner-${personId}`, kind: "personal" as const, name: person.name, personId, role: "viewer" as const } : null;
+  let foodStatus: PartnerSummary["foodStatus"] = "no_target";
+  if (o.foodTargetCents !== null && partnerSpace) {
+    const spent = partnerFoodSpent(viewer, personId, month);
+    const remaining = o.foodTargetCents - spent;
+    foodStatus = remaining < 0 ? "over" : remaining <= o.foodTargetCents * 0.15 ? "close" : "on_track";
+  }
+  const savings = o.allocations.filter((a) => a.kind !== "spending").reduce((a, x) => a + x.monthlyCents, 0);
+  return { personId, name: person.name, month, foodTargetSet: o.foodTargetCents !== null, foodStatus, takeHomeStatus: takeHome.status, savingsAllocationRoundedCents: savings ? Math.round(savings / 5000) * 5000 : null, shared: true };
+}
+
+function partnerFoodSpent(viewer: Viewer, personId: string, month: string): number {
+  // Only the total of the partner's food shares for the month leaves this function.
+  void viewer;
+  const period = monthPeriod(month);
+  const rows = getDb().select({ cents: expenseShares.cents }).from(expenseShares).where(and(eq(expenseShares.personId, personId), gte(expenseShares.date, period.from), lte(expenseShares.date, period.to))).all();
+  return rows.reduce((a, r) => a + r.cents, 0);
 }
 
 export function totalOrUnknown(t: Total): Amount {
   return t.complete ? known(t.knownCents) : unknown(t.unknowns.join("; "));
 }
 
-export { isKnown };
+export { total };

@@ -1,50 +1,22 @@
 # Finance Desk — build checklist
 
-Legend: `[x]` todo · `[~]` in progress · `[x]` done and verified
+Legend: `[ ]` todo · `[~]` in progress · `[x]` done and verified
 
-## Stage 1 — Scaffold
-- [x] Next.js 15 / TS / Tailwind 4 / pnpm scaffold (git history preserved)
-- [x] Drizzle + better-sqlite3, Vitest, Playwright 1.56 (matches installed Chromium), ESLint
-- [x] `docs/ASSUMED_SPEC.md`, `docs/PLAN.md`, this checklist, `.env.example`
+## Stages 1–7 (first build and Will/Arielle plan)
+- [x] Scaffold, engine, data layer, auth/modes, screens, assistant, verification, pushed
 
-## Stage 2 — Finance engine (pure, tested)
-- [x] Money / Unknown arithmetic
-- [x] Assumptions model with unknown-by-default fields
-- [x] Transaction classification without double counting
-- [x] Company waterfall
-- [x] Personal waterfall with goal priority (friends-travel before discretionary)
-- [x] Household funding
-- [x] Purchase scenario
-- [x] Monthly projection
-- [x] CSV parsing
-- [x] Unit tests green
-
-## Stage 3 — Data layer
-- [x] Schema + startup migration
-- [x] Demo seed (labelled synthetic data)
-- [x] Permission-scoped repositories
-
-## Stage 4 — Auth and modes
-- [x] Sessions, password hashing, demo persona sign-in (demo only)
-- [x] Live mode refuses to run without AUTH_SECRET; no demo fallback
-- [x] Server-side authorization on every action / route
-
-## Stage 5 — Screens
-- [x] App shell (desktop sidebar, mobile bottom nav)
-- [x] Sign-in, onboarding/settings assumptions
-- [x] Overview with provenance
-- [x] Company, Household, Personal ×2
-- [x] Transactions: list, filters, manual entry, CSV import
-- [x] Accounts
-- [x] Scenarios
-- [x] Settings: members, roles, invite links, mode, export
-
-## Stage 6 — Assistant
-- [x] Engine-backed tools
-- [x] Claude tool-use loop when key present
-- [x] Labelled deterministic preview when absent
-
-## Stage 7 — Verification
-- [x] `pnpm test` · `pnpm typecheck` · `pnpm lint` · `pnpm build` · `pnpm test:e2e`
-- [x] Desktop + mobile screenshots reviewed, overflow fixed
-- [x] Committed and pushed to `claude/finance-desk-app-f6yoqf`
+## Stage 8 — Assistant-first rebuild
+- [x] Audit and migration plan (`docs/ASSISTANT_FIRST_PLAN.md`), skills vendored at project scope
+- [x] Financial corrections: two $3k salaries only, $8k allocation archived, rent $5,800 + Teslas $1,200 paid by company for household, subscriptions itemised with tiers to confirm, API usage separate, hardware/furniture as dated one-time plans, no flat tax, withholding = FICA 7.65% + SDI 1.3% + income tax (unknown until entered), take-home verified only from pay stub/provider
+- [x] Engines: payroll, cash plan with exact partial-remainder label, food plan, splits, ledger semantics; regression tests
+- [x] Schema migration 0002 (additive), assumptions v3 with superseded archive and history, demo seed v3 (live never reseeded)
+- [x] Design tokens light/dark/system, persisted per user; reduced motion
+- [x] Five destinations, redirects from old routes, mobile bottom bar + profile menu
+- [x] Assistant home: briefing, ≤3 attention items, starters, scope, streaming + Stop, preview mode with "Connect assistant"
+- [x] Result components with "View calculation"; action cards draft → preview → approve → apply (idempotent, audited)
+- [x] Money, Activity (search/filter/detail/split/void/record/CSV), Documents (upload, receipt review → expense), Settings
+- [x] Push-to-talk with transcript preview and truthful fallbacks; optional spoken replies with Mute
+- [x] Privacy enforced server-side; partner summary coarse and switchable; documents and chat per user
+- [x] Tests: 78 unit (engines, action engine, privacy, preview router), e2e journeys A–K + themes + redirects + live mode, typecheck, lint, build
+- [x] Visual sweep at 1440×900, 1024×768, 390×844, 360×800 in both themes (`docs/design-review.md`)
+- [ ] Live Claude smoke test with a real key (not run in this session; adapter verified through the mocked preview path and typed SDK usage — see README checklist)

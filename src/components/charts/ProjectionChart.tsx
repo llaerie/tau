@@ -22,18 +22,18 @@ export function ProjectionChart({ points, floorCents, beforeLabel = "Cash", afte
     <div className="h-56 w-full min-w-0 overflow-hidden sm:h-64" role="img" aria-label={`Projected ${beforeLabel.toLowerCase()} by month`}>
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={points} margin={{ top: 12, right: 12, bottom: 4, left: 4 }}>
-          <CartesianGrid vertical={false} stroke="#ECE8E0" />
-          <XAxis dataKey="label" tickLine={false} axisLine={{ stroke: "#E7E2D9" }} />
+          <CartesianGrid vertical={false} stroke="var(--t-line)" />
+          <XAxis dataKey="label" tickLine={false} axisLine={{ stroke: "var(--t-line-2)" }} />
           <YAxis tickFormatter={money} width={58} tickLine={false} axisLine={false} />
           <Tooltip
             formatter={(v, name) => [formatCents(Number(v)), name === "before" ? beforeLabel : afterLabel]}
-            labelStyle={{ color: "#5C5751", fontSize: 12 }}
-            contentStyle={{ borderRadius: 10, border: "1px solid #E7E2D9", fontSize: 13 }}
+            labelStyle={{ color: "var(--t-ink-2)", fontSize: 12 }}
+            contentStyle={{ borderRadius: 10, border: "1px solid var(--t-line-2)", background: "var(--t-surface)", color: "var(--t-ink)", fontSize: 13 }}
           />
-          <ReferenceLine y={0} stroke="#B23B34" strokeDasharray="4 4" />
-          {floorCents != null && floorCents > 0 && <ReferenceLine y={floorCents} stroke="#A66A12" strokeDasharray="2 4" label={{ value: "reserve target", position: "insideTopLeft", fontSize: 11, fill: "#A66A12" }} />}
-          <Line type="monotone" dataKey="before" name="before" stroke={hasAfter ? "#C8C2B6" : "#2a78d6"} strokeWidth={2} dot={{ r: 3 }} connectNulls={false} isAnimationActive={false} />
-          {hasAfter && <Line type="monotone" dataKey="after" name="after" stroke="#eb6834" strokeWidth={2} dot={{ r: 3 }} isAnimationActive={false} />}
+          <ReferenceLine y={0} stroke="var(--t-bad)" strokeDasharray="4 4" />
+          {floorCents != null && floorCents > 0 && <ReferenceLine y={floorCents} stroke="var(--t-warn)" strokeDasharray="2 4" label={{ value: "reserve target", position: "insideTopLeft", fontSize: 11, fill: "var(--t-warn)" }} />}
+          <Line type="monotone" dataKey="before" name="before" stroke={hasAfter ? "var(--t-series-muted)" : "var(--t-series-1)"} strokeWidth={2} dot={{ r: 3 }} connectNulls={false} isAnimationActive={false} />
+          {hasAfter && <Line type="monotone" dataKey="after" name="after" stroke="var(--t-series-2)" strokeWidth={2} dot={{ r: 3 }} isAnimationActive={false} />}
         </LineChart>
       </ResponsiveContainer>
     </div>

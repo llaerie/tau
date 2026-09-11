@@ -50,7 +50,23 @@ export interface LedgerTransaction {
   billId?: string | null;
   goalId?: string | null;
   description: string;
+  /** Accounting treatment. A transfer that is really an owner distribution keeps it here. */
+  treatment?: string | null;
+  /** Links the bank movement, benefit and ledger treatment of one economic payment. */
+  economicEventId?: string | null;
+  voidedAt?: string | null;
 }
+
+export const TREATMENT_LABELS: Record<string, string> = {
+  none: "No special treatment",
+  expense: "Business expense",
+  asset: "Asset purchase",
+  liability_settlement: "Liability settlement",
+  shareholder_distribution: "Shareholder distribution",
+  taxable_compensation: "Taxable compensation or benefit",
+  accountable_reimbursement: "Accountable-plan reimbursement",
+  review_required: "Review required",
+};
 
 export interface FlowScope {
   /** Accounts visible in this view. */
@@ -99,6 +115,7 @@ export function summarizeFlows(txns: LedgerTransaction[], scope: FlowScope, peri
   const inScope = (id: string | null | undefined) => !!id && scope.accountIds.has(id);
 
   for (const t of txns) {
+    if (t.voidedAt) continue;
     if (period && !isInPeriod(t.date, period)) continue;
     const fromIn = inScope(t.accountId);
     const toIn = inScope(t.counterAccountId);
@@ -186,6 +203,7 @@ export function billStatuses(
 export function accountBalance(accountId: string, openingCents: number, txns: LedgerTransaction[], asOf?: string): number {
   let bal = openingCents;
   for (const t of txns) {
+    if (t.voidedAt) continue;
     if (asOf && t.date > asOf) continue;
     switch (t.kind) {
       case "income":

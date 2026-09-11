@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { expectNoHorizontalOverflow, resetDemo, signIn, signOut } from "./helpers";
+import { ask, expectNoHorizontalOverflow, resetDemo, signIn, signOut } from "./helpers";
 
 test.describe.configure({ mode: "serial" });
 
@@ -10,149 +10,202 @@ test.beforeAll(async ({ browser }) => {
   await page.close();
 });
 
-test("overview keeps spaces separate and marks unknowns honestly", async ({ page }) => {
-  await signIn(page, "will");
-  await expect(page.getByRole("heading", { name: /Good to see you, Will/ })).toBeVisible();
-  await expect(page.getByTestId("cash-company")).toContainText("known so far");
-  await expect(page.getByTestId("cash-household")).toContainText("$6,718");
-  await expect(page.getByTestId("cash-personal")).toContainText("Will");
-  await expect(page.getByText("Anticipated monthly revenue", { exact: true }).first()).toBeVisible();
-  await expect(page.getByText("Company revenue, not take-home")).toBeVisible();
-  await expect(page.getByText("The household plan is short by $930 a month")).toBeVisible();
-  await expect(page.getByText(/business vs household split/)).toBeVisible();
+test("A. Arielle opens the app: assistant first, briefing, composer, three starters", async ({ page, isMobile }) => {
+  await signIn(page, "arielle");
+  await expect(page.getByTestId("briefing")).toContainText(/Good (morning|afternoon|evening), Arielle/);
+  await expect(page.getByTestId("briefing")).toContainText("before income tax");
+  await expect(page.getByTestId("attention").getByRole("listitem")).toHaveCount(3);
+  await expect(page.getByTestId("starter-what-can-i-spend-")).toBeVisible();
+  await expect(page.getByTestId("starter-record-a-receipt")).toBeVisible();
+  await expect(page.getByTestId("starter-plan-a-purchase")).toBeVisible();
+  await expect(page.getByLabel("Ask about your money")).toBeVisible();
+  await expect(page.getByTestId("assistant-status")).toContainText("Preview mode");
+  await expect(page.getByTestId("connect-assistant")).toBeVisible();
+  if (isMobile) {
+    await expect(page.getByRole("navigation", { name: "Primary" }).getByRole("link")).toHaveCount(4);
+    await page.getByTestId("profile-menu").click();
+    await expect(page.getByRole("menuitem", { name: "Settings" })).toBeVisible();
+    await page.keyboard.press("Escape");
+  }
   await expectNoHorizontalOverflow(page);
 });
 
-test("company page explains provenance and keeps unknown costs unknown", async ({ page }) => {
-  await signIn(page, "will");
-  await page.goto("/company");
-  const distributable = page.getByTestId("metric-company-distributable");
-  await expect(distributable).toContainText("$15,350");
-  await expect(distributable).toContainText("3 unknown");
-  await distributable.getByRole("button", { name: "Where this comes from" }).click();
+test("B. food question separates gross, take-home status, target and missing inputs; never invents a target", async ({ page }) => {
+  await signIn(page, "arielle");
+  const turn = await ask(page, "How much can I spend on food?");
+  await expect(turn.getByTestId("assistant-text")).toContainText("no food target yet");
+  await expect(turn.getByTestId("assistant-text")).toContainText("before income tax");
+  await expect(turn.getByTestId("assistant-text")).toContainText("cannot give an exact available-to-spend amount");
+  await expect(turn.getByTestId("result-food_plan")).toBeVisible();
+  await expect(turn.getByTestId("result-food_plan")).toContainText("Gross salary");
+  await expect(turn.getByTestId("result-food_plan")).toContainText("$3,000");
+  await expect(turn.getByTestId("next-action")).toHaveText("Set a food target");
+  await expect(turn.getByText("Preview answer (no model connected)")).toBeVisible();
+});
+
+test("C/J. 'Set my food budget to $1,200' previews old/new, needs approval, persists once even when repeated", async ({ page }) => {
+  await signIn(page, "arielle");
+  const turn = await ask(page, "Set my food budget to $1,200");
+  const card = turn.getByTestId("action-budget_change");
+  await expect(card).toContainText("Waiting for your approval");
+  await expect(card).toContainText("$1,200");
+  await expect(card).toContainText(/Left after plan|unallocated/i);
+  await card.getByTestId("action-approve").click();
+  await expect(card).toContainText("Applied");
+  const again = await ask(page, "Set my food budget to $1,200");
+  const card2 = again.getByTestId("action-budget_change");
+  await expect(card2).toContainText("$1,200");
+  await card2.getByTestId("action-approve").click();
+  await expect(card2).toContainText("Applied");
+  await page.goto("/money?space=me");
+  await expect(page.getByTestId("food-plan")).toContainText("of $1,200");
+  await expect(page.getByTestId("unallocated")).toContainText("$1,200");
+});
+
+test("K. a detailed number opens its calculation in one click", async ({ page }) => {
+  await signIn(page, "arielle");
+  await page.goto("/money?space=me");
+  await page.getByTestId("calc-take-home").click();
   const dialog = page.getByRole("dialog");
-  await expect(dialog).toContainText("revenue − committed");
-  await expect(dialog).toContainText("Upper bound only");
+  await expect(dialog).toContainText("Formula");
+  await expect(dialog).toContainText("FICA");
+  await expect(dialog).toContainText("Income tax withheld");
   await dialog.getByRole("button", { name: "Close" }).click();
-  await expect(page.getByText("Employer payroll cost rate not set", { exact: true })).toBeVisible();
-  await expect(page.locator("dl").filter({ hasText: "Planned distribution to household" })).toContainText("$6,000");
-  await expectNoHorizontalOverflow(page);
+  await expect(dialog).toBeHidden();
 });
 
-test("personal spaces are private: Will cannot open Arielle's space, Arielle can", async ({ page }) => {
+test("D. a $120 dinner receipt split equally records one expense with two $60 shares", async ({ page }) => {
+  await signIn(page, "arielle");
+  await page.goto("/documents");
+  await page.getByTestId("upload-file").setInputFiles({ name: "dinner.txt", mimeType: "text/plain", buffer: Buffer.from("Nopa\nTable 4\nTotal $120.00\n2026-09-09\n") });
+  await page.getByTestId("upload-space").selectOption({ label: "Arielle (private)" });
+  await page.getByTestId("upload-submit").click();
+  await expect(page.getByText("Stored dinner.txt.")).toBeVisible();
+  await page.getByTestId("document-list").getByText("dinner.txt").click();
+  const drawer = page.getByTestId("document-detail");
+  await expect(drawer).toContainText("$120.00");
+  await expect(drawer.getByTestId("expense-amount")).toHaveValue("120.00");
+  await drawer.getByTestId("expense-split").check();
+  await drawer.getByTestId("expense-preview").click();
+  const card = drawer.getByTestId("action-expense");
+  await expect(card).toContainText("Arielle's share");
+  await expect(card.getByText("$60.00")).toHaveCount(2);
+  await card.getByTestId("action-approve").click();
+  // Once applied, the page refreshes and the receipt shows as recorded.
+  await expect(drawer).toContainText(/Recorded as an expense|Applied/);
+  await page.goto("/activity?q=Nopa");
+  await expect(page.getByTestId("activity-list").getByRole("listitem")).toHaveCount(1);
+  await expect(page.getByTestId("activity-list")).toContainText("split");
+  await expect(page.getByTestId("activity-list")).toContainText("−$120");
+  await page.goto("/money?space=me");
+  await expect(page.getByTestId("food-plan")).toContainText("$113");
+});
+
+test("E. 'Can the company buy a $2,000 computer next month?' is conditional and offers a plan, not a payment", async ({ page }) => {
   await signIn(page, "will");
-  const res = await page.goto("/personal/sp_demo_arielle");
-  expect(res?.status()).toBe(404);
-  await signOut(page);
-  await signIn(page, "arielle");
-  await page.goto("/personal/sp_demo_arielle");
-  await expect(page.getByRole("heading", { name: "Arielle" })).toBeVisible();
-  const willRes = await page.goto("/personal/sp_demo_will");
-  expect(willRes?.status()).toBe(404);
+  await page.getByTestId("scope-company").click();
+  const turn = await ask(page, "Can the company buy a $2,000 computer next month?");
+  await expect(turn.getByTestId("assistant-text")).toContainText(/conditional|not decidable/i);
+  await expect(turn.getByTestId("assistant-text")).toContainText(/Still unknown/);
+  await expect(turn.getByTestId("result-purchase_scenario")).toBeVisible();
+  await expect(turn.getByTestId("assistant-text")).toContainText("nothing would be paid");
 });
 
-test("Arielle's take-home funds the travel goal first and the spending plan is checked against what is left", async ({ page }) => {
-  await signIn(page, "arielle");
-  await page.goto("/personal/sp_demo_arielle");
-  // $3,000 gross − 7.65% FICA − $250 income-tax estimate = $2,520.50
-  await expect(page.getByTestId("metric-personal-net")).toContainText("$2,521");
-  await expect(page.getByTestId("metric-personal-available")).toContainText("$1,461");
-  await expect(page.getByRole("row", { name: /^1 Friends travel/ })).toContainText("Fully funded");
-  await expect(page.getByTestId("metric-personal-unallocated")).toContainText("Over-planned");
-  await expect(page.getByTestId("metric-personal-unallocated")).toContainText("−$40");
-  await expect(page.getByText("Shopping", { exact: true }).first()).toBeVisible();
-  await expectNoHorizontalOverflow(page);
+test("F. 'Add a $3,000 sofa paid by the company' records payer company, beneficiary household, treatment review", async ({ page }) => {
+  await signIn(page, "will");
+  await page.getByTestId("scope-company").click();
+  const turn = await ask(page, "Add a $3,000 sofa paid by the company");
+  const card = turn.getByTestId("action-purchase_plan");
+  await expect(card).toContainText("Our company / household");
+  await expect(card).toContainText("review required");
+  await expect(card).toContainText("not deductible");
+  await expect(card).toContainText("No purchase, payment or subscription is executed");
+  await card.getByTestId("action-approve").click();
+  await expect(card).toContainText("Applied");
+  await page.goto("/money?space=company");
+  await expect(page.getByTestId("purchase-plans")).toContainText("sofa");
+  await expect(page.getByTestId("purchase-plans")).toContainText("$3,000");
+  await expect(page.getByTestId("activity-list")).toHaveCount(0);
 });
 
-test("changing the income-tax estimate flows through to net take-home", async ({ page }) => {
+test("G. AI tools: two seats per provider, tiers unconfirmed, API usage separate, no $400 total", async ({ page }) => {
+  await signIn(page, "will");
+  const turn = await ask(page, "What are all our AI tools costing?");
+  const text = turn.getByTestId("assistant-text");
+  await expect(text).toContainText("Anthropic Claude × 2");
+  await expect(text).toContainText("OpenAI ChatGPT × 2");
+  await expect(text).toContainText("price unconfirmed");
+  await expect(text).toContainText("API usage last month");
+  await expect(text).not.toContainText("$400");
+});
+
+test("H. Will asking for Arielle's purchases gets only the shared summary; her rows never reach him", async ({ page }) => {
+  await signIn(page, "will");
+  const turn = await ask(page, "What did Arielle buy this month?");
+  await expect(turn.getByTestId("assistant-text")).toContainText("Individual purchases are private");
+  await expect(turn.getByTestId("assistant-text")).not.toContainText("Nopa");
+  await page.goto("/money?space=partner");
+  await expect(page.getByTestId("partner-summary")).toContainText("Food this month");
+  await expect(page.getByTestId("partner-summary")).not.toContainText("Nopa");
+  const exp = await page.request.get("/api/export");
+  expect(exp.status()).toBe(200);
+  expect(await exp.text()).not.toContain("sp_demo_arielle");
+  const docs = await page.request.get("/api/documents");
+  expect((await docs.json()).documents.some((d: { filename: string }) => d.filename === "dinner.txt")).toBe(false);
+  await page.goto("/activity?q=Nopa");
+  await expect(page.getByText("No entries match")).toBeVisible();
+});
+
+test("I. a delayed company payment: expected receipts stay expected, not deposited", async ({ page }) => {
+  await signIn(page, "will");
+  await page.getByTestId("scope-company").click();
+  const turn = await ask(page, "The company payment is delayed this month");
+  const text = turn.getByTestId("assistant-text");
+  await expect(text).toContainText("Expected receipts $30,000");
+  await expect(text).toContainText("received this month $0");
+  await expect(text).toContainText("not safe to spend");
+  await expect(turn.getByTestId("result-obligations")).toBeVisible();
+});
+
+test("J. voice: push-to-talk is offered where supported and the transcript is reviewed before sending", async ({ page }) => {
+  await signIn(page, "arielle");
+  const supported = await page.evaluate(() => "webkitSpeechRecognition" in window || "SpeechRecognition" in window);
+  if (supported) {
+    await expect(page.getByTestId("push-to-talk")).toBeVisible();
+    await expect(page.getByTestId("push-to-talk")).toHaveAttribute("aria-pressed", "false");
+  } else {
+    await expect(page.getByText("Voice unavailable here")).toBeVisible();
+  }
+  await expect(page.getByLabel("Ask about your money")).toHaveValue("");
+});
+
+test("themes persist per user and old routes redirect into the five destinations", async ({ page }) => {
   await signIn(page, "arielle");
   await page.goto("/settings");
-  const form = page.getByTestId("owner-form-per_demo_arielle");
-  await form.getByLabel("Income tax withheld per month (estimate)").fill("500");
-  await form.getByRole("button", { name: /Save Arielle/ }).click();
-  await expect(form.getByText("Saved.")).toBeVisible();
-  await page.goto("/personal/sp_demo_arielle");
-  // $3,000 − $229.50 − $500 = $2,270.50
-  await expect(page.getByTestId("metric-personal-net")).toContainText("$2,271");
-});
-
-test("manual entry and CSV import land in the ledger without double counting", async ({ page }) => {
-  await signIn(page, "arielle");
-  await page.goto("/transactions?space=sp_demo_arielle");
-  const form = page.getByTestId("transaction-form");
-  await form.getByLabel("Kind").selectOption("expense");
-  await form.getByLabel("Amount").fill("42.50");
-  await form.getByLabel("Description").fill("E2E coffee beans");
-  await form.getByRole("button", { name: "Add transaction" }).click();
-  await expect(page.getByText("Added.")).toBeVisible();
-  await expect(page.getByTestId("transactions-table")).toContainText("E2E coffee beans");
-
-  await page.goto("/transactions/import");
-  await page.getByLabel("Into account").selectOption({ label: "Arielle checking · Arielle" });
-  const csv = "Date,Description,Amount\n2026-09-04,E2E imported dinner,-31.20\n2026-09-05,E2E imported refund,12.00\n";
-  await page.getByLabel("CSV file").setInputFiles({ name: "statement.csv", mimeType: "text/csv", buffer: Buffer.from(csv) });
-  await page.getByRole("button", { name: "Preview" }).click();
-  await expect(page.getByTestId("csv-preview")).toContainText("E2E imported dinner");
-  await page.getByTestId("csv-commit").click();
-  await expect(page.getByTestId("csv-result")).toContainText("Imported 2");
-
-  // Importing the same file again skips the duplicates.
-  await page.getByLabel("CSV file").setInputFiles({ name: "statement.csv", mimeType: "text/csv", buffer: Buffer.from(csv) });
-  await page.getByRole("button", { name: "Preview" }).click();
-  await expect(page.getByTestId("csv-preview").getByText("duplicate")).toHaveCount(2);
-  await expect(page.getByTestId("csv-commit")).toBeDisabled();
-
-  await page.goto("/transactions?space=sp_demo_arielle&kind=expense");
-  await expect(page.getByTestId("transactions-table")).toContainText("E2E imported dinner");
-});
-
-test("purchase scenarios report goal impact and shortfalls honestly", async ({ page }) => {
-  await signIn(page, "arielle");
-  await page.goto("/scenarios");
-  const form = page.getByTestId("scenario-form");
-  await form.getByLabel("What").fill("Laptop");
-  await form.getByLabel("Space").selectOption({ label: "Arielle" });
-  await form.getByLabel("Amount").fill("1800");
-  await form.getByRole("button", { name: "Evaluate" }).click();
-  const laptop = page.getByTestId("scenario-card").filter({ hasText: "Laptop" });
-  await expect(laptop.getByTestId("scenario-verdict")).toHaveText("Affordable");
-  await expect(laptop).toContainText("Friends travel");
-
-  await form.getByLabel("What").fill("Car lease");
-  await form.getByLabel("Space").selectOption({ label: "Arielle" });
-  await form.getByLabel("Amount").fill("1600");
-  await form.getByLabel("Kind").selectOption("recurring");
-  await form.getByRole("button", { name: "Evaluate" }).click();
-  const lease = page.getByTestId("scenario-card").filter({ hasText: "Car lease" });
-  await expect(lease.getByTestId("scenario-verdict")).toHaveText("Creates a shortfall");
-  await expectNoHorizontalOverflow(page);
-});
-
-test("assistant returns a labelled deterministic preview built from tools", async ({ page }) => {
-  await signIn(page, "will");
-  await page.goto("/assistant");
-  await page.getByTestId("assistant-input").fill("What is still unknown?");
-  await page.getByTestId("assistant-send").click();
-  const reply = page.getByTestId("assistant-reply").last();
-  await expect(reply).toContainText("Deterministic preview");
-  await expect(reply).toContainText("Still unknown");
-  await expect(reply).toContainText("business vs household split");
-  await page.getByTestId("assistant-input").fill("What can the company put toward the household?");
-  await page.getByTestId("assistant-send").click();
-  await expect(page.getByTestId("assistant-reply").last()).toContainText("Company");
-});
-
-test("navigation works at every viewport", async ({ page, isMobile }) => {
-  await signIn(page, "will");
-  for (const path of ["/", "/company", "/household", "/personal/sp_demo_will", "/accounts", "/settings", "/scenarios"]) {
-    await page.goto(path);
-    await expectNoHorizontalOverflow(page);
+  await page.getByTestId("theme-dark").click();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+  await page.reload();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+  await page.getByTestId("theme-system").click();
+  await page.reload();
+  await expect(page.locator("html")).not.toHaveAttribute("data-theme", /./);
+  for (const [from, to] of [["/company", "/money?space=company"], ["/household", "/money?space=household"], ["/personal/sp_demo_arielle", "/money?space=me"], ["/transactions", "/activity"], ["/assistant", "/"], ["/scenarios", "/"], ["/more", "/settings"], ["/onboarding", "/"]]) {
+    await page.goto(from);
+    expect(new URL(page.url()).pathname + new URL(page.url()).search).toBe(to);
   }
-  if (isMobile) {
-    await expect(page.getByRole("navigation", { name: "Primary" }).getByRole("link", { name: "More" })).toBeVisible();
-    await page.getByRole("link", { name: "More" }).click();
-    await expect(page.getByRole("link", { name: "Scenarios" })).toBeVisible();
-  } else {
-    await expect(page.getByRole("navigation", { name: "Primary" }).getByRole("link", { name: "Scenarios" })).toBeVisible();
-  }
+  await signOut(page);
+});
+
+test("privacy on the wire: the partner's documents 404 and their personal space is not a tab", async ({ page }) => {
+  await signIn(page, "arielle");
+  const mine = await page.request.get("/api/documents");
+  const doc = (await mine.json()).documents.find((d: { filename: string }) => d.filename === "dinner.txt");
+  expect(doc).toBeTruthy();
+  await signOut(page);
+  await signIn(page, "will");
+  const res = await page.request.get(`/api/documents/${doc.id}`);
+  expect(res.status()).toBe(404);
+  await page.goto("/money");
+  await expect(page.getByTestId("tab-partner")).toHaveText("Arielle's summary");
+  await expect(page.getByTestId("tab-me")).toHaveText("My money");
 });

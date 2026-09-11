@@ -111,6 +111,11 @@ export const getSessionUser = cache(async (): Promise<s.User | null> => {
 export const getViewer = cache(async (): Promise<Viewer | null> => {
   const user = await getSessionUser();
   if (!user) return null;
+  return buildViewer(user);
+});
+
+/** Pure viewer construction for a known user row. Used by the request path and by server-side tests. */
+export function buildViewer(user: s.User): Viewer | null {
   const db = getDb();
   const membership = db.select().from(s.memberships).where(eq(s.memberships.userId, user.id)).get();
   if (!membership) return null;
@@ -140,7 +145,12 @@ export const getViewer = cache(async (): Promise<Viewer | null> => {
     assumptions,
     isDemo: workspace.isDemo,
   };
-});
+}
+
+export function viewerForUserId(userId: string): Viewer | null {
+  const user = getDb().select().from(s.users).where(eq(s.users.id, userId)).get();
+  return user ? buildViewer(user) : null;
+}
 
 function order(kind: string): number {
   return kind === "company" ? 0 : kind === "household" ? 1 : 2;

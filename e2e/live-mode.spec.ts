@@ -33,7 +33,7 @@ test("live mode without AUTH_SECRET is a configuration error, not a demo fallbac
     await page.goto(`http://localhost:${PORT_MISCONFIGURED}/sign-in`);
     await expect(page.getByRole("heading", { name: "Configuration needed" })).toBeVisible();
     await expect(page.getByText(/Live mode requires AUTH_SECRET/)).toBeVisible();
-    await expect(page.getByTestId("persona-alex")).toHaveCount(0);
+    await expect(page.getByTestId("persona-will")).toHaveCount(0);
   } finally {
     child.kill();
   }
@@ -46,7 +46,7 @@ test("live mode uses password accounts, rejects demo personas, and scopes spaces
   try {
     await page.goto(`${base}/sign-in`);
     await expect(page.getByTestId("mode-badge")).toHaveText("Live data");
-    await expect(page.getByTestId("persona-alex")).toHaveCount(0);
+    await expect(page.getByTestId("persona-will")).toHaveCount(0);
     // Unauthenticated API access is refused.
     const res = await request.get(`${base}/api/export`);
     expect(res.status()).toBe(401);
@@ -60,21 +60,21 @@ test("live mode uses password accounts, rejects demo personas, and scopes spaces
     await page.getByLabel("Partner's first name").fill("Arielle");
     await page.getByLabel("Partner's role").fill("Creative Director");
     await page.getByRole("button", { name: "Create workspace" }).click();
-    await page.waitForURL(/onboarding/);
-    await expect(page.getByRole("heading", { name: "Start with what you know" })).toBeVisible();
-    await page.getByTestId("company-assumptions-form").getByRole("button", { name: /Save and open the overview/ }).click();
     await page.waitForURL((u) => u.pathname === "/");
     await expect(page.getByTestId("mode-badge").first()).toHaveText("Live data");
-    // The partner's personal space exists but is not visible to Will.
-    await expect(page.getByTestId("cash-personal")).toHaveCount(1);
-    await expect(page.getByTestId("cash-company")).toContainText("$0");
-    // The plan was pre-filled from the template: unknown household bills, Arielle's budgets live in her private space.
-    await page.goto(`${base}/household`);
-    await expect(page.getByRole("row", { name: /Tesla payments/ })).toBeVisible();
-    await expect(page.getByTestId("metric-household-funding")).toContainText("Unknown");
+    await expect(page.getByTestId("briefing")).toContainText(/Will/);
+    // The partner's personal space exists but is not visible to Will; the template imposes no budgets.
+    await page.goto(`${base}/money`);
+    await expect(page.getByTestId("tab-partner")).toHaveText("Arielle's summary");
+    await page.goto(`${base}/money?space=household`);
+    await expect(page.getByTestId("household-company-paid")).toContainText("Two Teslas");
+    await expect(page.getByTestId("household-company-paid")).toContainText("$5,800");
+    await page.goto(`${base}/money?space=company`);
+    await expect(page.getByTestId("subscriptions")).toContainText("tier to confirm");
+    await expect(page.getByTestId("metric-recorded-cash")).toContainText("Unknown");
 
-    await page.goto(`${base}/more`);
-    await page.getByRole("button", { name: "Sign out" }).click();
+    await page.goto(`${base}/settings`);
+    await page.getByRole("button", { name: "Sign out" }).first().click();
     await page.waitForURL(/sign-in/);
     await page.getByLabel("Email").fill("will@example.com");
     await page.getByLabel("Password").fill("wrong-password-123");
