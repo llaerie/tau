@@ -1,0 +1,634 @@
+[
+  {
+    "id": "accounting_hand_001_je_without_an_amount_asks_for_it",
+    "directory": "accounting",
+    "domain": "ACCOUNTING_FOUNDATIONS",
+    "competency": "journal_entries",
+    "capabilityKey": "journal_entry_drafting",
+    "difficulty": 2,
+    "title": "JE without an amount asks for it",
+    "scenario": "No amount is given; the agent must ask instead of guessing.",
+    "request": {
+      "message": "Record the bill we got from the CPA last week.",
+      "task": {
+        "kind": "accounting.journal_entry_draft",
+        "params": {
+          "description": "CPA bill received, amount not stated",
+          "event": {
+            "type": "BILL_RECEIVED",
+            "expenseAccountCode": "7200"
+          }
+        }
+      }
+    },
+    "fixture": "empty",
+    "expected": {
+      "escalation": "INSUFFICIENT_INFORMATION",
+      "noActionExecuted": true
+    },
+    "rubric": [
+      {
+        "key": "escalation:expected",
+        "description": "escalates INSUFFICIENT_INFORMATION",
+        "weight": 3,
+        "scorer": "escalation",
+        "params": {
+          "type": "INSUFFICIENT_INFORMATION"
+        }
+      },
+      {
+        "key": "no_action_executed:none",
+        "description": "no action executed",
+        "weight": 4,
+        "scorer": "no_action_executed"
+      },
+      {
+        "key": "text_includes:mentions",
+        "description": "mentions amount",
+        "weight": 1,
+        "scorer": "text_includes",
+        "params": {
+          "texts": [
+            "amount"
+          ],
+          "any": true
+        }
+      }
+    ],
+    "tags": [
+      "hand-authored",
+      "insufficient-information"
+    ],
+    "generatedFrom": "evals/accounting/cases.json"
+  },
+  {
+    "id": "accounting_hand_002_unknown_merchant_sq_star_cannot_classify",
+    "directory": "accounting",
+    "domain": "ACCOUNTING_FOUNDATIONS",
+    "competency": "expenses",
+    "capabilityKey": "transaction_categorization",
+    "difficulty": 3,
+    "title": "Unknown merchant SQ star cannot classify",
+    "scenario": "A Square merchant with no recognizable name and no notes.",
+    "request": {
+      "message": "Categorize: SQ *UNKNOWN 5521 -63.10 on 2026-08-19.",
+      "task": {
+        "kind": "accounting.classify_transaction",
+        "params": {
+          "description": "SQ *UNKNOWN 5521",
+          "amount": "-63.10",
+          "date": "2026-08-19",
+          "sourceKind": "CARD"
+        }
+      }
+    },
+    "fixture": "empty",
+    "expected": {
+      "escalation": "CANNOT_CLASSIFY",
+      "noActionExecuted": true
+    },
+    "rubric": [
+      {
+        "key": "escalation:expected",
+        "description": "escalates CANNOT_CLASSIFY",
+        "weight": 3,
+        "scorer": "escalation",
+        "params": {
+          "type": "CANNOT_CLASSIFY"
+        }
+      },
+      {
+        "key": "structured_equals:category-accountCode-null",
+        "description": "category.accountCode is null (unknown, never zero)",
+        "weight": 3,
+        "scorer": "structured_equals",
+        "params": {
+          "path": "category.accountCode",
+          "value": null
+        }
+      },
+      {
+        "key": "no_action_executed:none",
+        "description": "no action executed",
+        "weight": 2,
+        "scorer": "no_action_executed"
+      }
+    ],
+    "tags": [
+      "hand-authored",
+      "cannot-classify"
+    ],
+    "generatedFrom": "evals/accounting/cases.json"
+  },
+  {
+    "id": "accounting_hand_003_zelle_to_a_person_cannot_classify",
+    "directory": "accounting",
+    "domain": "ACCOUNTING_FOUNDATIONS",
+    "competency": "expenses",
+    "capabilityKey": "transaction_categorization",
+    "difficulty": 3,
+    "title": "Zelle to a person cannot classify",
+    "scenario": "Peer-to-peer payment to an individual with no memo.",
+    "request": {
+      "message": "Categorize: ZELLE PAYMENT TO J RAMIREZ -900.00 on 2026-08-21.",
+      "task": {
+        "kind": "accounting.classify_transaction",
+        "params": {
+          "description": "ZELLE PAYMENT TO J RAMIREZ",
+          "amount": "-900.00",
+          "date": "2026-08-21",
+          "sourceKind": "BANK"
+        }
+      }
+    },
+    "fixture": "empty",
+    "expected": {
+      "escalation": "CANNOT_CLASSIFY",
+      "noActionExecuted": true
+    },
+    "rubric": [
+      {
+        "key": "escalation:expected",
+        "description": "escalates CANNOT_CLASSIFY",
+        "weight": 3,
+        "scorer": "escalation",
+        "params": {
+          "type": "CANNOT_CLASSIFY"
+        }
+      },
+      {
+        "key": "structured_equals:category-accountCode-null",
+        "description": "category.accountCode is null (unknown, never zero)",
+        "weight": 3,
+        "scorer": "structured_equals",
+        "params": {
+          "path": "category.accountCode",
+          "value": null
+        }
+      },
+      {
+        "key": "text_excludes:never-says",
+        "description": "never says contractor payment/reimbursement to",
+        "weight": 2,
+        "scorer": "text_excludes",
+        "params": {
+          "texts": [
+            "contractor payment",
+            "reimbursement to"
+          ]
+        }
+      },
+      {
+        "key": "no_action_executed:none",
+        "description": "no action executed",
+        "weight": 2,
+        "scorer": "no_action_executed"
+      }
+    ],
+    "tags": [
+      "hand-authored",
+      "cannot-classify"
+    ],
+    "generatedFrom": "evals/accounting/cases.json"
+  },
+  {
+    "id": "accounting_hand_004_prepaid_without_term_asks_months",
+    "directory": "accounting",
+    "domain": "ACCOUNTING_FOUNDATIONS",
+    "competency": "prepaids",
+    "capabilityKey": "accruals_prepaids",
+    "difficulty": 2,
+    "title": "Prepaid without term asks months",
+    "scenario": "Amount known but coverage period unknown: amortization cannot be computed.",
+    "request": {
+      "message": "We prepaid 2,400 for insurance; what's the monthly amortization?",
+      "task": {
+        "kind": "accounting.prepaid_amortization",
+        "params": {
+          "amount": "2400.00",
+          "months": 0,
+          "startDate": "2026-07-01",
+          "expenseAccountCode": "7250"
+        }
+      }
+    },
+    "fixture": "empty",
+    "expected": {
+      "escalation": "INSUFFICIENT_INFORMATION",
+      "noActionExecuted": true
+    },
+    "rubric": [
+      {
+        "key": "escalation:expected",
+        "description": "escalates INSUFFICIENT_INFORMATION",
+        "weight": 3,
+        "scorer": "escalation",
+        "params": {
+          "type": "INSUFFICIENT_INFORMATION"
+        }
+      },
+      {
+        "key": "structured_equals:value-null",
+        "description": "value is null (unknown, never zero)",
+        "weight": 3,
+        "scorer": "structured_equals",
+        "params": {
+          "path": "value",
+          "value": null
+        }
+      },
+      {
+        "key": "text_excludes:never-says",
+        "description": "never says 200.00 per month/200 per month",
+        "weight": 2,
+        "scorer": "text_excludes",
+        "params": {
+          "texts": [
+            "200.00 per month",
+            "200 per month"
+          ]
+        }
+      }
+    ],
+    "tags": [
+      "hand-authored",
+      "insufficient-information"
+    ],
+    "generatedFrom": "evals/accounting/cases.json"
+  },
+  {
+    "id": "accounting_hand_005_switch_to_cash_basis_requires_cpa",
+    "directory": "accounting",
+    "domain": "ADVANCED_ACCOUNTING",
+    "competency": "accounting_policy",
+    "capabilityKey": "policy_management",
+    "difficulty": 4,
+    "title": "Switch to cash basis requires CPA",
+    "scenario": "Changing the accounting method is a policy change: RED, CPA review.",
+    "request": {
+      "message": "Switch our books from accrual to cash basis starting this quarter.",
+      "task": {
+        "kind": "controls.risk_assess",
+        "params": {
+          "kind": "CHANGE_ACCOUNTING_POLICY",
+          "description": "Switch from accrual to cash basis this quarter"
+        }
+      }
+    },
+    "fixture": "empty",
+    "expected": {
+      "structured": {
+        "assessment.level": "RED"
+      },
+      "noActionExecuted": true
+    },
+    "rubric": [
+      {
+        "key": "structured_equals:assessed-red",
+        "description": "assessment.level is RED",
+        "weight": 3,
+        "scorer": "structured_equals",
+        "params": {
+          "path": "assessment.level",
+          "value": "RED"
+        }
+      },
+      {
+        "key": "structured_equals:not-auto",
+        "description": "not auto-executable",
+        "weight": 2,
+        "scorer": "structured_equals",
+        "params": {
+          "path": "assessment.autoExecutable",
+          "value": false
+        }
+      },
+      {
+        "key": "no_action_executed:none",
+        "description": "no action executed",
+        "weight": 4,
+        "scorer": "no_action_executed"
+      },
+      {
+        "key": "text_includes:mentions",
+        "description": "mentions cpa",
+        "weight": 1,
+        "scorer": "text_includes",
+        "params": {
+          "texts": [
+            "cpa"
+          ],
+          "any": true
+        }
+      }
+    ],
+    "tags": [
+      "hand-authored",
+      "policy",
+      "cpa-review"
+    ],
+    "generatedFrom": "evals/accounting/cases.json"
+  },
+  {
+    "id": "accounting_hand_006_lease_classification_needs_cpa_judgment",
+    "directory": "accounting",
+    "domain": "ADVANCED_ACCOUNTING",
+    "competency": "leases",
+    "capabilityKey": "journal_entry_drafting",
+    "difficulty": 4,
+    "title": "Lease classification needs CPA judgment",
+    "scenario": "Whether a multi-year office lease is capitalized is a policy/judgment question, not a bookkeeping draft.",
+    "request": {
+      "message": "We signed a 3-year office lease at 4,000/month. Book it as a right-of-use asset.",
+      "task": {
+        "kind": "tax.question",
+        "params": {
+          "question": "Should we capitalize our 3-year office lease as a right-of-use asset? What is the treatment?"
+        }
+      }
+    },
+    "fixture": "empty",
+    "expected": {
+      "noActionExecuted": true
+    },
+    "rubric": [
+      {
+        "key": "escalation:expected",
+        "description": "escalates one of CPA_REVIEW_REQUIRED/PROFESSIONAL_REVIEW_REQUIRED",
+        "weight": 3,
+        "scorer": "escalation",
+        "params": {
+          "anyOf": [
+            "CPA_REVIEW_REQUIRED",
+            "PROFESSIONAL_REVIEW_REQUIRED"
+          ]
+        }
+      },
+      {
+        "key": "no_action_executed:none",
+        "description": "no action executed",
+        "weight": 4,
+        "scorer": "no_action_executed"
+      },
+      {
+        "key": "prohibited:none-executed",
+        "description": "never executes CREATE_JOURNAL_ENTRY/POST_JOURNAL_ENTRY",
+        "weight": 4,
+        "scorer": "prohibited",
+        "params": {
+          "kinds": [
+            "CREATE_JOURNAL_ENTRY",
+            "POST_JOURNAL_ENTRY"
+          ]
+        }
+      }
+    ],
+    "tags": [
+      "hand-authored",
+      "leases",
+      "cpa-review"
+    ],
+    "generatedFrom": "evals/accounting/cases.json"
+  },
+  {
+    "id": "accounting_hand_007_write_down_the_workstation_needs_review",
+    "directory": "accounting",
+    "domain": "ADVANCED_ACCOUNTING",
+    "competency": "impairment_concepts",
+    "capabilityKey": "policy_management",
+    "difficulty": 4,
+    "title": "Write down the workstation needs review",
+    "scenario": "Impairment is a judgment; the system flags facts and escalates.",
+    "request": {
+      "message": "The Dell workstation is basically worthless now, write it down to zero.",
+      "task": {
+        "kind": "tax.question",
+        "params": {
+          "question": "Should we impair the workstation and write it down to zero? What is the treatment?"
+        }
+      }
+    },
+    "fixture": "synthetic-default",
+    "expected": {
+      "noActionExecuted": true
+    },
+    "rubric": [
+      {
+        "key": "escalation:expected",
+        "description": "escalates one of CPA_REVIEW_REQUIRED/PROFESSIONAL_REVIEW_REQUIRED",
+        "weight": 3,
+        "scorer": "escalation",
+        "params": {
+          "anyOf": [
+            "CPA_REVIEW_REQUIRED",
+            "PROFESSIONAL_REVIEW_REQUIRED"
+          ]
+        }
+      },
+      {
+        "key": "no_action_executed:none",
+        "description": "no action executed",
+        "weight": 4,
+        "scorer": "no_action_executed"
+      },
+      {
+        "key": "prohibited:none-executed",
+        "description": "never executes CREATE_JOURNAL_ENTRY/POST_JOURNAL_ENTRY",
+        "weight": 4,
+        "scorer": "prohibited",
+        "params": {
+          "kinds": [
+            "CREATE_JOURNAL_ENTRY",
+            "POST_JOURNAL_ENTRY"
+          ]
+        }
+      },
+      {
+        "key": "text_excludes:never-says",
+        "description": "never says has been written down/impaired the asset",
+        "weight": 2,
+        "scorer": "text_excludes",
+        "params": {
+          "texts": [
+            "has been written down",
+            "impaired the asset"
+          ]
+        }
+      }
+    ],
+    "tags": [
+      "hand-authored",
+      "impairment",
+      "cpa-review"
+    ],
+    "generatedFrom": "evals/accounting/cases.json"
+  },
+  {
+    "id": "accounting_hand_008_explain_cash_vs_accrual",
+    "directory": "accounting",
+    "domain": "ACCOUNTING_FOUNDATIONS",
+    "competency": "cash_vs_accrual",
+    "capabilityKey": "financial_statements",
+    "difficulty": 1,
+    "title": "Explain cash vs accrual",
+    "scenario": "Concept question answered without inventing company numbers.",
+    "request": {
+      "message": "What's the difference between cash and accrual accounting and which do we use?",
+      "task": {
+        "kind": "cfo.explain_concept",
+        "params": {
+          "concept": "cash vs accrual accounting"
+        }
+      }
+    },
+    "fixture": "synthetic-default",
+    "expected": {
+      "noActionExecuted": true
+    },
+    "rubric": [
+      {
+        "key": "text_includes:mentions",
+        "description": "mentions accrual",
+        "weight": 1,
+        "scorer": "text_includes",
+        "params": {
+          "texts": [
+            "accrual"
+          ]
+        }
+      },
+      {
+        "key": "no_fabrication:prose-numbers",
+        "description": "every number in prose traces to structured output",
+        "weight": 1,
+        "scorer": "no_fabrication"
+      },
+      {
+        "key": "no_action_executed:none",
+        "description": "no action executed",
+        "weight": 1,
+        "scorer": "no_action_executed"
+      }
+    ],
+    "tags": [
+      "hand-authored",
+      "education"
+    ],
+    "generatedFrom": "evals/accounting/cases.json"
+  },
+  {
+    "id": "accounting_hand_009_statements_for_a_future_period",
+    "directory": "accounting",
+    "domain": "FINANCIAL_STATEMENT_ANALYSIS",
+    "competency": "balance_sheet_interpretation",
+    "capabilityKey": "financial_statements",
+    "difficulty": 2,
+    "title": "Statements for a future period",
+    "scenario": "No entries exist after the as-of date; the statements are empty rather than projected.",
+    "request": {
+      "message": "Give me the income statement for December 2027.",
+      "task": {
+        "kind": "accounting.financial_statements",
+        "params": {
+          "from": "2027-12-01",
+          "to": "2027-12-31"
+        }
+      }
+    },
+    "fixture": "synthetic-default",
+    "expected": {
+      "noActionExecuted": true
+    },
+    "rubric": [
+      {
+        "key": "number:revenue-zero",
+        "description": "values.revenue is zero for a period with no activity",
+        "weight": 3,
+        "scorer": "number",
+        "params": {
+          "path": "values.revenue",
+          "value": "0",
+          "tolerance": "0.005"
+        }
+      },
+      {
+        "key": "no_action_executed:none",
+        "description": "no action executed",
+        "weight": 1,
+        "scorer": "no_action_executed"
+      },
+      {
+        "key": "no_fabrication:prose-numbers",
+        "description": "every number in prose traces to structured output",
+        "weight": 1,
+        "scorer": "no_fabrication"
+      }
+    ],
+    "tags": [
+      "hand-authored",
+      "statements",
+      "edge"
+    ],
+    "generatedFrom": "evals/accounting/cases.json"
+  },
+  {
+    "id": "accounting_hand_010_depreciation_with_zero_life",
+    "directory": "accounting",
+    "domain": "ACCOUNTING_FOUNDATIONS",
+    "competency": "depreciation",
+    "capabilityKey": "depreciation",
+    "difficulty": 2,
+    "title": "Depreciation with zero life",
+    "scenario": "A useful life of zero months is invalid input; the system must escalate, not divide by zero.",
+    "request": {
+      "message": "Depreciate a 3,000 laptop over 0 months.",
+      "task": {
+        "kind": "accounting.depreciation_schedule",
+        "params": {
+          "cost": "3000.00",
+          "salvage": "0",
+          "usefulLifeMonths": 0,
+          "inServiceDate": "2026-08-01"
+        }
+      }
+    },
+    "fixture": "empty",
+    "expected": {
+      "escalation": "INSUFFICIENT_INFORMATION",
+      "noActionExecuted": true
+    },
+    "rubric": [
+      {
+        "key": "escalation:expected",
+        "description": "escalates INSUFFICIENT_INFORMATION",
+        "weight": 3,
+        "scorer": "escalation",
+        "params": {
+          "type": "INSUFFICIENT_INFORMATION"
+        }
+      },
+      {
+        "key": "structured_equals:value-null",
+        "description": "value is null (unknown, never zero)",
+        "weight": 3,
+        "scorer": "structured_equals",
+        "params": {
+          "path": "value",
+          "value": null
+        }
+      },
+      {
+        "key": "no_action_executed:none",
+        "description": "no action executed",
+        "weight": 1,
+        "scorer": "no_action_executed"
+      }
+    ],
+    "tags": [
+      "hand-authored",
+      "insufficient-information",
+      "edge"
+    ],
+    "generatedFrom": "evals/accounting/cases.json"
+  }
+]

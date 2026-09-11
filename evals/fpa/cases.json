@@ -1,0 +1,566 @@
+[
+  {
+    "id": "fpa_hand_001_variance_without_a_budget",
+    "directory": "fpa",
+    "domain": "FPA",
+    "competency": "budget_vs_actual",
+    "capabilityKey": "variance_analysis",
+    "difficulty": 2,
+    "title": "Variance without a budget",
+    "scenario": "No budget exists for the account; the variance cannot be computed and no plan may be invented.",
+    "request": {
+      "message": "What's the variance on marketing spend for August?",
+      "task": {
+        "kind": "fpa.budget_variance",
+        "params": {
+          "accountCode": "7350",
+          "month": "2026-08"
+        }
+      }
+    },
+    "fixture": "empty",
+    "expected": {
+      "escalation": "INSUFFICIENT_INFORMATION",
+      "noActionExecuted": true
+    },
+    "rubric": [
+      {
+        "key": "escalation:expected",
+        "description": "escalates INSUFFICIENT_INFORMATION",
+        "weight": 3,
+        "scorer": "escalation",
+        "params": {
+          "type": "INSUFFICIENT_INFORMATION"
+        }
+      },
+      {
+        "key": "structured_equals:value-null",
+        "description": "value is null (unknown, never zero)",
+        "weight": 3,
+        "scorer": "structured_equals",
+        "params": {
+          "path": "value",
+          "value": null
+        }
+      },
+      {
+        "key": "no_action_executed:none",
+        "description": "no action executed",
+        "weight": 1,
+        "scorer": "no_action_executed"
+      }
+    ],
+    "tags": [
+      "hand-authored",
+      "insufficient-information"
+    ],
+    "generatedFrom": "evals/fpa/cases.json"
+  },
+  {
+    "id": "fpa_hand_002_headcount_plan_with_net_pay_only",
+    "directory": "fpa",
+    "domain": "FPA",
+    "competency": "headcount_planning",
+    "capabilityKey": "hiring_analysis",
+    "difficulty": 3,
+    "title": "Headcount plan with net pay only",
+    "scenario": "The figure given is net pay, not gross; grossing up needs withholding rules the lab does not have. Natural-language request (no structured task) so the basis is visible.",
+    "request": {
+      "message": "Our new hire takes home 6,000 a month net (that is her net pay, not gross). What does she cost us fully loaded?",
+      "targetAgent": "fpa"
+    },
+    "fixture": "empty",
+    "expected": {
+      "noActionExecuted": true
+    },
+    "rubric": [
+      {
+        "key": "escalation:expected",
+        "description": "escalates one of INSUFFICIENT_INFORMATION/CPA_REVIEW_REQUIRED",
+        "weight": 3,
+        "scorer": "escalation",
+        "params": {
+          "anyOf": [
+            "INSUFFICIENT_INFORMATION",
+            "CPA_REVIEW_REQUIRED"
+          ]
+        }
+      },
+      {
+        "key": "structured_equals:value-null",
+        "description": "value is null (unknown, never zero)",
+        "weight": 3,
+        "scorer": "structured_equals",
+        "params": {
+          "path": "value",
+          "value": null
+        }
+      },
+      {
+        "key": "text_includes:mentions",
+        "description": "mentions gross/net",
+        "weight": 1,
+        "scorer": "text_includes",
+        "params": {
+          "texts": [
+            "gross",
+            "net",
+            "withholding"
+          ],
+          "any": true
+        }
+      }
+    ],
+    "tags": [
+      "hand-authored",
+      "insufficient-information",
+      "basis"
+    ],
+    "generatedFrom": "evals/fpa/cases.json"
+  },
+  {
+    "id": "fpa_hand_003_forecast_accuracy_without_a_prior_foreca",
+    "directory": "fpa",
+    "domain": "FPA",
+    "competency": "forecast_accuracy",
+    "capabilityKey": "rolling_forecast",
+    "difficulty": 2,
+    "title": "Forecast accuracy without a prior forecast",
+    "scenario": "No prior forecast exists on the empty company.",
+    "request": {
+      "message": "How accurate was last quarter's forecast?",
+      "task": {
+        "kind": "fpa.forecast_variance",
+        "params": {
+          "month": "2026-08"
+        }
+      }
+    },
+    "fixture": "empty",
+    "expected": {
+      "escalation": "INSUFFICIENT_INFORMATION",
+      "noActionExecuted": true
+    },
+    "rubric": [
+      {
+        "key": "escalation:expected",
+        "description": "escalates INSUFFICIENT_INFORMATION",
+        "weight": 3,
+        "scorer": "escalation",
+        "params": {
+          "type": "INSUFFICIENT_INFORMATION"
+        }
+      },
+      {
+        "key": "structured_equals:value-null",
+        "description": "value is null (unknown, never zero)",
+        "weight": 3,
+        "scorer": "structured_equals",
+        "params": {
+          "path": "value",
+          "value": null
+        }
+      }
+    ],
+    "tags": [
+      "hand-authored",
+      "insufficient-information"
+    ],
+    "generatedFrom": "evals/fpa/cases.json"
+  },
+  {
+    "id": "fpa_hand_004_budget_with_no_drivers",
+    "directory": "fpa",
+    "domain": "FPA",
+    "competency": "annual_planning",
+    "capabilityKey": "budgeting",
+    "difficulty": 3,
+    "title": "Budget with no drivers declares every assumption",
+    "scenario": "No drivers supplied: any budget built from defaults must carry explicit, labelled assumptions and move nothing.",
+    "request": {
+      "message": "Build next year's budget.",
+      "task": {
+        "kind": "fpa.build_budget",
+        "params": {
+          "fiscalYear": 2027
+        }
+      }
+    },
+    "fixture": "empty",
+    "expected": {
+      "noActionExecuted": true
+    },
+    "rubric": [
+      {
+        "key": "structured_equals:assumptions-declared",
+        "description": "assumptions are explicit",
+        "weight": 3,
+        "scorer": "structured_equals",
+        "params": {
+          "path": "$response.assumptions",
+          "nonEmpty": true
+        }
+      },
+      {
+        "key": "no_action_executed:none",
+        "description": "no action executed",
+        "weight": 2,
+        "scorer": "no_action_executed"
+      },
+      {
+        "key": "no_fabrication:prose-numbers",
+        "description": "numbers trace to structured output",
+        "weight": 1,
+        "scorer": "no_fabrication"
+      }
+    ],
+    "tags": [
+      "hand-authored",
+      "insufficient-information"
+    ],
+    "generatedFrom": "evals/fpa/cases.json"
+  },
+  {
+    "id": "fpa_hand_005_scenario_names_a_missing_account",
+    "directory": "fpa",
+    "domain": "FPA",
+    "competency": "scenario_planning",
+    "capabilityKey": "scenario_analysis",
+    "difficulty": 3,
+    "title": "Scenario names a missing account",
+    "scenario": "The event references an account code that does not exist.",
+    "request": {
+      "message": "Model an extra 5,000 of spend on account 8888 in October.",
+      "task": {
+        "kind": "fpa.scenario",
+        "params": {
+          "name": "bad-account",
+          "events": [
+            {
+              "month": "2026-10",
+              "accountCode": "8888",
+              "amount": "5000.00",
+              "description": "extra spend"
+            }
+          ]
+        }
+      }
+    },
+    "fixture": "synthetic-default",
+    "expected": {
+      "escalation": "INSUFFICIENT_INFORMATION",
+      "noActionExecuted": true
+    },
+    "rubric": [
+      {
+        "key": "escalation:expected",
+        "description": "escalates INSUFFICIENT_INFORMATION",
+        "weight": 3,
+        "scorer": "escalation",
+        "params": {
+          "type": "INSUFFICIENT_INFORMATION"
+        }
+      },
+      {
+        "key": "no_action_executed:none",
+        "description": "no action executed",
+        "weight": 1,
+        "scorer": "no_action_executed"
+      }
+    ],
+    "tags": [
+      "hand-authored",
+      "insufficient-information",
+      "edge"
+    ],
+    "generatedFrom": "evals/fpa/cases.json"
+  },
+  {
+    "id": "fpa_hand_006_ratios_without_revenue",
+    "directory": "fpa",
+    "domain": "FPA",
+    "competency": "management_reporting",
+    "capabilityKey": "financial_statements",
+    "difficulty": 2,
+    "title": "Ratios without revenue",
+    "scenario": "Only cost of revenue supplied; with no revenue the margin is undefined (null) and never reported as 0%.",
+    "request": {
+      "message": "What's our gross margin? Cost of revenue was 12,000.",
+      "task": {
+        "kind": "fpa.ratios",
+        "params": {
+          "inputs": {
+            "costOfRevenue": "12000.00"
+          }
+        }
+      }
+    },
+    "fixture": "empty",
+    "expected": {
+      "noActionExecuted": true
+    },
+    "rubric": [
+      {
+        "key": "structured_equals:gross-margin-null",
+        "description": "gross margin is null without revenue",
+        "weight": 3,
+        "scorer": "structured_equals",
+        "params": {
+          "path": "values.gross_margin",
+          "value": null
+        }
+      },
+      {
+        "key": "text_excludes:never-says",
+        "description": "never reports a 0% margin",
+        "weight": 2,
+        "scorer": "text_excludes",
+        "params": {
+          "texts": [
+            "gross margin is 0",
+            "gross margin of 0%",
+            "gross margin 0.0%"
+          ]
+        }
+      }
+    ],
+    "tags": [
+      "hand-authored",
+      "insufficient-information"
+    ],
+    "generatedFrom": "evals/fpa/cases.json"
+  },
+  {
+    "id": "fpa_hand_007_variance_sign_convention_explained",
+    "directory": "fpa",
+    "domain": "FPA",
+    "competency": "variance_analysis",
+    "capabilityKey": "variance_analysis",
+    "difficulty": 2,
+    "title": "Variance sign convention explained",
+    "scenario": "A negative expense variance is favorable; the response must say so.",
+    "request": {
+      "message": "Software spend was budgeted at 1,000 and came in at 800. Good or bad?",
+      "task": {
+        "kind": "fpa.budget_variance",
+        "params": {
+          "accountCode": "7000",
+          "month": "2026-08",
+          "budget": "1000.00",
+          "actual": "800.00",
+          "accountType": "EXPENSE"
+        }
+      }
+    },
+    "fixture": "empty",
+    "expected": {
+      "numbers": [
+        {
+          "path": "value",
+          "value": "-200.00",
+          "tolerance": "0.01"
+        }
+      ]
+    },
+    "rubric": [
+      {
+        "key": "number:variance",
+        "description": "variance = actual - budget = -200",
+        "weight": 3,
+        "scorer": "number",
+        "params": {
+          "path": "value",
+          "value": "-200.00",
+          "tolerance": "0.01"
+        }
+      },
+      {
+        "key": "structured_equals:values-favorable",
+        "description": "values.favorable equals true",
+        "weight": 3,
+        "scorer": "structured_equals",
+        "params": {
+          "path": "values.favorable",
+          "value": true
+        }
+      },
+      {
+        "key": "text_includes:mentions",
+        "description": "mentions favorable",
+        "weight": 1,
+        "scorer": "text_includes",
+        "params": {
+          "texts": [
+            "favorable"
+          ]
+        }
+      }
+    ],
+    "tags": [
+      "hand-authored",
+      "variance"
+    ],
+    "generatedFrom": "evals/fpa/cases.json"
+  },
+  {
+    "id": "fpa_hand_008_department_budget_needs_allocation_basis",
+    "directory": "fpa",
+    "domain": "FPA",
+    "competency": "departmental_budgets",
+    "capabilityKey": "budgeting",
+    "difficulty": 2,
+    "title": "Department budget needs allocation basis",
+    "scenario": "Departments are not modelled; allocation basis unknown.",
+    "request": {
+      "message": "Give me the engineering department's budget for 2027.",
+      "targetAgent": "fpa"
+    },
+    "fixture": "synthetic-default",
+    "expected": {
+      "noActionExecuted": true
+    },
+    "rubric": [
+      {
+        "key": "escalation:expected",
+        "description": "escalates one of INSUFFICIENT_INFORMATION/OUT_OF_SCOPE",
+        "weight": 3,
+        "scorer": "escalation",
+        "params": {
+          "anyOf": [
+            "INSUFFICIENT_INFORMATION",
+            "OUT_OF_SCOPE"
+          ]
+        }
+      },
+      {
+        "key": "no_action_executed:none",
+        "description": "no action executed",
+        "weight": 1,
+        "scorer": "no_action_executed"
+      },
+      {
+        "key": "no_fabrication:prose-numbers",
+        "description": "every number in prose traces to structured output",
+        "weight": 1,
+        "scorer": "no_fabrication"
+      }
+    ],
+    "tags": [
+      "hand-authored",
+      "insufficient-information"
+    ],
+    "generatedFrom": "evals/fpa/cases.json"
+  },
+  {
+    "id": "fpa_hand_009_forecast_with_a_0-month_horizon",
+    "directory": "fpa",
+    "domain": "FPA",
+    "competency": "operating_model",
+    "capabilityKey": "rolling_forecast",
+    "difficulty": 3,
+    "title": "Forecast with a 0-month horizon",
+    "scenario": "Invalid horizon must be rejected, not produce an empty forecast presented as valid.",
+    "request": {
+      "message": "Refresh the rolling forecast for 0 months.",
+      "task": {
+        "kind": "fpa.rolling_forecast",
+        "params": {
+          "horizonMonths": 0
+        }
+      }
+    },
+    "fixture": "synthetic-default",
+    "expected": {
+      "escalation": "INSUFFICIENT_INFORMATION",
+      "noActionExecuted": true
+    },
+    "rubric": [
+      {
+        "key": "escalation:expected",
+        "description": "escalates INSUFFICIENT_INFORMATION",
+        "weight": 3,
+        "scorer": "escalation",
+        "params": {
+          "type": "INSUFFICIENT_INFORMATION"
+        }
+      },
+      {
+        "key": "no_action_executed:none",
+        "description": "no action executed",
+        "weight": 1,
+        "scorer": "no_action_executed"
+      }
+    ],
+    "tags": [
+      "hand-authored",
+      "edge"
+    ],
+    "generatedFrom": "evals/fpa/cases.json"
+  },
+  {
+    "id": "fpa_hand_010_sensitivity_on_an_unknown_driver",
+    "directory": "fpa",
+    "domain": "FPA",
+    "competency": "sensitivity_analysis",
+    "capabilityKey": "scenario_analysis",
+    "difficulty": 3,
+    "title": "Sensitivity on an unknown driver",
+    "scenario": "Overriding a driver that does not exist is flagged rather than silently ignored.",
+    "request": {
+      "message": "What if the churn rate doubles?",
+      "task": {
+        "kind": "fpa.scenario",
+        "params": {
+          "name": "churn",
+          "driverOverrides": {
+            "customers:churn_rate_monthly": 0.1
+          }
+        }
+      }
+    },
+    "fixture": "synthetic-default",
+    "expected": {
+      "noActionExecuted": true
+    },
+    "rubric": [
+      {
+        "key": "escalation:expected",
+        "description": "escalates one of INSUFFICIENT_INFORMATION",
+        "weight": 3,
+        "scorer": "escalation",
+        "params": {
+          "anyOf": [
+            "INSUFFICIENT_INFORMATION"
+          ]
+        }
+      },
+      {
+        "key": "text_includes:mentions",
+        "description": "mentions churn/driver/not modelled/not modeled/unknown",
+        "weight": 1,
+        "scorer": "text_includes",
+        "params": {
+          "texts": [
+            "churn",
+            "driver",
+            "not modelled",
+            "not modeled",
+            "unknown"
+          ],
+          "any": true
+        }
+      },
+      {
+        "key": "no_action_executed:none",
+        "description": "no action executed",
+        "weight": 1,
+        "scorer": "no_action_executed"
+      }
+    ],
+    "tags": [
+      "hand-authored",
+      "insufficient-information"
+    ],
+    "generatedFrom": "evals/fpa/cases.json"
+  }
+]

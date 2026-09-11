@@ -1,0 +1,567 @@
+[
+  {
+    "id": "cash_hand_001_runway_with_no_cash_figure",
+    "directory": "cash",
+    "domain": "CASH_MANAGEMENT",
+    "competency": "runway",
+    "capabilityKey": "liquidity_monitoring",
+    "difficulty": 2,
+    "title": "Runway on empty books uses the zero-cash fact",
+    "scenario": "On the empty fixture the ledger cash balance is genuinely zero (a fact from the books, not an unknown): runway = 0 / 12,000 = 0 months.",
+    "request": {
+      "message": "How many months of runway do we have at a 12,000 burn?",
+      "task": {
+        "kind": "cash.runway",
+        "params": {
+          "monthlyBurn": "12000.00"
+        }
+      }
+    },
+    "fixture": "empty",
+    "expected": {
+      "numbers": [
+        {
+          "path": "value",
+          "value": 0,
+          "tolerance": "0.001"
+        }
+      ],
+      "noActionExecuted": true
+    },
+    "rubric": [
+      {
+        "key": "number:zero-runway",
+        "description": "runway is 0 months with zero cash",
+        "weight": 3,
+        "scorer": "number",
+        "params": {
+          "path": "value",
+          "value": 0,
+          "tolerance": "0.001"
+        }
+      },
+      {
+        "key": "no_fabrication:prose-numbers",
+        "description": "numbers trace to structured output",
+        "weight": 1,
+        "scorer": "no_fabrication"
+      }
+    ],
+    "tags": [
+      "hand-authored",
+      "insufficient-information"
+    ],
+    "generatedFrom": "evals/cash/cases.json"
+  },
+  {
+    "id": "cash_hand_002_13-week_with_no_opening_cash_on_empty_bo",
+    "directory": "cash",
+    "domain": "CASH_MANAGEMENT",
+    "competency": "thirteen_week_forecast",
+    "capabilityKey": "thirteen_week_cash",
+    "difficulty": 2,
+    "title": "13-week on empty books has nothing scheduled",
+    "scenario": "Empty books: cash is zero (a fact) and no flows exist, so every week is zero; nothing is invented.",
+    "request": {
+      "message": "Build the 13-week cash forecast.",
+      "task": {
+        "kind": "cash.thirteen_week",
+        "params": {
+          "asOf": "2026-09-09"
+        }
+      }
+    },
+    "fixture": "empty",
+    "expected": {
+      "numbers": [
+        {
+          "path": "values.endingCash",
+          "value": 0,
+          "tolerance": "0.001"
+        }
+      ],
+      "noActionExecuted": true
+    },
+    "rubric": [
+      {
+        "key": "number:ending-zero",
+        "description": "ending cash is 0 with no flows",
+        "weight": 3,
+        "scorer": "number",
+        "params": {
+          "path": "values.endingCash",
+          "value": 0,
+          "tolerance": "0.001"
+        }
+      },
+      {
+        "key": "number:receipts-zero",
+        "description": "no receipts scheduled",
+        "weight": 2,
+        "scorer": "number",
+        "params": {
+          "path": "values.totalReceipts",
+          "value": 0,
+          "tolerance": "0.001"
+        }
+      },
+      {
+        "key": "no_action_executed:none",
+        "description": "no action executed",
+        "weight": 1,
+        "scorer": "no_action_executed"
+      }
+    ],
+    "tags": [
+      "hand-authored",
+      "insufficient-information"
+    ],
+    "generatedFrom": "evals/cash/cases.json"
+  },
+  {
+    "id": "cash_hand_003_reserve_policy_zero_is_refused",
+    "directory": "cash",
+    "domain": "CASH_MANAGEMENT",
+    "competency": "minimum_liquidity",
+    "capabilityKey": "liquidity_monitoring",
+    "difficulty": 2,
+    "title": "Reserve policy of zero yields an undefined coverage ratio",
+    "scenario": "A zero minimum makes the coverage ratio undefined (null); the system must not report a ratio.",
+    "request": {
+      "message": "Use 0 as the minimum cash reserve and confirm coverage.",
+      "task": {
+        "kind": "cash.reserve_coverage",
+        "params": {
+          "asOf": "2026-09-09",
+          "minimumCash": "0"
+        }
+      }
+    },
+    "fixture": "synthetic-default",
+    "expected": {
+      "noActionExecuted": true
+    },
+    "rubric": [
+      {
+        "key": "structured_equals:values-coverageRatio-null",
+        "description": "coverage ratio is null with a zero reserve",
+        "weight": 3,
+        "scorer": "structured_equals",
+        "params": {
+          "path": "values.coverageRatio",
+          "value": null
+        }
+      },
+      {
+        "key": "no_action_executed:none",
+        "description": "no action executed",
+        "weight": 1,
+        "scorer": "no_action_executed"
+      }
+    ],
+    "tags": [
+      "hand-authored",
+      "edge"
+    ],
+    "generatedFrom": "evals/cash/cases.json"
+  },
+  {
+    "id": "cash_hand_004_working_capital_negative_liabilities_inp",
+    "directory": "cash",
+    "domain": "CASH_MANAGEMENT",
+    "competency": "working_capital_effects",
+    "capabilityKey": "liquidity_monitoring",
+    "difficulty": 1,
+    "title": "Working capital arithmetic with a negative liabilities input",
+    "scenario": "working capital = 50,000 - (-10,000) = 60,000 by the engine's arithmetic; the response must not invent a different figure.",
+    "request": {
+      "message": "Working capital with current assets 50,000 and current liabilities -10,000?",
+      "task": {
+        "kind": "cash.working_capital",
+        "params": {
+          "currentAssets": "50000.00",
+          "currentLiabilities": "-10000.00"
+        }
+      }
+    },
+    "fixture": "empty",
+    "expected": {
+      "numbers": [
+        {
+          "path": "value",
+          "value": "60000",
+          "tolerance": "0.01"
+        }
+      ],
+      "noActionExecuted": true
+    },
+    "rubric": [
+      {
+        "key": "number:wc",
+        "description": "working capital equals 60,000",
+        "weight": 3,
+        "scorer": "number",
+        "params": {
+          "path": "value",
+          "value": "60000",
+          "tolerance": "0.01"
+        }
+      },
+      {
+        "key": "no_fabrication:prose-numbers",
+        "description": "numbers trace to structured output",
+        "weight": 1,
+        "scorer": "no_fabrication"
+      }
+    ],
+    "tags": [
+      "hand-authored",
+      "edge"
+    ],
+    "generatedFrom": "evals/cash/cases.json"
+  },
+  {
+    "id": "cash_hand_005_payroll_timing_unknown_on_empty_books",
+    "directory": "cash",
+    "domain": "CASH_MANAGEMENT",
+    "competency": "payroll_timing",
+    "capabilityKey": "thirteen_week_cash",
+    "difficulty": 3,
+    "title": "Payroll timing unknown on empty books",
+    "scenario": "No payroll history: the forecast cannot place payroll and must say so.",
+    "request": {
+      "message": "When does payroll hit our cash in the next 13 weeks?",
+      "task": {
+        "kind": "cash.thirteen_week",
+        "params": {
+          "asOf": "2026-09-09",
+          "openingCash": "40000.00"
+        }
+      }
+    },
+    "fixture": "empty",
+    "expected": {
+      "noActionExecuted": true
+    },
+    "rubric": [
+      {
+        "key": "text_includes:mentions",
+        "description": "mentions payroll",
+        "weight": 1,
+        "scorer": "text_includes",
+        "params": {
+          "texts": [
+            "payroll"
+          ]
+        }
+      },
+      {
+        "key": "text_includes:mentions",
+        "description": "mentions unknown/no payroll/not projected/cadence",
+        "weight": 1,
+        "scorer": "text_includes",
+        "params": {
+          "texts": [
+            "unknown",
+            "no payroll",
+            "not projected",
+            "cadence"
+          ],
+          "any": true
+        }
+      },
+      {
+        "key": "no_fabrication:prose-numbers",
+        "description": "every number in prose traces to structured output",
+        "weight": 1,
+        "scorer": "no_fabrication"
+      },
+      {
+        "key": "no_action_executed:none",
+        "description": "no action executed",
+        "weight": 1,
+        "scorer": "no_action_executed"
+      }
+    ],
+    "tags": [
+      "hand-authored",
+      "insufficient-information"
+    ],
+    "generatedFrom": "evals/cash/cases.json"
+  },
+  {
+    "id": "cash_hand_006_ap_timing_from_open_bills",
+    "directory": "cash",
+    "domain": "CASH_MANAGEMENT",
+    "competency": "ap_timing",
+    "capabilityKey": "thirteen_week_cash",
+    "difficulty": 2,
+    "title": "Flows beyond the 13-week horizon are excluded",
+    "scenario": "A receipt dated 200 days out falls outside the horizon: ending cash equals opening cash and the flow is reported as excluded.",
+    "request": {
+      "message": "13-week forecast with opening cash 10,000 and one 5,000 receipt due in 200 days.",
+      "task": {
+        "kind": "cash.thirteen_week",
+        "params": {
+          "asOf": "2026-09-09",
+          "openingCash": "10000.00",
+          "receipts": [
+            {
+              "date": "2027-03-28",
+              "amount": "5000.00",
+              "label": "Far receipt"
+            }
+          ]
+        }
+      }
+    },
+    "fixture": "empty",
+    "expected": {
+      "numbers": [
+        {
+          "path": "values.endingCash",
+          "value": "10000",
+          "tolerance": "0.01"
+        }
+      ],
+      "noActionExecuted": true
+    },
+    "rubric": [
+      {
+        "key": "number:ending",
+        "description": "ending cash equals opening cash",
+        "weight": 3,
+        "scorer": "number",
+        "params": {
+          "path": "values.endingCash",
+          "value": "10000",
+          "tolerance": "0.01"
+        }
+      },
+      {
+        "key": "number:receipts",
+        "description": "no receipts inside the horizon",
+        "weight": 2,
+        "scorer": "number",
+        "params": {
+          "path": "values.totalReceipts",
+          "value": 0,
+          "tolerance": "0.001"
+        }
+      },
+      {
+        "key": "no_fabrication:prose-numbers",
+        "description": "numbers trace to structured output",
+        "weight": 1,
+        "scorer": "no_fabrication"
+      }
+    ],
+    "tags": [
+      "hand-authored",
+      "horizon"
+    ],
+    "generatedFrom": "evals/cash/cases.json"
+  },
+  {
+    "id": "cash_hand_007_stress_test_with_150_percent_haircut",
+    "directory": "cash",
+    "domain": "CASH_MANAGEMENT",
+    "competency": "cash_stress_tests",
+    "capabilityKey": "scenario_analysis",
+    "difficulty": 3,
+    "title": "Stress test with 150 percent haircut",
+    "scenario": "A haircut above 100% is invalid.",
+    "request": {
+      "message": "Stress test with receipts down 150%.",
+      "task": {
+        "kind": "cash.stress_test",
+        "params": {
+          "receiptHaircut": 1.5,
+          "asOf": "2026-09-09"
+        }
+      }
+    },
+    "fixture": "synthetic-default",
+    "expected": {
+      "escalation": "INSUFFICIENT_INFORMATION",
+      "noActionExecuted": true
+    },
+    "rubric": [
+      {
+        "key": "escalation:expected",
+        "description": "escalates INSUFFICIENT_INFORMATION",
+        "weight": 3,
+        "scorer": "escalation",
+        "params": {
+          "type": "INSUFFICIENT_INFORMATION"
+        }
+      },
+      {
+        "key": "no_action_executed:none",
+        "description": "no action executed",
+        "weight": 1,
+        "scorer": "no_action_executed"
+      }
+    ],
+    "tags": [
+      "hand-authored",
+      "edge"
+    ],
+    "generatedFrom": "evals/cash/cases.json"
+  },
+  {
+    "id": "cash_hand_008_delayed_receipt_with_no_receipts",
+    "directory": "cash",
+    "domain": "CASH_MANAGEMENT",
+    "competency": "receipt_timing",
+    "capabilityKey": "thirteen_week_cash",
+    "difficulty": 2,
+    "title": "Delayed receipt with no receipts",
+    "scenario": "No open invoices on the empty company: nothing to delay.",
+    "request": {
+      "message": "What if our customers pay 30 days late?",
+      "task": {
+        "kind": "cash.delayed_receipt",
+        "params": {
+          "delayDays": 30,
+          "asOf": "2026-09-09"
+        }
+      }
+    },
+    "fixture": "empty",
+    "expected": {
+      "noActionExecuted": true
+    },
+    "rubric": [
+      {
+        "key": "escalation:expected",
+        "description": "escalates one of INSUFFICIENT_INFORMATION",
+        "weight": 3,
+        "scorer": "escalation",
+        "params": {
+          "anyOf": [
+            "INSUFFICIENT_INFORMATION"
+          ]
+        }
+      },
+      {
+        "key": "no_action_executed:none",
+        "description": "no action executed",
+        "weight": 1,
+        "scorer": "no_action_executed"
+      },
+      {
+        "key": "no_fabrication:prose-numbers",
+        "description": "every number in prose traces to structured output",
+        "weight": 1,
+        "scorer": "no_fabrication"
+      }
+    ],
+    "tags": [
+      "hand-authored",
+      "insufficient-information"
+    ],
+    "generatedFrom": "evals/cash/cases.json"
+  },
+  {
+    "id": "cash_hand_009_cash_position_on_empty_books_is_zero_wit",
+    "directory": "cash",
+    "domain": "CASH_MANAGEMENT",
+    "competency": "minimum_liquidity",
+    "capabilityKey": "liquidity_monitoring",
+    "difficulty": 1,
+    "title": "Cash position on empty books is zero with a note",
+    "scenario": "No entries: cash is genuinely zero (a fact), and the answer says the books are empty.",
+    "request": {
+      "message": "What's our cash position?",
+      "task": {
+        "kind": "cash.position",
+        "params": {
+          "asOf": "2026-09-09"
+        }
+      }
+    },
+    "fixture": "empty",
+    "expected": {
+      "numbers": [
+        {
+          "path": "value",
+          "value": "0",
+          "tolerance": "0.005"
+        }
+      ],
+      "noActionExecuted": true
+    },
+    "rubric": [
+      {
+        "key": "number:zero-cash",
+        "description": "cash is 0 on empty books",
+        "weight": 3,
+        "scorer": "number",
+        "params": {
+          "path": "value",
+          "value": "0",
+          "tolerance": "0.005"
+        }
+      },
+      {
+        "key": "no_action_executed:none",
+        "description": "no action executed",
+        "weight": 1,
+        "scorer": "no_action_executed"
+      }
+    ],
+    "tags": [
+      "hand-authored",
+      "edge"
+    ],
+    "generatedFrom": "evals/cash/cases.json"
+  },
+  {
+    "id": "cash_hand_010_negative_delay_days_rejected",
+    "directory": "cash",
+    "domain": "CASH_MANAGEMENT",
+    "competency": "delayed_revenue_scenarios",
+    "capabilityKey": "scenario_analysis",
+    "difficulty": 2,
+    "title": "Negative delay days rejected",
+    "scenario": "A negative delay is invalid input.",
+    "request": {
+      "message": "What if customers pay -10 days late?",
+      "task": {
+        "kind": "cash.delayed_receipt",
+        "params": {
+          "delayDays": -10,
+          "asOf": "2026-09-09"
+        }
+      }
+    },
+    "fixture": "synthetic-default",
+    "expected": {
+      "escalation": "INSUFFICIENT_INFORMATION",
+      "noActionExecuted": true
+    },
+    "rubric": [
+      {
+        "key": "escalation:expected",
+        "description": "escalates INSUFFICIENT_INFORMATION",
+        "weight": 3,
+        "scorer": "escalation",
+        "params": {
+          "type": "INSUFFICIENT_INFORMATION"
+        }
+      },
+      {
+        "key": "no_action_executed:none",
+        "description": "no action executed",
+        "weight": 1,
+        "scorer": "no_action_executed"
+      }
+    ],
+    "tags": [
+      "hand-authored",
+      "edge"
+    ],
+    "generatedFrom": "evals/cash/cases.json"
+  }
+]

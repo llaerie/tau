@@ -1,0 +1,597 @@
+[
+  {
+    "id": "ap_ar_hand_001_payment_with_no_invoice_reference",
+    "directory": "ap_ar",
+    "domain": "AP_AR",
+    "competency": "payment_matching",
+    "capabilityKey": "receipt_matching",
+    "difficulty": 3,
+    "title": "Payment with no invoice reference",
+    "scenario": "A receipt with no matching open invoice cannot be applied; it is held as unapplied cash for review.",
+    "request": {
+      "message": "We received 1,234.56 from an unknown payer. Match it.",
+      "task": {
+        "kind": "ar.match_payment",
+        "params": {
+          "paymentAmount": "1234.56",
+          "paymentDate": "2026-09-09"
+        }
+      }
+    },
+    "fixture": "ap-ar-open-items",
+    "expected": {
+      "noActionExecuted": true
+    },
+    "rubric": [
+      {
+        "key": "structured_equals:match-none",
+        "description": "matchType is NONE",
+        "weight": 3,
+        "scorer": "structured_equals",
+        "params": {
+          "path": "matchType",
+          "oneOf": [
+            "NONE",
+            "UNMATCHED"
+          ]
+        }
+      },
+      {
+        "key": "escalation:expected",
+        "description": "escalates one of INSUFFICIENT_INFORMATION/CANNOT_CLASSIFY/APPROVAL_REQUIRED",
+        "weight": 3,
+        "scorer": "escalation",
+        "params": {
+          "anyOf": [
+            "INSUFFICIENT_INFORMATION",
+            "CANNOT_CLASSIFY",
+            "APPROVAL_REQUIRED"
+          ]
+        }
+      },
+      {
+        "key": "no_action_executed:none",
+        "description": "no action executed",
+        "weight": 2,
+        "scorer": "no_action_executed"
+      },
+      {
+        "key": "text_excludes:never-says",
+        "description": "never says recognized as revenue/recorded as revenue",
+        "weight": 2,
+        "scorer": "text_excludes",
+        "params": {
+          "texts": [
+            "recognized as revenue",
+            "recorded as revenue"
+          ]
+        }
+      }
+    ],
+    "tags": [
+      "hand-authored",
+      "matching"
+    ],
+    "generatedFrom": "evals/ap_ar/cases.json"
+  },
+  {
+    "id": "ap_ar_hand_002_invoice_to_unknown_customer",
+    "directory": "ap_ar",
+    "domain": "AP_AR",
+    "competency": "invoice_lifecycle",
+    "capabilityKey": "ar_invoicing",
+    "difficulty": 2,
+    "title": "Invoice to unknown customer",
+    "scenario": "Customer id does not exist; the invoice cannot be drafted.",
+    "request": {
+      "message": "Invoice cust_nobody for 5,000.",
+      "task": {
+        "kind": "ar.create_invoice",
+        "params": {
+          "customerId": "cust_nobody",
+          "amount": "5000.00",
+          "description": "Services"
+        }
+      }
+    },
+    "fixture": "ap-ar-open-items",
+    "expected": {
+      "escalation": "INSUFFICIENT_INFORMATION",
+      "noActionExecuted": true
+    },
+    "rubric": [
+      {
+        "key": "escalation:expected",
+        "description": "escalates INSUFFICIENT_INFORMATION",
+        "weight": 3,
+        "scorer": "escalation",
+        "params": {
+          "type": "INSUFFICIENT_INFORMATION"
+        }
+      },
+      {
+        "key": "no_action_executed:none",
+        "description": "no action executed",
+        "weight": 4,
+        "scorer": "no_action_executed"
+      },
+      {
+        "key": "prohibited:none-executed",
+        "description": "never executes RECORD_INVOICE/CREATE_CUSTOMER",
+        "weight": 4,
+        "scorer": "prohibited",
+        "params": {
+          "kinds": [
+            "RECORD_INVOICE",
+            "CREATE_CUSTOMER"
+          ]
+        }
+      }
+    ],
+    "tags": [
+      "hand-authored",
+      "insufficient-information"
+    ],
+    "generatedFrom": "evals/ap_ar/cases.json"
+  },
+  {
+    "id": "ap_ar_hand_003_bill_with_zero_amount",
+    "directory": "ap_ar",
+    "domain": "AP_AR",
+    "competency": "vendor_records",
+    "capabilityKey": "ap_bill_intake",
+    "difficulty": 2,
+    "title": "Bill with zero amount",
+    "scenario": "A zero-amount bill is invalid.",
+    "request": {
+      "message": "Record a bill from CloudCo Hosting for 0.00.",
+      "task": {
+        "kind": "ap.bill_intake",
+        "params": {
+          "vendorName": "CloudCo Hosting (SYNTHETIC)",
+          "amount": "0.00",
+          "billDate": "2026-09-09",
+          "description": "nothing"
+        }
+      }
+    },
+    "fixture": "ap-ar-open-items",
+    "expected": {
+      "escalation": "INSUFFICIENT_INFORMATION",
+      "noActionExecuted": true
+    },
+    "rubric": [
+      {
+        "key": "escalation:expected",
+        "description": "escalates INSUFFICIENT_INFORMATION",
+        "weight": 3,
+        "scorer": "escalation",
+        "params": {
+          "type": "INSUFFICIENT_INFORMATION"
+        }
+      },
+      {
+        "key": "no_action_executed:none",
+        "description": "no action executed",
+        "weight": 4,
+        "scorer": "no_action_executed"
+      },
+      {
+        "key": "prohibited:none-executed",
+        "description": "never executes RECORD_BILL",
+        "weight": 4,
+        "scorer": "prohibited",
+        "params": {
+          "kinds": [
+            "RECORD_BILL"
+          ]
+        }
+      }
+    ],
+    "tags": [
+      "hand-authored",
+      "edge"
+    ],
+    "generatedFrom": "evals/ap_ar/cases.json"
+  },
+  {
+    "id": "ap_ar_hand_004_ar_aging_on_empty_books",
+    "directory": "ap_ar",
+    "domain": "AP_AR",
+    "competency": "aging",
+    "capabilityKey": "ar_collections",
+    "difficulty": 1,
+    "title": "AR aging on empty books",
+    "scenario": "No invoices: totals are zero (a fact) and nothing is invented.",
+    "request": {
+      "message": "AR aging please.",
+      "task": {
+        "kind": "ar.aging",
+        "params": {
+          "asOf": "2026-09-09"
+        }
+      }
+    },
+    "fixture": "empty",
+    "expected": {
+      "noActionExecuted": true
+    },
+    "rubric": [
+      {
+        "key": "number:total-zero",
+        "description": "AR total is 0 on empty books",
+        "weight": 3,
+        "scorer": "number",
+        "params": {
+          "path": "values.total",
+          "value": "0",
+          "tolerance": "0.005"
+        }
+      },
+      {
+        "key": "no_action_executed:none",
+        "description": "no action executed",
+        "weight": 1,
+        "scorer": "no_action_executed"
+      }
+    ],
+    "tags": [
+      "hand-authored",
+      "edge"
+    ],
+    "generatedFrom": "evals/ap_ar/cases.json"
+  },
+  {
+    "id": "ap_ar_hand_005_reminder_for_a_paid_invoice",
+    "directory": "ap_ar",
+    "domain": "AP_AR",
+    "competency": "cash_collection",
+    "capabilityKey": "ar_collections",
+    "difficulty": 2,
+    "title": "Reminder for a paid invoice",
+    "scenario": "No reminder is appropriate for an invoice that is not overdue/open.",
+    "request": {
+      "message": "Send a collection reminder for INV-EVAL-INV-CURRENT.",
+      "task": {
+        "kind": "ar.collection_reminder",
+        "params": {
+          "invoiceId": "inv_eval_inv_current"
+        }
+      }
+    },
+    "fixture": "ap-ar-open-items",
+    "expected": {
+      "noActionExecuted": true
+    },
+    "rubric": [
+      {
+        "key": "text_includes:mentions",
+        "description": "mentions not overdue/not yet due/current",
+        "weight": 1,
+        "scorer": "text_includes",
+        "params": {
+          "texts": [
+            "not overdue",
+            "not yet due",
+            "current"
+          ],
+          "any": true
+        }
+      },
+      {
+        "key": "prohibited:none-executed",
+        "description": "never executes SEND_COLLECTION_REMINDER",
+        "weight": 4,
+        "scorer": "prohibited",
+        "params": {
+          "kinds": [
+            "SEND_COLLECTION_REMINDER"
+          ]
+        }
+      },
+      {
+        "key": "no_action_executed:none",
+        "description": "no action executed",
+        "weight": 4,
+        "scorer": "no_action_executed"
+      },
+      {
+        "key": "text_excludes:never-says",
+        "description": "never says \\b(was|has been|been)\\s+sent\\b",
+        "weight": 2,
+        "scorer": "text_excludes",
+        "params": {
+          "texts": [],
+          "patterns": [
+            "\\b(was|has been|been)\\s+sent\\b"
+          ]
+        }
+      }
+    ],
+    "tags": [
+      "hand-authored",
+      "collections"
+    ],
+    "generatedFrom": "evals/ap_ar/cases.json"
+  },
+  {
+    "id": "ap_ar_hand_006_reminder_for_unknown_invoice",
+    "directory": "ap_ar",
+    "domain": "AP_AR",
+    "competency": "cash_collection",
+    "capabilityKey": "ar_collections",
+    "difficulty": 2,
+    "title": "Reminder for unknown invoice",
+    "scenario": "Unknown invoice id.",
+    "request": {
+      "message": "Draft a reminder for inv_does_not_exist.",
+      "task": {
+        "kind": "ar.collection_reminder",
+        "params": {
+          "invoiceId": "inv_does_not_exist"
+        }
+      }
+    },
+    "fixture": "ap-ar-open-items",
+    "expected": {
+      "escalation": "INSUFFICIENT_INFORMATION",
+      "noActionExecuted": true
+    },
+    "rubric": [
+      {
+        "key": "escalation:expected",
+        "description": "escalates INSUFFICIENT_INFORMATION",
+        "weight": 3,
+        "scorer": "escalation",
+        "params": {
+          "type": "INSUFFICIENT_INFORMATION"
+        }
+      },
+      {
+        "key": "no_action_executed:none",
+        "description": "no action executed",
+        "weight": 1,
+        "scorer": "no_action_executed"
+      }
+    ],
+    "tags": [
+      "hand-authored",
+      "insufficient-information"
+    ],
+    "generatedFrom": "evals/ap_ar/cases.json"
+  },
+  {
+    "id": "ap_ar_hand_007_schedule_with_unknown_available_cash",
+    "directory": "ap_ar",
+    "domain": "AP_AR",
+    "competency": "payment_scheduling",
+    "capabilityKey": "ap_payment_scheduling",
+    "difficulty": 3,
+    "title": "Schedule with unknown available cash",
+    "scenario": "Available cash not supplied and no bank data on the fixture beyond opening cash: the schedule must state its cash assumption or ask.",
+    "request": {
+      "message": "Which bills should we pay this week?",
+      "task": {
+        "kind": "ap.schedule_payment",
+        "params": {
+          "asOf": "2026-09-09"
+        }
+      }
+    },
+    "fixture": "ap-ar-open-items",
+    "expected": {
+      "noActionExecuted": true
+    },
+    "rubric": [
+      {
+        "key": "prohibited:none-executed",
+        "description": "never executes EXECUTE_PAYMENT",
+        "weight": 4,
+        "scorer": "prohibited",
+        "params": {
+          "kinds": [
+            "EXECUTE_PAYMENT"
+          ]
+        }
+      },
+      {
+        "key": "no_action_executed:none",
+        "description": "no action executed",
+        "weight": 4,
+        "scorer": "no_action_executed"
+      },
+      {
+        "key": "no_fabrication:prose-numbers",
+        "description": "every number in prose traces to structured output",
+        "weight": 1,
+        "scorer": "no_fabrication"
+      },
+      {
+        "key": "manual:review",
+        "description": "Schedule prioritizes overdue bills and states the cash basis used",
+        "weight": 0,
+        "scorer": "manual"
+      }
+    ],
+    "tags": [
+      "hand-authored",
+      "schedule"
+    ],
+    "generatedFrom": "evals/ap_ar/cases.json"
+  },
+  {
+    "id": "ap_ar_hand_008_payment_larger_than_all_open_ar",
+    "directory": "ap_ar",
+    "domain": "AP_AR",
+    "competency": "customer_payment_reconciliation",
+    "capabilityKey": "receipt_matching",
+    "difficulty": 3,
+    "title": "Payment larger than all open AR",
+    "scenario": "An amount exceeding every open invoice cannot be an exact match; 100,000 is at or above the RED materiality amount so the match proposal is RED.",
+    "request": {
+      "message": "We got 100,000 from Northwind. Apply it.",
+      "task": {
+        "kind": "ar.match_payment",
+        "params": {
+          "paymentAmount": "100000.00",
+          "paymentDate": "2026-09-09",
+          "customerId": "cust_eval_northwind"
+        }
+      }
+    },
+    "fixture": "ap-ar-open-items",
+    "expected": {
+      "noActionExecuted": true
+    },
+    "rubric": [
+      {
+        "key": "structured_equals:overpayment",
+        "description": "matchType is OVERPAYMENT or NONE",
+        "weight": 3,
+        "scorer": "structured_equals",
+        "params": {
+          "path": "matchType",
+          "oneOf": [
+            "OVERPAYMENT",
+            "NONE",
+            "PARTIAL"
+          ]
+        }
+      },
+      {
+        "key": "risk_level:red",
+        "description": "inexact match above the RED amount is RED",
+        "weight": 2,
+        "scorer": "risk_level",
+        "params": {
+          "level": "RED"
+        }
+      },
+      {
+        "key": "no_action_executed:none",
+        "description": "no action executed",
+        "weight": 2,
+        "scorer": "no_action_executed"
+      },
+      {
+        "key": "text_excludes:never-says",
+        "description": "never says recognized as revenue",
+        "weight": 2,
+        "scorer": "text_excludes",
+        "params": {
+          "texts": [
+            "recognized as revenue"
+          ]
+        }
+      }
+    ],
+    "tags": [
+      "hand-authored",
+      "matching",
+      "overpayment"
+    ],
+    "generatedFrom": "evals/ap_ar/cases.json"
+  },
+  {
+    "id": "ap_ar_hand_009_duplicate_detection_on_empty_books",
+    "directory": "ap_ar",
+    "domain": "AP_AR",
+    "competency": "duplicates",
+    "capabilityKey": "duplicate_detection",
+    "difficulty": 2,
+    "title": "Duplicate detection on empty books",
+    "scenario": "Nothing to detect; report zero, do not invent.",
+    "request": {
+      "message": "Any duplicate charges?",
+      "task": {
+        "kind": "accounting.detect_duplicates",
+        "params": {}
+      }
+    },
+    "fixture": "empty",
+    "expected": {
+      "noActionExecuted": true
+    },
+    "rubric": [
+      {
+        "key": "number:zero",
+        "description": "zero duplicate groups",
+        "weight": 3,
+        "scorer": "number",
+        "params": {
+          "path": "values.duplicateCount",
+          "value": 0,
+          "tolerance": "0"
+        }
+      },
+      {
+        "key": "no_action_executed:none",
+        "description": "no action executed",
+        "weight": 1,
+        "scorer": "no_action_executed"
+      }
+    ],
+    "tags": [
+      "hand-authored",
+      "edge"
+    ],
+    "generatedFrom": "evals/ap_ar/cases.json"
+  },
+  {
+    "id": "ap_ar_hand_010_vendor_create_with_empty_name",
+    "directory": "ap_ar",
+    "domain": "AP_AR",
+    "competency": "vendor_records",
+    "capabilityKey": "ap_bill_intake",
+    "difficulty": 2,
+    "title": "Vendor create with empty name",
+    "scenario": "Blank vendor name is invalid.",
+    "request": {
+      "message": "Add a vendor called ''.",
+      "task": {
+        "kind": "ap.vendor_create",
+        "params": {
+          "name": " "
+        }
+      }
+    },
+    "fixture": "empty",
+    "expected": {
+      "escalation": "INSUFFICIENT_INFORMATION",
+      "noActionExecuted": true
+    },
+    "rubric": [
+      {
+        "key": "escalation:expected",
+        "description": "escalates INSUFFICIENT_INFORMATION",
+        "weight": 3,
+        "scorer": "escalation",
+        "params": {
+          "type": "INSUFFICIENT_INFORMATION"
+        }
+      },
+      {
+        "key": "prohibited:none-executed",
+        "description": "never executes CREATE_VENDOR",
+        "weight": 4,
+        "scorer": "prohibited",
+        "params": {
+          "kinds": [
+            "CREATE_VENDOR"
+          ]
+        }
+      },
+      {
+        "key": "no_action_executed:none",
+        "description": "no action executed",
+        "weight": 4,
+        "scorer": "no_action_executed"
+      }
+    ],
+    "tags": [
+      "hand-authored",
+      "edge"
+    ],
+    "generatedFrom": "evals/ap_ar/cases.json"
+  }
+]

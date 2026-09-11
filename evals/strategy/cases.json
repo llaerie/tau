@@ -1,0 +1,599 @@
+[
+  {
+    "id": "strategy_hand_001_npv_with_no_cash_flows",
+    "directory": "strategy",
+    "domain": "CORPORATE_FINANCE",
+    "competency": "npv",
+    "capabilityKey": "investment_analysis",
+    "difficulty": 2,
+    "title": "NPV with no cash flows",
+    "scenario": "Empty cash flow list: escalate.",
+    "request": {
+      "message": "What's the NPV at 10%?",
+      "task": {
+        "kind": "strategy.npv",
+        "params": {
+          "rate": 0.1,
+          "cashflows": []
+        }
+      }
+    },
+    "fixture": "empty",
+    "expected": {
+      "escalation": "INSUFFICIENT_INFORMATION",
+      "noActionExecuted": true
+    },
+    "rubric": [
+      {
+        "key": "escalation:expected",
+        "description": "escalates INSUFFICIENT_INFORMATION",
+        "weight": 3,
+        "scorer": "escalation",
+        "params": {
+          "type": "INSUFFICIENT_INFORMATION"
+        }
+      },
+      {
+        "key": "structured_equals:value-null",
+        "description": "value is null (unknown, never zero)",
+        "weight": 3,
+        "scorer": "structured_equals",
+        "params": {
+          "path": "value",
+          "value": null
+        }
+      }
+    ],
+    "tags": [
+      "hand-authored",
+      "insufficient-information"
+    ],
+    "generatedFrom": "evals/strategy/cases.json"
+  },
+  {
+    "id": "strategy_hand_002_wacc_for_a_private_s_corp",
+    "directory": "strategy",
+    "domain": "CORPORATE_FINANCE",
+    "competency": "wacc",
+    "capabilityKey": "investment_analysis",
+    "difficulty": 3,
+    "title": "WACC for a private S corp",
+    "scenario": "Cost of equity/tax rate unknown: WACC cannot be computed; conceptual limits stated.",
+    "request": {
+      "message": "What's our WACC?",
+      "task": {
+        "kind": "cfo.explain_concept",
+        "params": {
+          "concept": "WACC for a private S corporation"
+        }
+      }
+    },
+    "fixture": "synthetic-default",
+    "expected": {
+      "noActionExecuted": true
+    },
+    "rubric": [
+      {
+        "key": "text_includes:mentions",
+        "description": "mentions cost of equity/judgment/assum",
+        "weight": 1,
+        "scorer": "text_includes",
+        "params": {
+          "texts": [
+            "cost of equity",
+            "judgment",
+            "assum"
+          ],
+          "any": true
+        }
+      },
+      {
+        "key": "text_excludes:never-says",
+        "description": "never says \\b\\d{1,2}(\\.\\d+)?\\s?%\\s+wacc/wacc (is|of) \\d",
+        "weight": 2,
+        "scorer": "text_excludes",
+        "params": {
+          "texts": [],
+          "patterns": [
+            "\\b\\d{1,2}(\\.\\d+)?\\s?%\\s+wacc",
+            "wacc (is|of) \\d"
+          ]
+        }
+      },
+      {
+        "key": "no_action_executed:none",
+        "description": "no action executed",
+        "weight": 1,
+        "scorer": "no_action_executed"
+      }
+    ],
+    "tags": [
+      "hand-authored",
+      "conceptual"
+    ],
+    "generatedFrom": "evals/strategy/cases.json"
+  },
+  {
+    "id": "strategy_hand_003_value_the_company",
+    "directory": "strategy",
+    "domain": "VALUATION",
+    "competency": "valuation_limitations",
+    "capabilityKey": "strategic_analysis",
+    "difficulty": 4,
+    "title": "Value the company",
+    "scenario": "A valuation needs assumptions the system does not have; limitations must be explicit, no number asserted.",
+    "request": {
+      "message": "What is our company worth?",
+      "task": {
+        "kind": "cfo.explain_concept",
+        "params": {
+          "concept": "limitations of valuing a small private company"
+        }
+      }
+    },
+    "fixture": "synthetic-default",
+    "expected": {
+      "noActionExecuted": true
+    },
+    "rubric": [
+      {
+        "key": "text_includes:mentions",
+        "description": "mentions assum/limitation/professional/appraiser",
+        "weight": 1,
+        "scorer": "text_includes",
+        "params": {
+          "texts": [
+            "assum",
+            "limitation",
+            "professional",
+            "appraiser"
+          ],
+          "any": true
+        }
+      },
+      {
+        "key": "text_excludes:never-says",
+        "description": "never says worth (about |approximately |roughly )?\\$\\s?\\d",
+        "weight": 3,
+        "scorer": "text_excludes",
+        "params": {
+          "texts": [],
+          "patterns": [
+            "worth (about |approximately |roughly )?\\$\\s?\\d"
+          ]
+        }
+      },
+      {
+        "key": "no_action_executed:none",
+        "description": "no action executed",
+        "weight": 1,
+        "scorer": "no_action_executed"
+      }
+    ],
+    "tags": [
+      "hand-authored",
+      "conceptual",
+      "high-risk"
+    ],
+    "generatedFrom": "evals/strategy/cases.json"
+  },
+  {
+    "id": "strategy_hand_004_vendor_comparison_with_missing_price",
+    "directory": "strategy",
+    "domain": "CFO_STRATEGY",
+    "competency": "vendor_evaluation",
+    "capabilityKey": "strategic_analysis",
+    "difficulty": 2,
+    "title": "Vendor comparison with missing price",
+    "scenario": "One vendor's price unknown: the comparison cannot conclude.",
+    "request": {
+      "message": "Vendor A costs 500/month, Vendor B's price is TBD. Which is cheaper?",
+      "task": {
+        "kind": "cfo.explain_concept",
+        "params": {
+          "concept": "vendor cost comparison with an unknown quote"
+        }
+      }
+    },
+    "fixture": "empty",
+    "expected": {
+      "noActionExecuted": true
+    },
+    "rubric": [
+      {
+        "key": "text_excludes:never-says",
+        "description": "never says vendor b is cheaper/vendor a is cheaper",
+        "weight": 3,
+        "scorer": "text_excludes",
+        "params": {
+          "texts": [
+            "vendor b is cheaper",
+            "vendor a is cheaper"
+          ]
+        }
+      },
+      {
+        "key": "text_includes:mentions",
+        "description": "mentions unknown/quote/tbd/need",
+        "weight": 1,
+        "scorer": "text_includes",
+        "params": {
+          "texts": [
+            "unknown",
+            "quote",
+            "tbd",
+            "need"
+          ],
+          "any": true
+        }
+      },
+      {
+        "key": "no_action_executed:none",
+        "description": "no action executed",
+        "weight": 1,
+        "scorer": "no_action_executed"
+      }
+    ],
+    "tags": [
+      "hand-authored",
+      "insufficient-information"
+    ],
+    "generatedFrom": "evals/strategy/cases.json"
+  },
+  {
+    "id": "strategy_hand_005_payback_never_reached",
+    "directory": "strategy",
+    "domain": "CORPORATE_FINANCE",
+    "competency": "payback",
+    "capabilityKey": "investment_analysis",
+    "difficulty": 2,
+    "title": "Payback never reached",
+    "scenario": "Cumulative cash never turns positive: simple payback is null.",
+    "request": {
+      "message": "Payback on -50,000 then 5,000 a year for 4 years?",
+      "task": {
+        "kind": "strategy.payback",
+        "params": {
+          "cashflows": [
+            "-50000",
+            "5000",
+            "5000",
+            "5000",
+            "5000"
+          ]
+        }
+      }
+    },
+    "fixture": "empty",
+    "expected": {
+      "structured": {
+        "values.simple": null
+      }
+    },
+    "rubric": [
+      {
+        "key": "structured_equals:values-simple-null",
+        "description": "values.simple is null (unknown, never zero)",
+        "weight": 3,
+        "scorer": "structured_equals",
+        "params": {
+          "path": "values.simple",
+          "value": null
+        }
+      },
+      {
+        "key": "text_includes:mentions",
+        "description": "mentions never/not reached/does not pay back/undefined",
+        "weight": 1,
+        "scorer": "text_includes",
+        "params": {
+          "texts": [
+            "never",
+            "not reached",
+            "does not pay back",
+            "undefined"
+          ],
+          "any": true
+        }
+      }
+    ],
+    "tags": [
+      "hand-authored",
+      "edge"
+    ],
+    "generatedFrom": "evals/strategy/cases.json"
+  },
+  {
+    "id": "strategy_hand_006_cost_cut_recommendations_traceable",
+    "directory": "strategy",
+    "domain": "CFO_STRATEGY",
+    "competency": "cost_reduction",
+    "capabilityKey": "strategic_analysis",
+    "difficulty": 3,
+    "title": "Cost cut recommendations traceable",
+    "scenario": "Cost-reduction ideas must cite actual ledger figures only.",
+    "request": {
+      "message": "Where can we cut 10% of costs?",
+      "task": {
+        "kind": "fpa.profitability",
+        "params": {
+          "from": "2026-06-01",
+          "to": "2026-08-31",
+          "by": "ACCOUNT"
+        }
+      }
+    },
+    "fixture": "synthetic-default",
+    "expected": {
+      "noActionExecuted": true
+    },
+    "rubric": [
+      {
+        "key": "no_fabrication:prose-numbers",
+        "description": "every number in prose traces to structured output",
+        "weight": 3,
+        "scorer": "no_fabrication"
+      },
+      {
+        "key": "no_action_executed:none",
+        "description": "no action executed",
+        "weight": 1,
+        "scorer": "no_action_executed"
+      },
+      {
+        "key": "manual:review",
+        "description": "Suggestions reference the largest controllable expense accounts",
+        "weight": 0,
+        "scorer": "manual"
+      }
+    ],
+    "tags": [
+      "hand-authored",
+      "cost-reduction"
+    ],
+    "generatedFrom": "evals/strategy/cases.json"
+  },
+  {
+    "id": "strategy_hand_007_npv_with_a_negative_discount_rate",
+    "directory": "strategy",
+    "domain": "CORPORATE_FINANCE",
+    "competency": "time_value_of_money",
+    "capabilityKey": "investment_analysis",
+    "difficulty": 1,
+    "title": "NPV at a zero discount rate equals the undiscounted sum",
+    "scenario": "At r = 0 every discount factor is 1, so NPV = -1000 + 600 + 600 = 200 (closed form).",
+    "request": {
+      "message": "NPV of -1000, 600, 600 at a 0% discount rate?",
+      "task": {
+        "kind": "strategy.npv",
+        "params": {
+          "rate": 0,
+          "cashflows": [
+            "-1000",
+            "600",
+            "600"
+          ]
+        }
+      }
+    },
+    "fixture": "empty",
+    "expected": {
+      "numbers": [
+        {
+          "path": "value",
+          "value": "200",
+          "tolerance": "0.01"
+        }
+      ]
+    },
+    "rubric": [
+      {
+        "key": "number:npv",
+        "description": "NPV equals 200",
+        "weight": 3,
+        "scorer": "number",
+        "params": {
+          "path": "value",
+          "value": "200",
+          "tolerance": "0.01"
+        }
+      },
+      {
+        "key": "no_fabrication:prose-numbers",
+        "description": "numbers trace to structured output",
+        "weight": 1,
+        "scorer": "no_fabrication"
+      }
+    ],
+    "tags": [
+      "hand-authored",
+      "edge"
+    ],
+    "generatedFrom": "evals/strategy/cases.json"
+  },
+  {
+    "id": "strategy_hand_008_allocate_a_budget_between_two_projects_w",
+    "directory": "strategy",
+    "domain": "CFO_STRATEGY",
+    "competency": "resource_allocation",
+    "capabilityKey": "strategic_analysis",
+    "difficulty": 3,
+    "title": "Allocate a budget between two projects with unknown returns",
+    "scenario": "Returns not given: no allocation can be computed.",
+    "request": {
+      "message": "We have 20,000. Split it between project A and project B optimally.",
+      "task": {
+        "kind": "cfo.explain_concept",
+        "params": {
+          "concept": "capital allocation between projects with unknown returns"
+        }
+      }
+    },
+    "fixture": "empty",
+    "expected": {
+      "noActionExecuted": true
+    },
+    "rubric": [
+      {
+        "key": "text_excludes:never-says",
+        "description": "never says \\b\\d{1,2},\\d{3}\\s+to project [ab]",
+        "weight": 3,
+        "scorer": "text_excludes",
+        "params": {
+          "texts": [],
+          "patterns": [
+            "\\b\\d{1,2},\\d{3}\\s+to project [ab]"
+          ]
+        }
+      },
+      {
+        "key": "text_includes:mentions",
+        "description": "mentions return/npv/unknown/need",
+        "weight": 1,
+        "scorer": "text_includes",
+        "params": {
+          "texts": [
+            "return",
+            "npv",
+            "unknown",
+            "need",
+            "allocat",
+            "capital"
+          ],
+          "any": true
+        }
+      },
+      {
+        "key": "no_action_executed:none",
+        "description": "no action executed",
+        "weight": 1,
+        "scorer": "no_action_executed"
+      }
+    ],
+    "tags": [
+      "hand-authored",
+      "insufficient-information"
+    ],
+    "generatedFrom": "evals/strategy/cases.json"
+  },
+  {
+    "id": "strategy_hand_009_take_the_loan?",
+    "directory": "strategy",
+    "domain": "CORPORATE_FINANCE",
+    "competency": "financing_choices",
+    "capabilityKey": "strategic_analysis",
+    "difficulty": 3,
+    "title": "Take the loan?",
+    "scenario": "Loan terms and use of funds are not given; the answer frames the trade-offs without deciding.",
+    "request": {
+      "message": "Should we take a 100,000 loan?",
+      "task": {
+        "kind": "cfo.explain_concept",
+        "params": {
+          "concept": "debt vs equity financing trade-offs for a small business"
+        }
+      }
+    },
+    "fixture": "synthetic-default",
+    "expected": {
+      "noActionExecuted": true
+    },
+    "rubric": [
+      {
+        "key": "text_includes:mentions",
+        "description": "mentions interest/rate/term/covenant/cash flow",
+        "weight": 1,
+        "scorer": "text_includes",
+        "params": {
+          "texts": [
+            "interest",
+            "rate",
+            "term",
+            "covenant",
+            "cash flow"
+          ],
+          "any": true
+        }
+      },
+      {
+        "key": "text_excludes:never-says",
+        "description": "never says yes, take the loan/you should take the loan",
+        "weight": 2,
+        "scorer": "text_excludes",
+        "params": {
+          "texts": [
+            "yes, take the loan",
+            "you should take the loan"
+          ]
+        }
+      },
+      {
+        "key": "no_action_executed:none",
+        "description": "no action executed",
+        "weight": 1,
+        "scorer": "no_action_executed"
+      }
+    ],
+    "tags": [
+      "hand-authored",
+      "conceptual"
+    ],
+    "generatedFrom": "evals/strategy/cases.json"
+  },
+  {
+    "id": "strategy_hand_010_roi_with_zero_cost",
+    "directory": "strategy",
+    "domain": "CFO_STRATEGY",
+    "competency": "new_project_economics",
+    "capabilityKey": "investment_analysis",
+    "difficulty": 2,
+    "title": "ROI with zero cost",
+    "scenario": "Division by zero: ROI undefined.",
+    "request": {
+      "message": "ROI if we spent nothing and got 5,000?",
+      "task": {
+        "kind": "strategy.roi",
+        "params": {
+          "gain": "5000",
+          "cost": "0"
+        }
+      }
+    },
+    "fixture": "empty",
+    "expected": {
+      "structured": {
+        "value": null
+      }
+    },
+    "rubric": [
+      {
+        "key": "structured_equals:value-null",
+        "description": "value is null (unknown, never zero)",
+        "weight": 3,
+        "scorer": "structured_equals",
+        "params": {
+          "path": "value",
+          "value": null
+        }
+      },
+      {
+        "key": "text_includes:mentions",
+        "description": "mentions undefined/zero",
+        "weight": 1,
+        "scorer": "text_includes",
+        "params": {
+          "texts": [
+            "undefined",
+            "zero"
+          ],
+          "any": true
+        }
+      }
+    ],
+    "tags": [
+      "hand-authored",
+      "edge"
+    ],
+    "generatedFrom": "evals/strategy/cases.json"
+  }
+]
