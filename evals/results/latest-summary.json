@@ -1,9 +1,9 @@
 {
-  "runId": "run_20260911172913_50148a4c",
-  "savedAt": "2026-09-11T17:29:17.668Z",
+  "runId": "run_20260911173021_3cbca3b9",
+  "savedAt": "2026-09-11T17:30:25.693Z",
   "summary": {
-    "runId": "run_20260911172913_50148a4c",
-    "ranAt": "2026-09-11T17:29:13.174Z",
+    "runId": "run_20260911173021_3cbca3b9",
+    "ranAt": "2026-09-11T17:30:21.112Z",
     "model": {
       "provider": "local",
       "model": "local-deterministic",
@@ -11,9 +11,9 @@
       "deterministic": true
     },
     "total": 746,
-    "passed": 745,
-    "failed": 1,
-    "passRate": 0.9987,
+    "passed": 746,
+    "failed": 0,
+    "passRate": 1,
     "byDirectory": {
       "accounting": {
         "total": 150,
@@ -27,8 +27,8 @@
       },
       "cash": {
         "total": 68,
-        "passed": 67,
-        "passRate": 0.9853
+        "passed": 68,
+        "passRate": 1
       },
       "tax": {
         "total": 95,
@@ -94,8 +94,8 @@
       },
       "CASH_MANAGEMENT": {
         "total": 65,
-        "passed": 64,
-        "passRate": 0.9846
+        "passed": 65,
+        "passRate": 1
       },
       "TAX_OPERATIONS": {
         "total": 99,
@@ -228,11 +228,9 @@
       },
       "liquidity_monitoring": {
         "total": 45,
-        "passed": 44,
-        "passRate": 0.9778,
-        "failureCaseIds": [
-          "cash_hand_009_cash_position_on_empty_books_is_zero_wit"
-        ]
+        "passed": 45,
+        "passRate": 1,
+        "failureCaseIds": []
       },
       "tax_calendar": {
         "total": 8,
@@ -368,7 +366,7 @@
       }
     },
     "metrics": {
-      "exactCalculationAccuracy": 0.9985,
+      "exactCalculationAccuracy": 1,
       "reconciliationAccuracy": 1,
       "classificationAccuracy": 1,
       "escalationAccuracy": 1,
@@ -377,20 +375,11 @@
       "falseActionRate": 0,
       "hallucinationRate": 0,
       "unsupportedSourceRate": 0,
-      "passRate": 0.9987,
+      "passRate": 1,
       "count": 746
     },
-    "failedCaseIds": [
-      "cash_hand_009_cash_position_on_empty_books_is_zero_wit"
-    ],
-    "durationMs": 4468
+    "failedCaseIds": [],
+    "durationMs": 4560
   },
-  "failed": [
-    {
-      "caseId": "cash_hand_009_cash_position_on_empty_books_is_zero_wit",
-      "failures": [
-        "number:zero-cash: expected 0 at value, got null (not numeric)"
-      ]
-    }
-  ]
+  "failed": []
 }

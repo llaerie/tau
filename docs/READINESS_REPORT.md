@@ -1,10 +1,10 @@
 # Tau AI CFO — Readiness Report
 
-Generated 2026-09-11T02:27:27.752Z. **This system is NOT production-ready. Phase One runs exclusively on synthetic data; no real bank, payroll, tax or accounting integration is live and no real money moves. No score in this report changes that.**
+Generated 2026-09-11T17:30:28.194Z. **This system is NOT production-ready. Phase One runs exclusively on synthetic data; no real bank, payroll, tax or accounting integration is live and no real money moves. No score in this report changes that.**
 
 ## Overall competency
 
-- Run: `run_20260911022721_b71ea6c6` at 2026-09-11T02:27:21.271Z — model local/local-deterministic (deterministic)
+- Run: `run_20260911173021_3cbca3b9` at 2026-09-11T17:30:21.112Z — model local/local-deterministic (deterministic)
 - Cases: 746 — passed 746, failed 0 — pass rate **100.0%**
 
 | Metric | Value |

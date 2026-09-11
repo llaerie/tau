@@ -1,10 +1,10 @@
 {
-  "generatedAt": "2026-09-11T02:27:27.752Z",
+  "generatedAt": "2026-09-11T17:30:28.194Z",
   "productionReady": false,
   "statement": "This system is NOT production-ready. Phase One runs exclusively on synthetic data; no real bank, payroll, tax or accounting integration is live and no real money moves. No score in this report changes that.",
   "run": {
-    "runId": "run_20260911022721_b71ea6c6",
-    "ranAt": "2026-09-11T02:27:21.271Z",
+    "runId": "run_20260911173021_3cbca3b9",
+    "ranAt": "2026-09-11T17:30:21.112Z",
     "model": {
       "provider": "local",
       "model": "local-deterministic",
@@ -106,7 +106,7 @@
         "failureCaseIds": [],
         "promotionEligible": false,
         "promotionBlockers": [
-          "Needs ≥10 evaluations (has 2)"
+          "Needs ≥10 evaluations (has 3)"
         ]
       },
       {
@@ -122,8 +122,7 @@
         "failureCaseIds": [],
         "promotionEligible": false,
         "promotionBlockers": [
-          "Needs ≥10 evaluations (has 3)",
-          "Needs 2 consecutive passing runs (has 1)"
+          "Needs ≥10 evaluations (has 6)"
         ]
       },
       {
@@ -167,8 +166,7 @@
         "failureCaseIds": [],
         "promotionEligible": false,
         "promotionBlockers": [
-          "Needs ≥15 evaluations (has 2)",
-          "Needs 3 consecutive passing runs (has 2)"
+          "Needs ≥15 evaluations (has 3)"
         ]
       },
       {
@@ -212,7 +210,7 @@
         "failureCaseIds": [],
         "promotionEligible": false,
         "promotionBlockers": [
-          "Needs ≥10 evaluations (has 4)"
+          "Needs ≥10 evaluations (has 6)"
         ]
       },
       {
@@ -240,10 +238,8 @@
         "runPassRate": 1,
         "runTotal": 11,
         "failureCaseIds": [],
-        "promotionEligible": false,
-        "promotionBlockers": [
-          "Needs 3 consecutive passing runs (has 2)"
-        ]
+        "promotionEligible": true,
+        "promotionBlockers": []
       },
       {
         "key": "budgeting",
@@ -384,8 +380,7 @@
         "failureCaseIds": [],
         "promotionEligible": false,
         "promotionBlockers": [
-          "Needs ≥15 evaluations (has 4)",
-          "Needs 3 consecutive passing runs (has 2)"
+          "Needs ≥15 evaluations (has 6)"
         ]
       },
       {
@@ -427,10 +422,8 @@
         "runPassRate": 1,
         "runTotal": 8,
         "failureCaseIds": [],
-        "promotionEligible": false,
-        "promotionBlockers": [
-          "Needs 3 consecutive passing runs (has 2)"
-        ]
+        "promotionEligible": true,
+        "promotionBlockers": []
       },
       {
         "key": "tax_workpapers",
@@ -443,10 +436,8 @@
         "runPassRate": 1,
         "runTotal": 84,
         "failureCaseIds": [],
-        "promotionEligible": false,
-        "promotionBlockers": [
-          "Needs 3 consecutive passing runs (has 2)"
-        ]
+        "promotionEligible": true,
+        "promotionBlockers": []
       },
       {
         "key": "cpa_package",
@@ -459,11 +450,8 @@
         "runPassRate": 1,
         "runTotal": 6,
         "failureCaseIds": [],
-        "promotionEligible": false,
-        "promotionBlockers": [
-          "Needs ≥15 evaluations (has 12)",
-          "Needs 3 consecutive passing runs (has 2)"
-        ]
+        "promotionEligible": true,
+        "promotionBlockers": []
       },
       {
         "key": "document_classification",
@@ -478,7 +466,7 @@
         "failureCaseIds": [],
         "promotionEligible": false,
         "promotionBlockers": [
-          "Needs ≥10 evaluations (has 2)"
+          "Needs ≥10 evaluations (has 3)"
         ]
       },
       {
@@ -494,7 +482,7 @@
         "failureCaseIds": [],
         "promotionEligible": false,
         "promotionBlockers": [
-          "Needs ≥10 evaluations (has 2)"
+          "Needs ≥10 evaluations (has 3)"
         ]
       },
       {
@@ -578,11 +566,8 @@
         "runPassRate": 1,
         "runTotal": 5,
         "failureCaseIds": [],
-        "promotionEligible": false,
-        "promotionBlockers": [
-          "Needs ≥15 evaluations (has 10)",
-          "Needs 3 consecutive passing runs (has 2)"
-        ]
+        "promotionEligible": true,
+        "promotionBlockers": []
       },
       {
         "key": "education",
@@ -597,7 +582,7 @@
         "failureCaseIds": [],
         "promotionEligible": false,
         "promotionBlockers": [
-          "Needs ≥10 evaluations (has 2)"
+          "Needs ≥10 evaluations (has 3)"
         ]
       }
     ],
@@ -655,10 +640,8 @@
         "runPassRate": 1,
         "runTotal": 2,
         "failureCaseIds": [],
-        "promotionEligible": false,
-        "promotionBlockers": [
-          "Needs ≥5 evaluations (has 4)"
-        ]
+        "promotionEligible": true,
+        "promotionBlockers": []
       },
       {
         "key": "tax_filing",

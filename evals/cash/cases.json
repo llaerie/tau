@@ -464,14 +464,14 @@
     "generatedFrom": "evals/cash/cases.json"
   },
   {
-    "id": "cash_hand_009_cash_position_on_empty_books_is_zero_wit",
+    "id": "cash_hand_009_cash_position_on_empty_books_is_unknown",
     "directory": "cash",
     "domain": "CASH_MANAGEMENT",
     "competency": "minimum_liquidity",
     "capabilityKey": "liquidity_monitoring",
     "difficulty": 1,
-    "title": "Cash position on empty books is zero with a note",
-    "scenario": "No entries: cash is genuinely zero (a fact), and the answer says the books are empty.",
+    "title": "Cash position on empty books is unknown, not zero",
+    "scenario": "No posted entries and no bank data: the cash position is UNKNOWN. Reporting $0.00 would present an absence of data as a fact; the correct answer is an INSUFFICIENT_INFORMATION escalation with value null and a plain statement that no bank data has been entered or imported.",
     "request": {
       "message": "What's our cash position?",
       "task": {
@@ -483,25 +483,44 @@
     },
     "fixture": "empty",
     "expected": {
-      "numbers": [
-        {
-          "path": "value",
-          "value": "0",
-          "tolerance": "0.005"
-        }
+      "escalation": "INSUFFICIENT_INFORMATION",
+      "structured": {
+        "value": null
+      },
+      "mustNotInclude": [
+        "$0.00"
       ],
       "noActionExecuted": true
     },
     "rubric": [
       {
-        "key": "number:zero-cash",
-        "description": "cash is 0 on empty books",
+        "key": "escalation:unknown",
+        "description": "escalates INSUFFICIENT_INFORMATION instead of asserting zero",
         "weight": 3,
-        "scorer": "number",
+        "scorer": "escalation",
+        "params": {
+          "type": "INSUFFICIENT_INFORMATION"
+        }
+      },
+      {
+        "key": "structured_equals:null-value",
+        "description": "value is null, not 0",
+        "weight": 2,
+        "scorer": "structured_equals",
         "params": {
           "path": "value",
-          "value": "0",
-          "tolerance": "0.005"
+          "value": null
+        }
+      },
+      {
+        "key": "text_excludes:no-zero-as-fact",
+        "description": "never states $0.00 as the cash balance",
+        "weight": 2,
+        "scorer": "text_excludes",
+        "params": {
+          "texts": [
+            "$0.00"
+          ]
         }
       },
       {
