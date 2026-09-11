@@ -1,0 +1,129 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+  <style>
+    body { margin: 0; font-family: Inter, ui-sans-serif, system-ui, -apple-system, sans-serif; font-size: 14px; line-height: 1.5; }
+    a { color: #0e7a70; text-decoration: none; } a:hover { color: #0b5f58; text-decoration: underline; }
+    .num { font-variant-numeric: tabular-nums lining-nums; letter-spacing: -0.01em; }
+  </style>
+</helmet>
+
+<div style="display: flex; flex-direction: column; width: 390px; height: 844px; background: #f7f6f2; color: #1b1e22; overflow: hidden">
+
+  <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-shrink: 0; padding: 10px 14px; border-bottom: 1px solid #e3e1da; background: #ffffff">
+    <div style="display: flex; align-items: center; gap: 9px; min-width: 0">
+      <div style="display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 7px; background: #0e7a70; color: #ffffff; font-size: 12px; font-weight: 700">F</div>
+      <div style="min-width: 0">
+        <div style="font-size: 14px; font-weight: 600; line-height: 1.2">Finance Desk</div>
+        <div style="font-size: 11.5px; color: #5f676e">Our company (demo)</div>
+      </div>
+    </div>
+    <div style="display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 50%; background: #e9e8e2; font-size: 12.5px; font-weight: 600; color: #4c535a">A</div>
+  </div>
+
+  <div style="flex-grow: 1; min-height: 0; overflow: hidden; padding: 14px 14px 0; display: flex; flex-direction: column; gap: 12px">
+    <div style="align-self: flex-end; max-width: 84%; padding: 9px 14px; border-radius: 15px 15px 4px 15px; background: #dff1ee; font-size: 14px">Set my food budget to $1,200</div>
+
+    <div style="border: 1px solid rgba(14,122,112,.45); border-radius: 12px; background: #ffffff; overflow: hidden">
+      <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; padding: 13px 15px 0">
+        <div style="min-width: 0">
+          <div style="font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: #5f676e">My money</div>
+          <div style="margin-top: 3px; font-size: 15px; font-weight: 600; letter-spacing: -.01em">Set your food target to $1,200 a month</div>
+        </div>
+        <div style="display: inline-flex; align-items: center; gap: 5px; flex-shrink: 0; padding: 3px 8px; border-radius: 6px; background: #fbefdb; color: #9a5b06; font-size: 11px; font-weight: 500; white-space: nowrap">
+          <span style="width: 5px; height: 5px; border-radius: 50%; background: #9a5b06"></span>Waiting
+        </div>
+      </div>
+
+      <div style="padding: 12px 15px 14px">
+        <div style="font-size: 12px; color: #5f676e">Food target</div>
+        <div style="display: flex; align-items: baseline; flex-wrap: wrap; gap: 9px; margin-top: 4px">
+          <span class="num" style="font-size: 17px; color: #5f676e; text-decoration: line-through">not set</span>
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#5f676e" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="align-self: center"><path d="M5 12h13m-5-5 5 5-5 5"></path></svg>
+          <span class="num" style="font-size: 26px; font-weight: 600; letter-spacing: -.02em">$1,200</span>
+          <span style="font-size: 13px; color: #4c535a">a month</span>
+        </div>
+
+        <div style="display: flex; align-items: flex-start; gap: 8px; margin-top: 12px; padding: 10px 11px; border-radius: 9px; background: #ecebfa">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#5d55b8" stroke-width="1.8" stroke-linecap="round" style="flex-shrink: 0; margin-top: 2px"><circle cx="12" cy="12" r="8.5"></circle><path d="M12 11v5.5M12 7.8v.2"></path></svg>
+          <div style="min-width: 0">
+            <div style="font-size: 13px; color: #1b1e22">Your unallocated plan stays <strong style="font-weight: 600; color: #5d55b8">unknown</strong> either way.</div>
+            <a href="#" style="display: inline-block; margin-top: 5px; font-size: 12.5px; font-weight: 500">Confirm withholding</a>
+          </div>
+        </div>
+      </div>
+
+      <div style="padding: 11px 15px; border-top: 1px solid #e3e1da; background: #f2f1ec">
+        <div style="display: flex; align-items: flex-start; gap: 8px">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#5f676e" stroke-width="1.7" style="flex-shrink: 0; margin-top: 2px"><circle cx="12" cy="12" r="8.5"></circle><path d="m6.5 6.5 11 11"></path></svg>
+          <span style="font-size: 12.5px; color: #4c535a">Will not move money, change Will's plan, or show him your details.</span>
+        </div>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 8px; padding: 13px 15px; border-top: 1px solid #e3e1da">
+        <button style="width: 100%; min-height: 48px; border: none; border-radius: 10px; background: #0e7a70; color: #ffffff; font-family: inherit; font-size: 15.5px; font-weight: 600; cursor: pointer">Approve and apply</button>
+        <button style="width: 100%; min-height: 44px; border: 1px solid #cfccc3; border-radius: 10px; background: #ffffff; color: #4c535a; font-family: inherit; font-size: 14px; font-weight: 500; cursor: pointer">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <div style="flex-shrink: 0; padding: 0 14px 10px">
+    <div style="display: flex; align-items: center; gap: 9px; min-height: 44px; padding: 0 12px; margin-bottom: 8px; border: 1px solid #f0d9a8; border-radius: 10px; background: #fbefdb">
+      <span style="width: 7px; height: 7px; border-radius: 50%; background: #9a5b06; flex-shrink: 0"></span>
+      <span style="font-size: 12.5px; color: #7a4a05; flex-grow: 1">1 change waiting</span>
+      <button style="min-height: 32px; padding: 0 11px; border: 1px solid #d9b878; border-radius: 7px; background: #ffffff; color: #7a4a05; font-family: inherit; font-size: 12.5px; font-weight: 500">Review</button>
+    </div>
+
+    <div style="border: 1px solid #cfccc3; border-radius: 13px; background: #ffffff; box-shadow: 0 6px 18px -12px rgba(27,30,34,.3)">
+      <div style="padding: 11px 13px 2px; font-size: 15px; color: #5f676e">Ask about your money…</div>
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 8px 8px">
+        <div style="display: flex; align-items: center; gap: 5px; padding: 6px 10px; border-radius: 999px; background: #dff1ee; color: #0b5f58; font-size: 12.5px; font-weight: 500">
+          My money
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="#0b5f58" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg>
+        </div>
+        <div style="display: flex; align-items: center; gap: 7px">
+          <div style="display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border: 1px solid #cfccc3; border-radius: 50%; font-size: 11.5px; font-weight: 600; color: #5f676e">i</div>
+          <div style="display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; border: 1px solid #cfccc3; border-radius: 11px; background: #ffffff">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#4c535a" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"></rect><path d="M5 11a7 7 0 0 0 14 0M12 18v3M9 21h6"></path></svg>
+          </div>
+          <div style="display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 11px; background: #0e7a70">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h13m-5-5 5 5-5 5"></path></svg>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); flex-shrink: 0; border-top: 1px solid #e3e1da; background: #ffffff">
+    <sc-for list="{{tabs}}" as="t" hint-placeholder-count="4">
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 9px 0 11px; color: {{t.fg}}">
+        <svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="{{t.fg}}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="{{t.d}}"></path></svg>
+        <span style="font-size: 10.5px; font-weight: 500">{{t.label}}</span>
+      </div>
+    </sc-for>
+  </div>
+</div>
+</x-dc>
+
+<script data-dc-script>
+class Component extends DCLogic {
+  renderVals() {
+    const tabs = [
+      { label: 'Assistant', d: 'M4 6h16v10H10l-4 4v-4H4zM8 10h8M8 13h5', on: true },
+      { label: 'Money', d: 'M3 7h18v10H3zM3 11h18M7 15h3M12 7V5M12 19v-2', on: false },
+      { label: 'Activity', d: 'M4 18 9 11l4 4 3-5 4 6M4 6h16', on: false },
+      { label: 'Documents', d: 'M7 3h7l4 4v14H7zM14 3v4h4M10 12h6M10 16h6', on: false },
+    ].map((t) => ({ ...t, fg: t.on ? '#0e7a70' : '#5f676e' }));
+    return { tabs };
+  }
+}
+</script>
+</body>
+</html>

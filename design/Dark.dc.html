@@ -1,0 +1,120 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+  <style>
+    body { margin: 0; font-family: Inter, ui-sans-serif, system-ui, -apple-system, sans-serif; font-size: 14px; line-height: 1.5; }
+    a { color: #33d1bb; text-decoration: none; } a:hover { color: #6fe3d2; text-decoration: underline; }
+    .num { font-variant-numeric: tabular-nums lining-nums; letter-spacing: -0.01em; }
+  </style>
+</helmet>
+
+<div style="display: flex; width: 1440px; height: 900px; background: #15171a; color: #ecedee; overflow: hidden">
+
+  <div style="display: flex; flex-direction: column; width: 200px; flex-shrink: 0; border-right: 1px solid #2e3339; background: #1d2024">
+    <div style="display: flex; align-items: center; gap: 10px; padding: 20px 16px 8px">
+      <div style="display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 8px; background: #33d1bb; color: #0f1b19; font-size: 13px; font-weight: 700">F</div>
+      <div style="min-width: 0">
+        <div style="font-size: 14px; font-weight: 600; line-height: 1.25">Finance Desk</div>
+        <div style="font-size: 12px; color: #878e96; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">Our company (demo)</div>
+      </div>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 2px; padding: 12px">
+      <sc-for list="{{nav}}" as="n" hint-placeholder-count="5">
+        <div style="display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 6px; font-size: 13.5px; background: {{n.bg}}; color: {{n.fg}}; font-weight: {{n.weight}}">
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="{{n.icon}}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="{{n.d}}"></path></svg>
+          <span>{{n.label}}</span>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+
+  <div style="display: flex; flex-direction: column; flex-grow: 1; min-width: 0; padding: 28px 40px; align-items: center; gap: 22px">
+    <div style="width: 100%; max-width: 720px; display: flex; flex-direction: column; gap: 22px">
+
+      <!-- applied -->
+      <div style="border: 1px solid rgba(85,211,138,.45); border-radius: 12px; background: #1d2024; overflow: hidden">
+        <div style="display: flex; align-items: center; gap: 12px; padding: 16px 20px; background: #163524; border-bottom: 1px solid rgba(85,211,138,.22)">
+          <div style="display: flex; align-items: center; justify-content: center; width: 30px; height: 30px; flex-shrink: 0; border-radius: 50%; background: #55d38a">
+            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="#0f1b19" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"></path></svg>
+          </div>
+          <div style="min-width: 0">
+            <div style="font-size: 16px; font-weight: 600; color: #c9f2d9; letter-spacing: -.01em">Food target set to $1,200 a month</div>
+            <div style="margin-top: 2px; font-size: 12.5px; color: #55d38a">Applied 8:37 PM · saved once, not repeatable</div>
+          </div>
+        </div>
+
+        <div style="padding: 18px 20px 16px">
+          <div style="font-size: 12.5px; color: #878e96">Food target</div>
+          <div style="display: flex; align-items: baseline; flex-wrap: wrap; gap: 12px; margin-top: 6px">
+            <span class="num" style="font-size: 20px; color: #878e96; text-decoration: line-through; text-decoration-thickness: 1.5px">not set</span>
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#878e96" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="align-self: center"><path d="M5 12h13m-5-5 5 5-5 5"></path></svg>
+            <span class="num" style="font-size: 30px; font-weight: 600; letter-spacing: -.02em; color: #ecedee">$1,200</span>
+            <span style="font-size: 14px; color: #b4b9bf">a month</span>
+          </div>
+          <div style="display: flex; align-items: flex-start; gap: 9px; margin-top: 14px; padding: 11px 13px; border-radius: 9px; background: #292547">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#aea4f5" stroke-width="1.8" stroke-linecap="round" style="flex-shrink: 0; margin-top: 2px"><circle cx="12" cy="12" r="8.5"></circle><path d="M12 11v5.5M12 7.8v.2"></path></svg>
+            <div style="min-width: 0">
+              <div style="font-size: 13.5px; color: #ecedee">Your unallocated plan is still <strong style="font-weight: 600; color: #aea4f5">unknown</strong>, so this does not tell you what is left.</div>
+              <a href="#" style="display: inline-block; margin-top: 6px; font-size: 12.5px; font-weight: 500">Confirm withholding</a>
+            </div>
+          </div>
+        </div>
+
+        <div style="display: flex; align-items: center; gap: 12px; padding: 14px 20px; border-top: 1px solid #2e3339">
+          <button style="min-height: 44px; padding: 0 18px; border: 1px solid #3d434a; border-radius: 9px; background: #1d2024; color: #ecedee; font-family: inherit; font-size: 14px; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; gap: 8px">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#b4b9bf" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10h10a5 5 0 1 1-5 5"></path><path d="m4 10 4-4M4 10l4 4"></path></svg>
+            Undo this change
+          </button>
+          <span style="font-size: 12.5px; color: #878e96">Reversing is itself recorded, nothing is deleted.</span>
+        </div>
+      </div>
+
+      <!-- reversed -->
+      <div style="border: 1px solid #2e3339; border-radius: 12px; background: #1d2024; overflow: hidden">
+        <div style="display: flex; align-items: center; gap: 12px; padding: 16px 20px; background: #23272c; border-bottom: 1px solid #2e3339">
+          <div style="display: flex; align-items: center; justify-content: center; width: 30px; height: 30px; flex-shrink: 0; border-radius: 50%; background: #3d434a">
+            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="#ecedee" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10h10a5 5 0 1 1-5 5"></path><path d="m4 10 4-4M4 10l4 4"></path></svg>
+          </div>
+          <div style="min-width: 0">
+            <div style="font-size: 16px; font-weight: 600; letter-spacing: -.01em">Reversed. Your food target is back to not set.</div>
+            <div style="margin-top: 2px; font-size: 12.5px; color: #b4b9bf">The change and the reversal both stay in the audit log.</div>
+          </div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 12px; padding: 14px 20px">
+          <button style="min-height: 44px; padding: 0 18px; border: 1px solid #3d434a; border-radius: 9px; background: #1d2024; color: #ecedee; font-family: inherit; font-size: 14px; font-weight: 500; cursor: pointer">Set it again</button>
+          <span style="font-size: 12.5px; color: #878e96">Nothing is saved.</span>
+        </div>
+      </div>
+
+      <div style="display: flex; align-items: center; gap: 10px; padding: 13px 16px; border: 1px dashed #3d434a; border-radius: 10px; color: #878e96; font-size: 12.5px">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#878e96" stroke-width="1.7" stroke-linecap="round" style="flex-shrink: 0"><circle cx="12" cy="12" r="8.5"></circle><path d="M12 11v5.5M12 7.8v.2"></path></svg>
+        Dark is the theme that already passes contrast. These two states exist so the confirmation reads at a glance in both.
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+
+<script data-dc-script>
+class Component extends DCLogic {
+  renderVals() {
+    const nav = [
+      { label: 'Assistant', d: 'M4 6h16v10H10l-4 4v-4H4zM8 10h8M8 13h5', on: true },
+      { label: 'Money', d: 'M3 7h18v10H3zM3 11h18M7 15h3M12 7V5M12 19v-2', on: false },
+      { label: 'Activity', d: 'M4 18 9 11l4 4 3-5 4 6M4 6h16', on: false },
+      { label: 'Documents', d: 'M7 3h7l4 4v14H7zM14 3v4h4M10 12h6M10 16h6', on: false },
+      { label: 'Settings', d: 'M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Zm8 4-1.6.6a6.6 6.6 0 0 1-.8 2l.8 1.5-2.1 2.1-1.5-.8a6.6 6.6 0 0 1-2 .8L12 20l-.6-1.6a6.6 6.6 0 0 1-2-.8l-1.5.8-2.1-2.1.8-1.5a6.6 6.6 0 0 1-.8-2L4 12l1.6-.6a6.6 6.6 0 0 1 .8-2l-.8-1.5 2.1-2.1 1.5.8a6.6 6.6 0 0 1 2-.8L12 4l.6 1.6a6.6 6.6 0 0 1 2 .8l1.5-.8 2.1 2.1-.8 1.5a6.6 6.6 0 0 1 .8 2Z', on: false },
+    ].map((n) => ({ ...n, bg: n.on ? '#163a36' : 'transparent', fg: n.on ? '#ecedee' : '#b4b9bf', weight: n.on ? '500' : '400', icon: n.on ? '#33d1bb' : '#878e96' }));
+    return { nav };
+  }
+}
+</script>
+</body>
+</html>

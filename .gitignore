@@ -49,3 +49,6 @@ next-env.d.ts
 /playwright-report/
 /e2e/.auth/
 /data/uploads/
+
+# seeded design canvas (2.5 MB build artifact; re-seed from design/*.dc.html)
+/design/approval-moment.html

@@ -1,0 +1,126 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+  <style>
+    body { margin: 0; font-family: Inter, ui-sans-serif, system-ui, -apple-system, sans-serif; font-size: 14px; line-height: 1.5; }
+    a { color: #0e7a70; text-decoration: none; } a:hover { color: #0b5f58; text-decoration: underline; }
+    .num { font-variant-numeric: tabular-nums lining-nums; }
+    .k { font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: #5f676e; }
+    .row { display: grid; grid-template-columns: 200px 1fr; gap: 10px 18px; padding: 9px 0; border-bottom: 1px solid #e3e1da; font-size: 13px; }
+    .row > :first-child { color: #5f676e; }
+    .sw { display: flex; align-items: center; gap: 9px; font-size: 12.5px; }
+    .chip { display: inline-block; width: 26px; height: 18px; border-radius: 4px; border: 1px solid rgba(27,30,34,.12); }
+  </style>
+</helmet>
+
+<div style="width: 1000px; min-height: 1400px; background: #f7f6f2; color: #1b1e22; padding: 40px 44px; box-sizing: border-box">
+
+  <div class="k">Specification</div>
+  <h1 style="margin: 6px 0 4px; font-size: 30px; font-weight: 600; letter-spacing: -.02em">The approval moment</h1>
+  <p style="margin: 0 0 30px; font-size: 15px; color: #4c535a; max-width: 680px; text-wrap: pretty">Every write in Finance Desk goes through draft, preview, approve, apply. This is the one screen where a person commits a change to their money, and today it is the screen most likely to be hidden behind the composer.</p>
+
+  <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 28px">
+
+    <div>
+      <div class="k">What changes, and why</div>
+      <div style="margin-top: 10px">
+        <sc-for list="{{changes}}" as="c" hint-placeholder-count="7">
+          <div style="padding: 12px 0; border-bottom: 1px solid #e3e1da">
+            <div style="font-size: 13.5px; font-weight: 600">{{c.title}}</div>
+            <div style="margin-top: 3px; font-size: 12.5px; color: #4c535a"><span style="color: #5f676e">Today:</span> {{c.before}}</div>
+            <div style="margin-top: 2px; font-size: 12.5px; color: #4c535a"><span style="color: #0b5f58">New:</span> {{c.after}}</div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+
+    <div>
+      <div class="k">Measurements</div>
+      <div style="margin-top: 10px">
+        <div class="row"><span>Primary action height</span><span class="num">44 px desktop, 48 px phone. Was 30 px.</span></div>
+        <div class="row"><span>Primary action label</span><span class="num">15 px / 600. Was 12.5 px / 500.</span></div>
+        <div class="row"><span>Hero figure</span><span class="num">30 px / 600 / tabular, -0.02em</span></div>
+        <div class="row"><span>Superseded figure</span><span class="num">20 px, ink-3, line-through 1.5 px</span></div>
+        <div class="row"><span>Card title</span><span class="num">16 px / 600. Was 14 px.</span></div>
+        <div class="row"><span>Pending bar</span><span class="num">44 px min, warn-soft, above the composer</span></div>
+        <div class="row"><span>Composer, desktop</span><span class="num">~152 px. Was 233 px.</span></div>
+        <div class="row"><span>Composer, phone</span><span class="num">~104 px. Was ~420 px.</span></div>
+        <div class="row"><span>Card radius</span><span class="num">12 px, unchanged</span></div>
+        <div class="row" style="border-bottom: none"><span>Button radius</span><span class="num">9 px, up from 8 px for the taller control</span></div>
+      </div>
+
+      <div class="k" style="margin-top: 26px">Colour, and one correction</div>
+      <div style="display: flex; flex-direction: column; gap: 9px; margin-top: 10px">
+        <sc-for list="{{swatches}}" as="s" hint-placeholder-count="6">
+          <div class="sw">
+            <span class="chip" style="background: {{s.hex}}"></span>
+            <span style="font-weight: 500">{{s.name}}</span>
+            <span class="num" style="color: #5f676e">{{s.hex}}</span>
+            <span style="color: #4c535a">{{s.note}}</span>
+          </div>
+        </sc-for>
+      </div>
+      <div style="margin-top: 12px; padding: 12px 14px; border-radius: 9px; background: #fbefdb; font-size: 12.5px; color: #7a4a05; text-wrap: pretty">The muted token moves from #7a828a to #5f676e in light mode only. It measured 3.90:1 on white, below the 4.5:1 floor, and it currently sets every reassurance sentence in the product. Dark mode already passes and does not change.</div>
+    </div>
+  </div>
+
+  <div style="margin-top: 34px; padding-top: 26px; border-top: 1px solid #cfccc3">
+    <div class="k">The mechanic that keeps the button reachable</div>
+    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; margin-top: 14px">
+      <div style="padding: 16px; border: 1px solid #e3e1da; border-radius: 10px; background: #ffffff">
+        <div style="font-size: 13.5px; font-weight: 600">1 &nbsp;Measure the real block</div>
+        <p style="margin: 6px 0 0; font-size: 12.5px; color: #4c535a; text-wrap: pretty">A ResizeObserver reports the composer's height into a CSS variable. Today a fixed 16rem is assumed, and the real block is taller than that on both desktop and phone.</p>
+      </div>
+      <div style="padding: 16px; border: 1px solid #e3e1da; border-radius: 10px; background: #ffffff">
+        <div style="font-size: 13.5px; font-weight: 600">2 &nbsp;Scroll to the button, not the end</div>
+        <p style="margin: 6px 0 0; font-size: 12.5px; color: #4c535a; text-wrap: pretty">When a draft arrives, the card's action row is what gets scrolled into view. Landing on the end of the conversation is what buries it.</p>
+      </div>
+      <div style="padding: 16px; border: 1px solid #e3e1da; border-radius: 10px; background: #ffffff">
+        <div style="font-size: 13.5px; font-weight: 600">3 &nbsp;Say so when it is out of sight</div>
+        <p style="margin: 6px 0 0; font-size: 12.5px; color: #4c535a; text-wrap: pretty">If an unapproved draft scrolls off, the pending bar appears above the composer until it is approved or cancelled. It is the only thing that ever sits there.</p>
+      </div>
+    </div>
+  </div>
+
+  <div style="margin-top: 30px; padding: 18px 20px; border: 1px solid #cfccc3; border-radius: 10px; background: #ffffff">
+    <div class="k">Kept exactly as it is</div>
+    <p style="margin: 8px 0 0; font-size: 13px; color: #4c535a; text-wrap: pretty">You chose correctness over comfort, so none of the rigour is softened. The refusal stays a refusal: where the consequence of a change cannot be computed, the card says so rather than offering a friendlier estimate. Every boundary sentence and the privacy note survive word for word; they are restructured and made legible, not trimmed. The engine's rule that an unknown is never treated as zero is untouched.</p>
+    <p style="margin: 10px 0 0; font-size: 13px; color: #4c535a; text-wrap: pretty">Two copy bugs are fixed rather than preserved: the hardcoded "Will not:" prefix in front of an already-complete sentence with its doubled period, and a row whose before and after are both "unknown" rendering as a struck-through unknown followed by unknown.</p>
+  </div>
+</div>
+</x-dc>
+
+<script data-dc-script>
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      changes: [
+        { title: 'The change is the hero', before: 'Five rows at one weight, the important one third from the top.', after: 'One before-and-after line at 30 px, everything else subordinate to it.' },
+        { title: 'The consequence is stated', before: 'A second row reading struck-through unknown, then unknown.', after: 'A sentence saying the unallocated plan stays unknown either way, and what would settle it.' },
+        { title: 'Approve is the primary action', before: '30 px tall, 12.5 px label, same weight as Cancel beside it.', after: 'Full width, 44 px, 15 px label. Cancel is a bordered secondary.' },
+        { title: 'Applied is perceptible', before: 'A border tint and a 12.5 px grey-green line.', after: 'A filled check, a tinted header band, the outcome restated, the time in local time.' },
+        { title: 'Undo exists', before: 'No control at all, though the model already has a reversed state.', after: 'Undo this change sits on the applied card, with its own preview and confirm.' },
+        { title: 'Boundaries are structured', before: 'A run-on grey paragraph below the buttons.', after: 'A labelled block above the buttons, one icon per line, same words.' },
+        { title: 'The composer gets out of the way', before: '233 px desktop, about 420 px on a phone, four lines of disclaimer.', after: 'One status line and an info affordance. The disclaimer opens on demand.' },
+      ],
+      swatches: [
+        { name: 'accent', hex: '#0e7a70', note: 'primary action, unchanged' },
+        { name: 'good', hex: '#1f7a45', note: 'applied confirmation' },
+        { name: 'good-soft', hex: '#e3f3e8', note: 'confirmation band' },
+        { name: 'warn', hex: '#9a5b06', note: 'waiting, and the pending bar' },
+        { name: 'unknown', hex: '#5d55b8', note: 'the unknown consequence' },
+        { name: 'ink-3 (new)', hex: '#5f676e', note: 'was #7a828a' },
+      ],
+    };
+  }
+}
+</script>
+</body>
+</html>
