@@ -1,14 +1,72 @@
 {
   "artboards": [
-    { "file": "Main.dc.html", "x": 0, "y": 0, "w": 1440, "h": 900, "title": "Approval moment — desktop", "is_interactive": true },
-    { "file": "Dark.dc.html", "x": 1600, "y": 0, "w": 1440, "h": 900, "title": "Applied and reversed — dark" },
-    { "file": "Mobile.dc.html", "x": 0, "y": 1120, "w": 390, "h": 844, "title": "Approval moment — phone" },
-    { "file": "Before.dc.html", "x": 560, "y": 1120, "w": 1440, "h": 900, "title": "Today, for comparison" },
-    { "file": "Anatomy.dc.html", "x": 2160, "y": 1120, "w": 1000, "h": 1400, "title": "Spec" }
+    {
+      "file": "Main.dc.html",
+      "x": 0,
+      "y": 0,
+      "w": 1440,
+      "h": 900,
+      "title": "Approval moment \u2014 desktop",
+      "is_interactive": true
+    },
+    {
+      "file": "Dark.dc.html",
+      "x": 1600,
+      "y": 0,
+      "w": 1440,
+      "h": 900,
+      "title": "Applied and reversed \u2014 dark"
+    },
+    {
+      "file": "Mobile.dc.html",
+      "x": 0,
+      "y": 1120,
+      "w": 390,
+      "h": 844,
+      "title": "Approval moment \u2014 phone"
+    },
+    {
+      "file": "Pending.dc.html",
+      "x": 520,
+      "y": 1120,
+      "w": 390,
+      "h": 844,
+      "title": "Pending bar \u2014 phone, card scrolled off"
+    },
+    {
+      "file": "Before.dc.html",
+      "x": 1040,
+      "y": 1120,
+      "w": 1440,
+      "h": 900,
+      "title": "Today, for comparison"
+    },
+    {
+      "file": "Anatomy.dc.html",
+      "x": 2640,
+      "y": 1120,
+      "w": 1000,
+      "h": 1580,
+      "title": "Spec"
+    }
   ],
   "annotations": [
-    { "id": "start-here", "x": 0, "y": -150, "w": 560, "text": "Start here. Press Approve and apply on the desktop artboard to see the applied state, then Undo.\n\nFigures are Arielle's real demo numbers, including the case where the consequence genuinely cannot be computed." },
-    { "id": "before-note", "x": 560, "y": 2080, "w": 460, "text": "Today's card at the same scale, with the composer drawn at its real 233px height. The red line is where the approve button disappears." }
+    {
+      "id": "start-here",
+      "x": 0,
+      "y": -250,
+      "w": 560,
+      "text": "Start here. Press Approve and apply on the desktop artboard to see the applied state, then Undo.\n\nFigures are Arielle's real demo numbers, including the case where the consequence genuinely cannot be computed."
+    },
+    {
+      "id": "before-note",
+      "x": 1040,
+      "y": 2080,
+      "w": 520,
+      "text": "Today's card at the same scale, with real conversation history above it and the composer at its real 233px. The red line is the composer's top edge: Approve and Cancel sit under it."
+    }
   ],
-  "launch": { "view": "canvas" }
+  "launch": {
+    "view": "canvas"
+  }
 }

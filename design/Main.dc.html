@@ -74,6 +74,18 @@
             </div>
           </sc-if>
 
+          <sc-if value="{{isCancelled}}" hint-placeholder-val="{{ false }}">
+            <div style="display: flex; align-items: center; gap: 12px; padding: 16px 20px; background: #f2f1ec; border-bottom: 1px solid #e3e1da">
+              <div style="display: flex; align-items: center; justify-content: center; width: 30px; height: 30px; flex-shrink: 0; border-radius: 50%; background: #cfccc3">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#ffffff" stroke-width="2.4" stroke-linecap="round"><path d="m7 7 10 10M17 7 7 17"></path></svg>
+              </div>
+              <div style="min-width: 0">
+                <div style="font-size: 16px; font-weight: 600; letter-spacing: -.01em">Cancelled. Nothing was saved.</div>
+                <div style="margin-top: 2px; font-size: 12.5px; color: #4c535a">Your food target is still not set. Nothing reached the audit log.</div>
+              </div>
+            </div>
+          </sc-if>
+
           <sc-if value="{{isReversed}}" hint-placeholder-val="{{ false }}">
             <div style="display: flex; align-items: center; gap: 12px; padding: 16px 20px; background: #f2f1ec; border-bottom: 1px solid #e3e1da">
               <div style="display: flex; align-items: center; justify-content: center; width: 30px; height: 30px; flex-shrink: 0; border-radius: 50%; background: #5f676e">
@@ -101,7 +113,7 @@
               <div style="min-width: 0">
                 <div style="font-size: 13.5px; color: #1b1e22">Your unallocated plan stays <strong style="font-weight: 600; color: #5d55b8">unknown</strong> either way, so this change does not tell you what is left.</div>
                 <div style="margin-top: 3px; font-size: 12.5px; color: #4c535a">It needs your income-tax withholding, which is not confirmed.</div>
-                <a href="#" style="display: inline-block; margin-top: 7px; font-size: 12.5px; font-weight: 500">Confirm withholding</a>
+                <a href="#" style="display: inline-block; margin-top: 7px; font-size: 12.5px; font-weight: 500; color: #0b5f58">Confirm withholding</a>
               </div>
             </div>
           </div>
@@ -112,11 +124,11 @@
             <div style="display: flex; flex-direction: column; gap: 7px; margin-top: 8px">
               <div style="display: flex; align-items: flex-start; gap: 8px">
                 <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#5f676e" stroke-width="1.7" style="flex-shrink: 0; margin-top: 2px"><circle cx="12" cy="12" r="8.5"></circle><path d="m6.5 6.5 11 11"></path></svg>
-                <span style="font-size: 12.5px; color: #4c535a">Move money, or change anyone else's plan.</span>
+                <span style="font-size: 12.5px; color: #4c535a">Does not move money or change anyone else's plan.</span>
               </div>
               <div style="display: flex; align-items: flex-start; gap: 8px">
                 <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#5f676e" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0; margin-top: 2px"><rect x="5" y="10.5" width="14" height="9" rx="2"></rect><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"></path></svg>
-                <span style="font-size: 12.5px; color: #4c535a">Show your plan to Will. He sees a coarse summary only, if you allow it.</span>
+                <span style="font-size: 12.5px; color: #4c535a">Your plan details stay private; your partner can see only a coarse summary if you allow it.</span>
               </div>
             </div>
           </div>
@@ -135,13 +147,13 @@
                   <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#4c535a" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10h10a5 5 0 1 1-5 5"></path><path d="m4 10 4-4M4 10l4 4"></path></svg>
                   Undo this change
                 </button>
-                <span style="font-size: 12.5px; color: #5f676e">Reversing is itself recorded, nothing is deleted.</span>
+                <span style="font-size: 12.5px; color: #5f676e">Reversing is itself recorded. Nothing is deleted.</span>
               </div>
             </sc-if>
-            <sc-if value="{{isReversed}}" hint-placeholder-val="{{ false }}">
+            <sc-if value="{{isClosed}}" hint-placeholder-val="{{ false }}">
               <div style="display: flex; align-items: center; gap: 12px; width: 100%">
                 <button onClick="{{reset}}" style="min-height: 44px; padding: 0 18px; border: 1px solid #cfccc3; border-radius: 9px; background: #ffffff; color: #1b1e22; font-family: inherit; font-size: 14px; font-weight: 500; cursor: pointer">Set it again</button>
-                <span style="font-size: 12.5px; color: #5f676e">Nothing is saved.</span>
+                <span style="font-size: 12.5px; color: #5f676e">{{closedNote}}</span>
               </div>
             </sc-if>
           </div>
@@ -152,13 +164,6 @@
     <!-- composer -->
     <div style="flex-shrink: 0; padding: 0 40px 16px; display: flex; justify-content: center">
       <div style="width: 100%; max-width: 720px">
-        <sc-if value="{{isPending}}" hint-placeholder-val="{{ true }}">
-          <div style="display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 14px; margin-bottom: 8px; border: 1px solid #f0d9a8; border-radius: 10px; background: #fbefdb">
-            <span style="width: 7px; height: 7px; border-radius: 50%; background: #9a5b06; flex-shrink: 0"></span>
-            <span style="font-size: 13px; color: #7a4a05; flex-grow: 1">1 change waiting for your approval</span>
-            <button style="min-height: 32px; padding: 0 12px; border: 1px solid #d9b878; border-radius: 7px; background: #ffffff; color: #7a4a05; font-family: inherit; font-size: 12.5px; font-weight: 500; cursor: pointer">Review</button>
-          </div>
-        </sc-if>
 
         <div style="border: 1px solid #cfccc3; border-radius: 14px; background: #ffffff; box-shadow: 0 6px 20px -12px rgba(27,30,34,.28)">
           <div style="padding: 12px 14px 2px; font-size: 15px; color: #5f676e">Ask about your take-home, food, or record something…</div>
@@ -191,7 +196,7 @@
 </div>
 </x-dc>
 
-<script data-dc-script data-props='{"phase":{"editor":"enum","options":["pending","applied","reversed"],"default":"pending","tsType":"string"}}'>
+<script data-dc-script data-props='{"phase":{"editor":"enum","options":["pending","applied","reversed","cancelled"],"default":"pending","tsType":"string"}}'>
 class Component extends DCLogic {
   renderVals() {
     const phase = this.state && this.state.phase ? this.state.phase : (this.props.phase || 'pending');
@@ -212,10 +217,13 @@ class Component extends DCLogic {
       isPending: phase === 'pending',
       isApplied: phase === 'applied',
       isReversed: phase === 'reversed',
-      heroColor: phase === 'reversed' ? '#5f676e' : '#1b1e22',
-      card: { border: phase === 'applied' ? 'rgba(31,122,69,.45)' : phase === 'reversed' ? '#e3e1da' : 'rgba(14,122,112,.45)' },
+      isCancelled: phase === 'cancelled',
+      isClosed: phase === 'reversed' || phase === 'cancelled',
+      closedNote: phase === 'cancelled' ? 'Nothing was saved.' : 'The reversal is in the audit log.',
+      heroColor: (phase === 'reversed' || phase === 'cancelled') ? '#5f676e' : '#1b1e22',
+      card: { border: phase === 'applied' ? 'rgba(31,122,69,.45)' : (phase === 'reversed' || phase === 'cancelled') ? '#e3e1da' : 'rgba(14,122,112,.45)' },
       approve: () => this.setState({ phase: 'applied' }),
-      cancel: () => this.setState({ phase: 'reversed' }),
+      cancel: () => this.setState({ phase: 'cancelled' }),
       undo: () => this.setState({ phase: 'reversed' }),
       reset: () => this.setState({ phase: 'pending' }),
     };
