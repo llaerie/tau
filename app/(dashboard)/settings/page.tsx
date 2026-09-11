@@ -6,10 +6,12 @@ import { getFallbackEvents, type ModelRegistryDescription } from "@/lib/models/r
 import { isLabMode } from "@/lib/security/session";
 import { permissionsFor } from "@/lib/security/rbac";
 import { LAB_ROLES } from "@/lib/ui/session";
+import { listUsers, MIN_PASSWORD_LENGTH } from "@/lib/security/users";
+import { LogoutButton, ChangePasswordForm } from "@/components/auth/AccountForms";
 import { labSnapshotInfo } from "@/lib/ui/data";
 import { PageHeader, Tabs, pickTab, Card, CardHeader, TableWrap, StatusPill, Badge, Notice, KeyValue } from "@/components/ui";
 import { RoleSwitcher, ProviderWizard, MaterialityForm, ResetLab } from "@/components/settings/SettingsForms";
-import { fmtDateTime, fmtMoney, titleCase } from "@/lib/ui/format";
+import { fmtDate, fmtDateTime, fmtMoney, titleCase } from "@/lib/ui/format";
 import { can } from "@/lib/security/rbac";
 
 export const metadata: Metadata = { title: "Settings" };
@@ -38,6 +40,8 @@ export default async function SettingsPage({ searchParams }: { searchParams: Sea
   const thr = rt.thresholds;
   const materialityFields = Object.entries(MATERIALITY_CONFIG_KEYS).map(([k, key]) => ({ k, key, field: current(key) }));
   const snapshot = labSnapshotInfo();
+  const labMode = isLabMode();
+  const users = !labMode && can(actor.role, "MANAGE_USERS") ? listUsers() : null;
 
   return (
     <>
@@ -198,11 +202,53 @@ export default async function SettingsPage({ searchParams }: { searchParams: Sea
 
       {tab === "session" ? (
         <div className="space-y-4">
-          <Card>
-            <CardHeader title="Lab session role" subtitle="Switches the signed session cookie. RBAC is enforced server-side on every page and API call. Lab mode only." actions={<Badge tone={isLabMode() ? "warn" : "ok"}>{isLabMode() ? "TAU_AUTH_MODE=lab" : "full auth"}</Badge>} />
-            <KeyValue dense className="mb-3" items={[{ k: "Actor", v: `${actor.displayName ?? actor.id} (${actor.id})` }, { k: "Role", v: actor.role, mono: true }, { k: "Permissions", v: <span className="flex flex-wrap gap-1">{permissionsFor(actor.role).map((p) => <Badge key={p}>{p}</Badge>)}</span> }]} />
-            <RoleSwitcher current={actor.role} roles={[...LAB_ROLES]} labMode={isLabMode()} />
-          </Card>
+          {labMode ? (
+            <Card>
+              <CardHeader title="Lab session role" subtitle="Switches the signed session cookie. RBAC is enforced server-side on every page and API call. Lab mode only." actions={<Badge tone="warn">TAU_AUTH_MODE=lab</Badge>} />
+              <KeyValue dense className="mb-3" items={[{ k: "Actor", v: `${actor.displayName ?? actor.id} (${actor.id})` }, { k: "Role", v: actor.role, mono: true }, { k: "Permissions", v: <span className="flex flex-wrap gap-1">{permissionsFor(actor.role).map((p) => <Badge key={p}>{p}</Badge>)}</span> }]} />
+              <RoleSwitcher current={actor.role} roles={[...LAB_ROLES]} labMode />
+              <p className="mt-3 text-[11px] text-faint">Password-based sign-in switches on automatically once a user exists: <span className="mono">npm run users:add -- --email you@example.com --name &quot;Name&quot; --role OWNER</span></p>
+            </Card>
+          ) : (
+            <>
+              <Card>
+                <CardHeader title="Signed in as" subtitle="Roles are assigned by an owner from the command line (npm run users:add). RBAC is enforced server-side on every page and API call." actions={<Badge tone="ok">full auth</Badge>} />
+                <KeyValue dense className="mb-3" items={[{ k: "User", v: `${actor.displayName ?? actor.id} (${actor.id})` }, { k: "Role", v: actor.role, mono: true }, { k: "Permissions", v: <span className="flex flex-wrap gap-1">{permissionsFor(actor.role).map((p) => <Badge key={p}>{p}</Badge>)}</span> }]} />
+                <LogoutButton />
+              </Card>
+              <Card>
+                <CardHeader title="Change password" subtitle="Requires your current password. Five failed attempts lock sign-in for 15 minutes." />
+                <ChangePasswordForm minLength={MIN_PASSWORD_LENGTH} />
+              </Card>
+              {users ? (
+                <Card padded={false}>
+                  <CardHeader title={`Users (${users.length})`} className="px-4 pt-3" subtitle="Add or remove users with npm run users:add / users:list. Password hashes never leave the server." />
+                  <TableWrap className="border-0">
+                    <table className="tbl">
+                      <thead>
+                        <tr>
+                          <th>Name</th>
+                          <th>Email</th>
+                          <th>Role</th>
+                          <th>Created</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {users.map((u) => (
+                          <tr key={u.id}>
+                            <td className="font-medium">{u.displayName}</td>
+                            <td className="mono">{u.email}</td>
+                            <td className="mono">{u.role}</td>
+                            <td className="text-muted">{fmtDate(u.createdAt.slice(0, 10))}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </TableWrap>
+                </Card>
+              ) : null}
+            </>
+          )}
           <Card padded={false}>
             <CardHeader title="Role matrix" className="px-4 pt-3" />
             <TableWrap className="border-0">

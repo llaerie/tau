@@ -1,7 +1,9 @@
 import type { ReactNode } from "react";
 import { Shell } from "@/components/shell/Shell";
+import { WorkspaceBanner } from "@/components/shell/WorkspaceBanner";
 import { getRuntime } from "@/lib/db/runtime";
 import { getActor } from "@/lib/ui/session";
+import { UserMenu } from "@/components/UserMenu";
 
 export const dynamic = "force-dynamic";
 
@@ -19,8 +21,10 @@ export default async function DashboardLayout({ children }: { children: ReactNod
     // Runtime failed to initialise; the pages show their own notices.
   }
   return (
+    <><WorkspaceBanner />
     <Shell actor={{ id: actor.id, role: actor.role, displayName: actor.displayName }} profile={profile} badges={badges}>
+      <UserMenu />
       {children}
-    </Shell>
+    </Shell></>
   );
 }

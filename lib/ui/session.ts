@@ -1,32 +1,39 @@
 /**
  * Server-side actor resolution from the signed session cookie.
- * Lab mode falls back to the default OWNER actor when no cookie is present.
+ *
+ * Lab mode falls back to the default OWNER actor when no (valid) cookie is present.
+ * Full mode never falls back: route handlers get a thrown error (mapped to 401 by
+ * `withApi`) and server components are redirected to /login.
  */
 import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 import type { Actor, Role } from "@/lib/core/types";
-import { LAB_DEFAULT_ACTOR, SESSION_COOKIE_NAME, resolveActor, sessionCookieValue, createSessionToken, serializeSessionCookie, isLabMode } from "@/lib/security/session";
+import { LAB_DEFAULT_ACTOR, SESSION_COOKIE_NAME, sessionCookieValue, createSessionToken, serializeSessionCookie } from "@/lib/security/session";
+import { authenticateSessionToken } from "@/lib/security/auth";
 import { can, type Permission } from "@/lib/security/rbac";
 
-/** Actor for the current server component / server action request. */
+/** Actor for the current server component / server action request. Redirects to /login in full mode when unauthenticated. */
 export async function getActor(): Promise<Actor> {
+  let token: string | undefined;
   try {
     const jar = await cookies();
-    const token = jar.get(SESSION_COOKIE_NAME)?.value;
-    return resolveActor(token);
+    token = jar.get(SESSION_COOKIE_NAME)?.value;
   } catch {
-    return { ...LAB_DEFAULT_ACTOR };
+    token = undefined;
   }
+  let actor: Actor | null = null;
+  try {
+    actor = authenticateSessionToken(token);
+  } catch {
+    actor = null;
+  }
+  if (!actor) redirect("/login");
+  return actor;
 }
 
-/** Actor from a route-handler Request (cookie header). Throws in full auth mode when invalid. */
+/** Actor from a route-handler Request (cookie header). Throws in full auth mode when missing or invalid. */
 export function actorFromRequest(req: Request): Actor {
-  const token = sessionCookieValue(req.headers.get("cookie"));
-  try {
-    return resolveActor(token);
-  } catch (err) {
-    if (isLabMode()) return { ...LAB_DEFAULT_ACTOR };
-    throw err;
-  }
+  return authenticateSessionToken(sessionCookieValue(req.headers.get("cookie")));
 }
 
 export const LAB_ROLES: readonly Role[] = ["OWNER", "FINANCE_OPERATOR", "CPA", "VIEWER"];

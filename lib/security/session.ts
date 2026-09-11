@@ -1,15 +1,19 @@
 /**
  * Minimal signed-cookie sessions (HMAC-SHA256 over a base64url JSON payload).
  *
- * Lab mode (TAU_AUTH_MODE !== "full"): a missing token resolves to the default
- * OWNER actor so the single-user lab works without a login flow. Full mode requires
- * a valid token and a real TAU_SESSION_SECRET.
+ * Lab mode: a missing token resolves to the default OWNER actor so the single-user lab
+ * works without a login flow. Full mode (TAU_AUTH_MODE=full, or the default once
+ * `.tau/users.json` holds a user — see ./auth-mode) requires a valid token signed with
+ * TAU_SESSION_SECRET (or, when unset, a random secret persisted to `.tau/session-secret`).
  */
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
 import type { Actor, Role } from "@/lib/core/types";
 import { ControlViolationError } from "@/lib/core/errors";
 import { getSecret } from "./secrets";
 import { ROLES } from "./rbac";
+import { resolveAuthMode } from "./auth-mode";
 
 export const SESSION_COOKIE_NAME = "tau_session";
 export const DEFAULT_SESSION_TTL_SECONDS = 12 * 60 * 60;
@@ -28,14 +32,39 @@ export interface SessionPayload {
 export type SessionVerification = { ok: true; payload: SessionPayload } | { ok: false; reason: "MALFORMED" | "BAD_SIGNATURE" | "EXPIRED" | "INVALID_ACTOR" };
 
 export function isLabMode(): boolean {
-  return (process.env.TAU_AUTH_MODE ?? "lab").toLowerCase() !== "full";
+  return resolveAuthMode() === "lab";
+}
+
+/** Full mode without TAU_SESSION_SECRET: generate one once and keep it in `.tau/session-secret` (0600). */
+function persistedSecretPath(): string {
+  const override = process.env.TAU_SESSION_SECRET_FILE;
+  return override && override.trim() !== "" ? resolve(override) : resolve(process.cwd(), ".tau", "session-secret");
+}
+
+let persistedSecret: string | undefined;
+
+function persistedSessionSecret(): string {
+  if (persistedSecret) return persistedSecret;
+  const path = persistedSecretPath();
+  if (existsSync(path)) {
+    const v = readFileSync(path, "utf8").trim();
+    if (v.length >= 32) return (persistedSecret = v);
+  }
+  try {
+    mkdirSync(dirname(path), { recursive: true });
+    const v = randomBytes(32).toString("hex");
+    writeFileSync(path, `${v}\n`, { mode: 0o600 });
+    return (persistedSecret = v);
+  } catch {
+    throw new ControlViolationError("TAU_SESSION_SECRET must be set when TAU_AUTH_MODE=full (could not persist a generated secret)");
+  }
 }
 
 function sessionSecret(): string {
   const s = getSecret("TAU_SESSION_SECRET");
   if (s) return s;
   if (isLabMode()) return LAB_FALLBACK_SECRET;
-  throw new ControlViolationError("TAU_SESSION_SECRET must be set when TAU_AUTH_MODE=full");
+  return persistedSessionSecret();
 }
 
 const b64u = (buf: Buffer | string): string => Buffer.from(buf).toString("base64url");
