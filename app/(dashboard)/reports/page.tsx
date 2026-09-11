@@ -5,6 +5,7 @@ import { PageHeader, Tabs, pickTab, Grid, Stat, Card, CardHeader, TableWrap, Mon
 import { CpaPackagePanel } from "@/components/reports/CpaPackagePanel";
 import { fmtDate, fmtMoney } from "@/lib/ui/format";
 import type { StatementLine } from "@/lib/core/contracts";
+import { hasBookData } from "@/lib/db/workspace";
 
 export const metadata: Metadata = { title: "Reports" };
 export const dynamic = "force-dynamic";
@@ -47,6 +48,11 @@ export default async function ReportsPage({ searchParams }: { searchParams: Sear
   return (
     <>
       <PageHeader title="Reports" description="Statements straight from the ledger with reconciliation badges, exportable as Markdown or JSON, plus the CPA package generator." />
+      {!hasBookData(rt.dataset) ? (
+        <Notice tone="warn" className="mb-4" title="No posted entries — these statements are empty, not zero">
+          Nothing has been posted to the ledger, so every line below is structurally 0.00. Cash and balance-sheet figures are UNKNOWN until bank/card activity is entered or imported and opening balances are posted; do not read these as balances.
+        </Notice>
+      ) : null}
       <form method="get" className="mb-4 flex flex-wrap items-end gap-2">
         <input type="hidden" name="tab" value={tab} />
         <label className="text-[12px] text-muted">

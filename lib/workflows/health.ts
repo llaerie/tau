@@ -11,7 +11,8 @@ import { makeCalc } from "@/lib/finance/calc-result";
 import { burnRate, cashReserveCoverage, cashRunway, type MonthlyCashPoint } from "@/lib/finance/cash";
 import { budgetVariance } from "@/lib/finance/variance";
 import { actualsByAccountMonth } from "@/lib/forecasting/budget";
-import { unknownsRegistry } from "@/lib/knowledge/finance-bible";
+import { mergeBibleFields, unknownsRegistry } from "@/lib/knowledge/finance-bible";
+import { CASH_UNKNOWN_LABEL } from "@/lib/db/workspace";
 import { approvedBudgetFor, cashPosition } from "@/lib/monitors/helpers";
 import { CalcCollector, persistCalcs } from "./shared";
 
@@ -27,7 +28,8 @@ export interface HealthMetric<T> {
 export interface FinancialHealth {
   asOf: ISODate;
   isSyntheticData: boolean;
-  cash: HealthMetric<DecimalString> & { minimumReserve: DecimalString | null; surplus: DecimalString | null; reserveStatus: "CONFIRMED" | "UNKNOWN" };
+  /** `value` is null (UNKNOWN — no bank data) when the ledger has no posted activity. */
+  cash: HealthMetric<DecimalString | null> & { known: boolean; minimumReserve: DecimalString | null; surplus: DecimalString | null; reserveStatus: "CONFIRMED" | "UNKNOWN" };
   runwayMonths: HealthMetric<number | null> & { burnRate: DecimalString | null };
   arOverdue: HealthMetric<DecimalString> & { count: number; overdueShare: number | null };
   integrityPassed: HealthMetric<boolean> & { failingChecks: string[] };
@@ -45,35 +47,40 @@ export async function financialHealth(rt: LabRuntime, asOf: ISODate = rt.asOfDat
   const calcs = new CalcCollector();
 
   // Cash & reserve (reserve unknown → null, WATCH)
-  const cash = calcs.add(cashPosition(ds, rt.ledger, asOf).calc);
+  const position = cashPosition(ds, rt.ledger, asOf);
+  const cash = calcs.add(position.calc);
+  const known = position.known;
   const reserve = rt.thresholds.minimumCashReserve;
-  const coverage = calcs.add(cashReserveCoverage({ cash: cash.value.total, minimumReserve: reserve, asOfDate: asOf, policyStatus: reserve === null ? "UNCONFIRMED" : "CONFIRMED", sourceIds: [cash.id] }));
+  const coverage = calcs.add(cashReserveCoverage({ cash: known ? position.total : null, minimumReserve: reserve, asOfDate: asOf, policyStatus: reserve === null ? "UNCONFIRMED" : "CONFIRMED", sourceIds: [cash.id] }));
   const cashMetric: FinancialHealth["cash"] = {
-    value: cash.value.total,
+    value: known ? position.total : null,
+    known,
     calcId: cash.id,
     minimumReserve: coverage.value?.minimumReserve ?? null,
     surplus: coverage.value?.surplus ?? null,
     reserveStatus: reserve === null ? "UNKNOWN" : "CONFIRMED",
-    status: D(cash.value.total).lte(0) ? "ACTION" : coverage.value === null ? "WATCH" : coverage.value.meetsPolicy ? "GOOD" : "ACTION",
-    note: coverage.value === null ? "Minimum cash reserve policy not set; coverage cannot be evaluated (null, not zero)." : `Coverage ${coverage.value.coverageRatio ?? "n/a"}× the reserve.`,
+    status: !known ? "WATCH" : D(position.total).lte(0) ? "ACTION" : coverage.value === null ? "WATCH" : coverage.value.meetsPolicy ? "GOOD" : "ACTION",
+    note: !known ? `${CASH_UNKNOWN_LABEL}: the ledger has no posted entries, so there is no cash balance to score (null, not zero).` : coverage.value === null ? "Minimum cash reserve policy not set; coverage cannot be evaluated (null, not zero)." : `Coverage ${coverage.value.coverageRatio ?? "n/a"}× the reserve.`,
   };
 
-  // Burn & runway from trailing monthly cash balances (4 points → 3 flows)
+  // Burn & runway from trailing monthly cash balances (4 points → 3 flows). No book data → no history.
   const points: MonthlyCashPoint[] = [];
-  for (let i = 3; i >= 0; i--) {
-    const m = monthKey(addMonths(asOf, -i));
-    const end = i === 0 ? asOf : monthEnd(`${m}-01`);
-    points.push({ month: m, balance: cashPosition(ds, rt.ledger, end).total });
+  if (known) {
+    for (let i = 3; i >= 0; i--) {
+      const m = monthKey(addMonths(asOf, -i));
+      const end = i === 0 ? asOf : monthEnd(`${m}-01`);
+      points.push({ month: m, balance: cashPosition(ds, rt.ledger, end).total });
+    }
   }
   const burn = calcs.add(burnRate({ monthlyCashBalances: points, months: 3, asOfDate: asOf, sourceIds: [cash.id] }));
-  const runway = calcs.add(cashRunway({ cash: cash.value.total, burnRate: burn.value, asOfDate: asOf, sourceIds: [burn.id] }));
+  const runway = calcs.add(cashRunway({ cash: known ? position.total : null, burnRate: burn.value, asOfDate: asOf, sourceIds: [burn.id] }));
   const cashFlowPositive = burn.value !== null && D(burn.value).lte(0);
   const runwayMetric: FinancialHealth["runwayMonths"] = {
     value: runway.value,
     calcId: runway.id,
     burnRate: burn.value,
     status: burn.value === null ? "WATCH" : cashFlowPositive ? "GOOD" : runway.value !== null && runway.value >= 6 ? "GOOD" : runway.value !== null && runway.value >= 3 ? "WATCH" : "ACTION",
-    note: burn.value === null ? "Insufficient cash history to compute burn." : cashFlowPositive ? "Cash-flow positive over the trailing 3 months; runway unbounded (null)." : undefined,
+    note: burn.value === null ? (known ? "Insufficient cash history to compute burn." : `${CASH_UNKNOWN_LABEL}: burn and runway cannot be computed without posted activity.`) : cashFlowPositive ? "Cash-flow positive over the trailing 3 months; runway unbounded (null)." : undefined,
   };
 
   // AR overdue
@@ -88,7 +95,7 @@ export async function financialHealth(rt: LabRuntime, asOf: ISODate = rt.asOfDat
   const integrityMetric: FinancialHealth["integrityPassed"] = { value: integrity.passed, calcId: integrityCalc.id, failingChecks: failing.map((c) => c.key), status: integrity.passed ? (failing.length ? "WATCH" : "GOOD") : "ACTION" };
 
   // Unknown config
-  const unknowns = unknownsRegistry(rt.bible).filter((u) => u.status !== "CONFIRMED");
+  const unknowns = unknownsRegistry(mergeBibleFields(rt.bible, ds.configFields)).filter((u) => u.status !== "CONFIRMED");
   const byRole: Record<string, number> = {};
   for (const u of unknowns) byRole[u.whoCanAnswer] = (byRole[u.whoCanAnswer] ?? 0) + 1;
   const unknownCalc = calcs.add(makeCalc({ name: "unknown_config_count", value: unknowns.length, unit: "COUNT", formula: "count of finance-setup items with status ≠ CONFIRMED", inputs: { keys: unknowns.map((u) => u.key) }, asOfDate: asOf }));

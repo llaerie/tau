@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { pageCtx, type SearchParams, sp } from "@/lib/ui/page";
 import { PageHeader, Tabs, pickTab, Card, CardHeader, StatusPill, Badge, Grid, Stat, TableWrap, Money, Notice, EmptyState, LinkButton } from "@/components/ui";
 import { ActionButton } from "@/components/ui/ActionButton";
+import { NewJournalEntryForm, type JournalAccountOption } from "@/components/accounting/NewJournalEntryForm";
+import { canEnterManually } from "@/lib/ui/manual-entry";
 import { fmtDate, fmtDateTime, fmtMoney, titleCase } from "@/lib/ui/format";
 import { can } from "@/lib/security/rbac";
 import { isValidISODate } from "@/lib/core/dates";
@@ -20,6 +22,8 @@ export default async function AccountingPage({ searchParams }: { searchParams: S
   const acct = new Map(ds.accounts.map((a) => [a.id, a]));
   const canPropose = can(actor.role, "PROPOSE_ACTIONS");
   const canLock = can(actor.role, "LOCK_PERIOD");
+  const canEnter = canEnterManually(actor);
+  const journalAccounts: JournalAccountOption[] = [...ds.accounts].filter((a) => a.isActive).sort((a, b) => a.code.localeCompare(b.code)).map((a) => ({ code: a.code, name: a.name, type: a.type, restricted: a.restricted }));
 
   const tbDate = isValidISODate(sp(q.asOf)) ? sp(q.asOf) : asOf;
   const jStatus = sp(q.status);
@@ -92,6 +96,7 @@ export default async function AccountingPage({ searchParams }: { searchParams: S
 
       {tab === "journal" ? (
         <div className="space-y-3">
+          <NewJournalEntryForm accounts={journalAccounts} canEnter={canEnter} defaultDate={asOf} />
           <form className="grid grid-cols-2 gap-2 md:grid-cols-5" method="get">
             <input type="hidden" name="tab" value="journal" />
             <input name="search" defaultValue={sp(q.search)} placeholder="Search description / id" className="input col-span-2 md:col-span-1" />
@@ -122,7 +127,7 @@ export default async function AccountingPage({ searchParams }: { searchParams: S
               <JournalEntryCard key={e.id} e={e} acct={acct} entryById={entryById} canPropose={canPropose} />
             ))}
             {journal.length > 120 ? <Notice>Showing the first 120 of {journal.length}. Narrow the filters to see more.</Notice> : null}
-            {journal.length === 0 ? <EmptyState title="No entries match" /> : null}
+            {journal.length === 0 ? <EmptyState title={entries.length === 0 ? "No journal entries yet" : "No entries match"}>{entries.length === 0 ? "The ledger is empty — nothing has been posted. Use “New entry” above (for example, opening balances from your latest bank statement) or import transactions. Balances stay UNKNOWN until entries are posted." : null}</EmptyState> : null}
           </div>
         </div>
       ) : null}
@@ -205,6 +210,13 @@ export default async function AccountingPage({ searchParams }: { searchParams: S
                 </tr>
               </thead>
               <tbody>
+                {periods.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="py-6 text-center text-muted">
+                      No accounting periods yet — a period opens automatically when its first entry is created.
+                    </td>
+                  </tr>
+                ) : null}
                 {periods.map((p) => {
                   const n = entries.filter((e) => e.periodId === p.id).length;
                   return (

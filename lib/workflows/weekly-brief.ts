@@ -13,9 +13,10 @@ import { budgetVariance, type VarianceRow } from "@/lib/finance/variance";
 import { actualsByAccountMonth } from "@/lib/forecasting/budget";
 import { buildDefaultDrivers, detectPayrollCadence, projectPayDates } from "@/lib/forecasting/drivers";
 import { rollingForecast } from "@/lib/forecasting/forecast";
-import { unknownsRegistry } from "@/lib/knowledge/finance-bible";
+import { mergeBibleFields, unknownsRegistry } from "@/lib/knowledge/finance-bible";
+import { CASH_UNKNOWN_LABEL } from "@/lib/db/workspace";
 import { PENDING_DUE_DATE_NOTE } from "@/lib/tax/calendar";
-import { SEVERITY_RANK, approvedBudgetFor, buildMonitorContext, cashPosition, receiptThresholdFor, runMonitorsInContext, taxObligationsFor, thirteenWeekFor, type AttentionItem, type CashAccountBalance } from "@/lib/monitors";
+import { SEVERITY_RANK, approvedBudgetFor, buildMonitorContext, receiptThresholdFor, runMonitorsInContext, taxObligationsFor, thirteenWeekFor, type AttentionItem, type CashAccountBalance } from "@/lib/monitors";
 import { CalcCollector, expensesByAccount, persistCalcs, revenueReceived, wordCount, type ExpenseRow } from "./shared";
 
 export const WEEKLY_BRIEF_VERSION = "weekly-brief:v1";
@@ -27,8 +28,10 @@ export interface WeeklyBrief {
   generatedAt: ISODateTime;
   companyName: string;
   isSyntheticData: boolean;
-  cashToday: { accounts: CashAccountBalance[]; total: DecimalString; calcId: ID };
-  thirteenWeekLowestCash: { amount: DecimalString; weekStart: ISODate; weekIndex: number; endingCash: DecimalString; minimumCash: DecimalString | null; weeksBelowMinimum: number | null; calcId: ID };
+  /** `total` is null (UNKNOWN — no bank data) when the ledger has no posted activity. */
+  cashToday: { accounts: CashAccountBalance[]; total: DecimalString | null; known: boolean; calcId: ID };
+  /** `amount` / `endingCash` are null when the opening cash is unknown (no bank data). */
+  thirteenWeekLowestCash: { amount: DecimalString | null; weekStart: ISODate; weekIndex: number; endingCash: DecimalString | null; minimumCash: DecimalString | null; weeksBelowMinimum: number | null; calcId: ID };
   revenueReceived: { trailing7Days: DecimalString; monthToDate: DecimalString; calcIds: ID[] };
   revenueExpected: { next30Days: DecimalString; overdueTotal: DecimalString; invoices: { id: ID; number: string; customerName: string; dueDate: ISODate; openAmount: DecimalString; daysPastDue: number }[]; calcId: ID };
   expenses: { week: { total: DecimalString; byAccount: ExpenseRow[] }; monthToDate: { total: DecimalString; byAccount: ExpenseRow[] }; calcIds: ID[] };
@@ -158,7 +161,7 @@ export async function buildWeeklyBrief(rt: LabRuntime, asOf: ISODate = rt.asOfDa
     .map((a) => ({ approvalId: a.id, kind: a.action.kind, description: a.action.description, riskLevel: a.risk.level, requestedApproverRoles: a.requestedApproverRoles, requestedAt: a.requestedAt, amount: a.action.amount?.amount }));
 
   // Missing information
-  const setupItems = unknownsRegistry(rt.bible)
+  const setupItems = unknownsRegistry(mergeBibleFields(rt.bible, ds.configFields))
     .filter((u) => u.status !== "CONFIRMED")
     .map((u) => ({ key: u.key, label: u.label, whoCanAnswer: u.whoCanAnswer, status: u.status }));
   const missingDocs = missingDocumentAlerts(ds, { receiptThreshold: receiptThresholdFor(ds.configFields, rt.policies) }).map((a) => ({ id: a.id, kind: a.kind, severity: a.severity, message: a.message }));
@@ -168,6 +171,7 @@ export async function buildWeeklyBrief(rt: LabRuntime, asOf: ISODate = rt.asOfDa
   for (const item of queue.items.filter((i) => i.severity !== "INFO").slice(0, 5)) recommendedActions.push({ title: item.title, task: item.suggestedTask, relatedIds: item.relatedIds });
   for (const d of topDecisions) recommendedActions.push({ title: `Decide pending ${d.riskLevel} approval: ${d.description}`, relatedIds: [d.approvalId] });
   if (rt.thresholds.minimumCashReserve === null) recommendedActions.push({ title: "Set the minimum cash reserve policy so cash alerts can be judged against it", task: { kind: "cfo.config_status", params: {} }, relatedIds: ["materiality.minimumCashReserve"] });
+  if (!tw.cash.known) recommendedActions.unshift({ title: "Cash is unknown: add bank accounts and enter or import bank/card transactions so the books have data", task: { kind: "cash.position", params: { asOf } }, relatedIds: ["cash_position"] });
   if (setupItems.length) recommendedActions.push({ title: `Answer ${setupItems.length} finance-setup question(s) (${[...new Set(setupItems.map((s) => s.whoCanAnswer))].join(", ")})`, task: { kind: "cfo.config_status", params: {} }, relatedIds: setupItems.slice(0, 5).map((s) => s.key) });
 
   const counts = { total: queue.items.length, critical: queue.items.filter((i) => i.severity === "CRITICAL").length, warning: queue.items.filter((i) => i.severity === "WARNING").length, info: queue.items.filter((i) => i.severity === "INFO").length };
@@ -178,8 +182,8 @@ export async function buildWeeklyBrief(rt: LabRuntime, asOf: ISODate = rt.asOfDa
     generatedAt: nowISO(),
     companyName: ds.profile.displayName,
     isSyntheticData: ds.profile.isSynthetic,
-    cashToday: { accounts: tw.cash.accounts, total: tw.cash.total, calcId: tw.cash.calc.id },
-    thirteenWeekLowestCash: { amount: fc.lowestCash, weekStart: fc.lowestCashWeekStart, weekIndex: fc.lowestCashWeek, endingCash: fc.endingCash, minimumCash: fc.minimumCash, weeksBelowMinimum: fc.weeksBelowMinimum, calcId: fc.calc.id },
+    cashToday: { accounts: tw.cash.accounts, total: tw.cash.known ? tw.cash.total : null, known: tw.cash.known, calcId: tw.cash.calc.id },
+    thirteenWeekLowestCash: { amount: tw.cash.known ? fc.lowestCash : null, weekStart: fc.lowestCashWeekStart, weekIndex: fc.lowestCashWeek, endingCash: tw.cash.known ? fc.endingCash : null, minimumCash: fc.minimumCash, weeksBelowMinimum: tw.cash.known ? fc.weeksBelowMinimum : null, calcId: fc.calc.id },
     revenueReceived: { trailing7Days: rev7.value, monthToDate: revMtd.value, calcIds: [rev7.id, revMtd.id] },
     revenueExpected: { next30Days: next30, overdueTotal: aging.value.overdueTotal, invoices: expectedInvoices.map((i) => ({ id: i.id, number: i.number, customerName: i.counterpartyName, dueDate: i.dueDate, openAmount: i.openAmount, daysPastDue: i.daysPastDue })), calcId: aging.id },
     expenses: { week: { total: expWeek.total, byAccount: expWeek.byAccount }, monthToDate: { total: expMtd.total, byAccount: expMtd.byAccount }, calcIds: [expWeek.calc.id, expMtd.calc.id] },
@@ -207,9 +211,13 @@ export async function buildWeeklyBrief(rt: LabRuntime, asOf: ISODate = rt.asOfDa
 function executiveSummary(b: WeeklyBrief, reserve: DecimalString | null): string {
   const s: string[] = [];
   s.push(`${b.isSyntheticData ? "SYNTHETIC DATA. " : ""}Weekly brief for ${b.companyName} as of ${fmtDate(b.asOf)}.`);
-  s.push(`Cash today is ${fmtMoney(b.cashToday.total)} across ${b.cashToday.accounts.length} account(s).`);
   const low = b.thirteenWeekLowestCash;
-  if (reserve === null) s.push(`The 13-week forecast bottoms at ${fmtMoney(low.amount)} in the week of ${fmtDate(low.weekStart)}; no cash reserve policy is set, so that cannot be judged against a target.`);
+  if (!b.cashToday.known || b.cashToday.total === null || low.amount === null) {
+    s.push(`Cash today is ${CASH_UNKNOWN_LABEL}: no bank or card activity has been entered or imported and no entry has been posted, so no cash balance and no 13-week cash forecast can be stated. Nothing is assumed.`);
+  } else s.push(`Cash today is ${fmtMoney(b.cashToday.total)} across ${b.cashToday.accounts.length} account(s).`);
+  if (!b.cashToday.known || low.amount === null) {
+    /* nothing to say about the forecast without an opening balance */
+  } else if (reserve === null) s.push(`The 13-week forecast bottoms at ${fmtMoney(low.amount)} in the week of ${fmtDate(low.weekStart)}; no cash reserve policy is set, so that cannot be judged against a target.`);
   else s.push(`The 13-week forecast bottoms at ${fmtMoney(low.amount)} in the week of ${fmtDate(low.weekStart)}, ${D(low.amount).lt(D(reserve)) ? "below" : "above"} the ${fmtMoney(reserve)} reserve.`);
   s.push(`Revenue received: ${fmtMoney(b.revenueReceived.trailing7Days)} in the last 7 days and ${fmtMoney(b.revenueReceived.monthToDate)} month-to-date.`);
   s.push(`${fmtMoney(b.revenueExpected.next30Days)} of open invoices is due within 30 days${D(b.revenueExpected.overdueTotal).gt(0) ? `, of which ${fmtMoney(b.revenueExpected.overdueTotal)} is already overdue` : ""}.`);
@@ -244,9 +252,15 @@ export function renderWeeklyBriefMarkdown(b: WeeklyBrief): string {
   L.push(`# Weekly CFO Brief — ${b.companyName} — as of ${b.asOf}`);
   if (b.isSyntheticData) L.push("", "> **SYNTHETIC DATA** — this brief is generated from the Phase One lab company; no real money or filings.");
   L.push("", "## Executive summary", "", b.executiveSummary);
-  L.push("", "## Cash today", "", `| Account | Balance |`, `|---|---:|`);
-  for (const a of b.cashToday.accounts) L.push(`| ${a.name} | ${fmtMoney(a.balance)} |`);
-  L.push(`| **Total** | **${fmtMoney(b.cashToday.total)}** |`, "", `13-week lowest cash: **${fmtMoney(b.thirteenWeekLowestCash.amount)}** (week of ${b.thirteenWeekLowestCash.weekStart}); ending cash ${fmtMoney(b.thirteenWeekLowestCash.endingCash)}; minimum reserve ${b.thirteenWeekLowestCash.minimumCash === null ? "NOT SET" : fmtMoney(b.thirteenWeekLowestCash.minimumCash)}.`);
+  L.push("", "## Cash today", "");
+  if (!b.cashToday.known || b.cashToday.total === null) {
+    L.push(`**${CASH_UNKNOWN_LABEL}** — the ledger has no posted entries. ${b.cashToday.accounts.length ? `${b.cashToday.accounts.length} account(s) are registered but carry no activity.` : "No bank accounts or cards are registered yet."} Enter or import transactions and post opening balances before relying on any cash figure.`);
+    L.push("", `13-week cash forecast: **not available** — opening cash is unknown; minimum reserve ${b.thirteenWeekLowestCash.minimumCash === null ? "NOT SET" : fmtMoney(b.thirteenWeekLowestCash.minimumCash)}.`);
+  } else {
+    L.push(`| Account | Balance |`, `|---|---:|`);
+    for (const a of b.cashToday.accounts) L.push(`| ${a.name} | ${fmtMoney(a.balance)} |`);
+    L.push(`| **Total** | **${fmtMoney(b.cashToday.total)}** |`, "", `13-week lowest cash: **${fmtMoney(b.thirteenWeekLowestCash.amount)}** (week of ${b.thirteenWeekLowestCash.weekStart}); ending cash ${fmtMoney(b.thirteenWeekLowestCash.endingCash)}; minimum reserve ${b.thirteenWeekLowestCash.minimumCash === null ? "NOT SET" : fmtMoney(b.thirteenWeekLowestCash.minimumCash)}.`);
+  }
   L.push("", "## Revenue", "", `- Received last 7 days: ${fmtMoney(b.revenueReceived.trailing7Days)}`, `- Received month-to-date: ${fmtMoney(b.revenueReceived.monthToDate)}`, `- Expected next 30 days (open invoices): ${fmtMoney(b.revenueExpected.next30Days)} (overdue ${fmtMoney(b.revenueExpected.overdueTotal)})`);
   for (const i of b.revenueExpected.invoices) L.push(`  - ${i.number} ${i.customerName}: ${fmtMoney(i.openAmount)} due ${i.dueDate}${i.daysPastDue > 0 ? ` (${i.daysPastDue} days overdue)` : ""}`);
   L.push("", "## Expenses", "", `- This week: ${fmtMoney(b.expenses.week.total)}`);

@@ -4,6 +4,10 @@ import { unknownsRegistry, blockedCapabilities, bibleSummary, BIBLE_SECTIONS, MO
 import { mergedConfigFields } from "@/lib/ui/config";
 import { PageHeader, Tabs, pickTab, Card, CardHeader, StatusPill, Badge, Grid, Stat, TableWrap, Notice, Details, EmptyState, KeyValue } from "@/components/ui";
 import { AnswerFieldForm } from "@/components/company/AnswerFieldForm";
+import { BankAccountsForm, type GlOption } from "@/components/company/BankAccountsForm";
+import { canEnterManually, BANK_ACCOUNTS_BIBLE_KEY, CARDS_BIBLE_KEY } from "@/lib/ui/manual-entry";
+import { eligibleGlAccountsFor, hasBookData } from "@/lib/db/workspace";
+import Link from "next/link";
 import { AccessDenied } from "@/components/ui/AccessDenied";
 import { fmtDateTime, titleCase } from "@/lib/ui/format";
 import { pretty } from "@/lib/ui/serialize";
@@ -13,7 +17,7 @@ import type { ConfigField } from "@/lib/core/types";
 export const metadata: Metadata = { title: "Company setup" };
 export const dynamic = "force-dynamic";
 
-const TABS = ["setup", "bible", "international", "synthetic"];
+const TABS = ["setup", "accounts", "bible", "international", "synthetic"];
 
 function fieldValue(v: unknown): string {
   if (v === null || v === undefined) return "UNKNOWN";
@@ -40,6 +44,16 @@ export default async function CompanyPage({ searchParams }: { searchParams: Sear
   const intlWorkers = rt.dataset.workers.filter((w) => w.country !== "US" || w.internationalReview);
   const intlFields = merged.filter((f) => f.section === "International workforce");
   const open = registry.filter((r) => r.status !== "CONFIRMED").length;
+  const isSynthetic = rt.dataset.profile.isSynthetic;
+  const canEnter = canEnterManually(actor);
+  const glName = (id: string) => {
+    const a = rt.dataset.accounts.find((x) => x.id === id);
+    return a ? `${a.code} · ${a.name}` : id;
+  };
+  const bankGl: GlOption[] = eligibleGlAccountsFor(rt.dataset, "BANK").map((a) => ({ id: a.id, code: a.code, name: a.name }));
+  const cardGl: GlOption[] = eligibleGlAccountsFor(rt.dataset, "CARD").map((a) => ({ id: a.id, code: a.code, name: a.name }));
+  const registeredAccounts = rt.dataset.bankAccounts.length + rt.dataset.cards.length;
+  const books = hasBookData(rt.dataset);
 
   return (
     <>
@@ -51,7 +65,12 @@ export default async function CompanyPage({ searchParams }: { searchParams: Sear
         <Stat label="International workers" value={intlWorkers.length} sub="Cross-border professional review" tone={intlWorkers.some((w) => w.internationalReview?.status !== "REVIEWED") ? "bad" : "ok"} />
       </Grid>
 
-      <Tabs basePath="/company" active={tab} tabs={[{ key: "setup", label: "Setup checklist", count: open }, { key: "bible", label: "Finance bible (30 sections)" }, { key: "international", label: "International workforce review" }, { key: "synthetic", label: "Synthetic lab profile" }]} />
+      {!isSynthetic ? (
+        <Notice tone="info" className="mb-4" title="Your company workspace">
+          Nothing is connected: no bank, card, payroll or accounting feed exists. The books hold only what you enter or import{books ? "" : " — nothing has been posted yet, so cash and balances are UNKNOWN"}. Start with the <Link href="/company?tab=accounts" className="underline">bank accounts &amp; cards</Link> tab, then the OWNER items below; send the CPA items to your CPA.
+        </Notice>
+      ) : null}
+      <Tabs basePath="/company" active={tab} tabs={[{ key: "setup", label: "Setup checklist", count: open }, { key: "accounts", label: "Bank accounts & cards", count: registeredAccounts }, { key: "bible", label: "Finance bible (30 sections)" }, { key: "international", label: "International workforce review" }, { key: "synthetic", label: isSynthetic ? "Synthetic lab profile" : "Company profile" }]} />
 
       {tab === "setup" ? (
         <div className="space-y-4">
@@ -89,6 +108,11 @@ export default async function CompanyPage({ searchParams }: { searchParams: Sear
                             </div>
                           </div>
                           {f?.note ? <p className="text-[12px] text-muted">{f.note}</p> : null}
+                          {item.fieldKey === BANK_ACCOUNTS_BIBLE_KEY || item.fieldKey === CARDS_BIBLE_KEY ? (
+                            <p className="text-[12px]">
+                              <Link href="/company?tab=accounts" className="text-accent underline">Register accounts on the Bank accounts &amp; cards tab</Link> — this field is confirmed automatically from what you register (last four digits only).
+                            </p>
+                          ) : null}
                           {f?.updatedAt ? (
                             <p className="text-[11px] text-faint">
                               updated {fmtDateTime(f.updatedAt)} by {f.updatedBy ?? "—"}
@@ -133,6 +157,69 @@ export default async function CompanyPage({ searchParams }: { searchParams: Sear
                 </table>
               </TableWrap>
             )}
+          </Card>
+        </div>
+      ) : null}
+
+      {tab === "accounts" ? (
+        <div className="space-y-4">
+          <Card padded={false}>
+            <CardHeader title={`Registered bank accounts (${rt.dataset.bankAccounts.length}) and cards (${rt.dataset.cards.length})`} className="px-4 pt-3" subtitle="Last four digits only. Each maps to one GL account so balances stay separable. No live connection exists." />
+            <TableWrap className="border-0">
+              <table className="tbl">
+                <thead>
+                  <tr>
+                    <th>Kind</th>
+                    <th>Name</th>
+                    <th>Institution / issuer</th>
+                    <th>Type</th>
+                    <th>Last 4</th>
+                    <th>GL account</th>
+                    <th>Source</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {registeredAccounts === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="py-6 text-center text-muted">
+                        No bank accounts or cards registered yet — add them below. Transactions can only be entered against a registered account.
+                      </td>
+                    </tr>
+                  ) : null}
+                  {rt.dataset.bankAccounts.map((b) => (
+                    <tr key={b.id}>
+                      <td>
+                        <StatusPill status="BANK" label="Bank" />
+                      </td>
+                      <td className="font-medium">{b.name}</td>
+                      <td className="text-muted">{b.institution}</td>
+                      <td>{titleCase(b.accountType)}</td>
+                      <td className="mono">····{b.last4}</td>
+                      <td className="mono">{glName(b.glAccountId)}</td>
+                      <td>{b.isSynthetic ? <Badge tone="warn">synthetic</Badge> : <Badge tone="ok">entered</Badge>}</td>
+                    </tr>
+                  ))}
+                  {rt.dataset.cards.map((c) => (
+                    <tr key={c.id}>
+                      <td>
+                        <StatusPill status="CARD" label="Card" />
+                      </td>
+                      <td className="font-medium">{c.name}</td>
+                      <td className="text-muted">{c.issuer}</td>
+                      <td>Credit card</td>
+                      <td className="mono">····{c.last4}</td>
+                      <td className="mono">{glName(c.glAccountId)}</td>
+                      <td>{c.isSynthetic ? <Badge tone="warn">synthetic</Badge> : <Badge tone="ok">entered</Badge>}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </TableWrap>
+          </Card>
+          <Card>
+            <CardHeader title="Add a bank account or card" subtitle={`Confirms ${BANK_ACCOUNTS_BIBLE_KEY} / ${CARDS_BIBLE_KEY} in the finance bible and writes an audit event.`} />
+            {!canEnter ? <AccessDenied permission="EDIT_CONFIG" role={actor.role} /> : null}
+            <BankAccountsForm bankGl={bankGl} cardGl={cardGl} canEnter={canEnter} />
           </Card>
         </div>
       ) : null}
@@ -268,9 +355,15 @@ export default async function CompanyPage({ searchParams }: { searchParams: Sear
 
       {tab === "synthetic" ? (
         <div className="space-y-4">
-          <Notice tone="warn" title="Synthetic lab profile">
-            These fields describe <strong>{rt.dataset.profile.displayName}</strong>, the synthetic training company. They are labelled synthetic and are kept separate from the real finance bible above.
-          </Notice>
+          {isSynthetic ? (
+            <Notice tone="warn" title="Synthetic lab profile">
+              These fields describe <strong>{rt.dataset.profile.displayName}</strong>, the synthetic training company. They are labelled synthetic and are kept separate from the real finance bible above.
+            </Notice>
+          ) : (
+            <Notice tone="info" title="Company profile">
+              The profile below is the real company as currently known. Fields marked UNCONFIRMED have no value — answer them on the setup checklist; nothing is assumed. The chart of accounts is a PROPOSED template until the CPA confirms it.
+            </Notice>
+          )}
           <Card>
             <KeyValue
               items={[
@@ -287,7 +380,7 @@ export default async function CompanyPage({ searchParams }: { searchParams: Sear
             />
           </Card>
           <Card padded={false}>
-            <CardHeader title={`Synthetic config fields (${synthetic.length})`} className="px-4 pt-3" />
+            <CardHeader title={isSynthetic ? `Synthetic config fields (${synthetic.length})` : `Synthetic config fields (${synthetic.length}) — none expected in the company workspace`} className="px-4 pt-3" />
             <TableWrap className="border-0">
               <table className="tbl">
                 <thead>

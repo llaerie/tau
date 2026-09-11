@@ -17,6 +17,8 @@ export class MemoryStore implements DataStore {
   constructor(dataset: CompanyDataset, private readonly snapshotPath?: string) {
     this.dataset = dataset;
     for (const e of dataset.auditEvents) this.auditIds.add(e.id);
+    // A store bound to a path that has no file yet persists on its first flush.
+    this.dirty = !!snapshotPath && !existsSync(snapshotPath);
   }
 
   static fromSnapshot(path: string): MemoryStore | null {

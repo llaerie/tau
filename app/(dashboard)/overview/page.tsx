@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { pageCtx } from "@/lib/ui/page";
-import { cashPosition, thirteenWeek, monthlyPnl, revenueMtd, arReport, nextPayroll, localAttentionQueue, localFinancialHealth, latestEvalSummaryFromDisk, evalSummaryOf, type AttentionItem, type HealthScorecard } from "@/lib/ui/data";
+import { cashPosition, cashLabel, hasBookData, CASH_UNKNOWN_LABEL, thirteenWeek, monthlyPnl, revenueMtd, arReport, nextPayroll, localAttentionQueue, localFinancialHealth, latestEvalSummaryFromDisk, evalSummaryOf, type AttentionItem, type HealthScorecard } from "@/lib/ui/data";
 import { callOptional, loadEvalHarness, loadMonitors, loadWorkflows } from "@/lib/ui/optional";
 import { fmtDate, fmtMoney, fmtMonth, fmtPercent, toNum } from "@/lib/ui/format";
 import { PageHeader, Grid, Card, CardHeader, Stat, RiskChip, StatusPill, Sparkline, Bars, Money, EmptyState, ModuleNotice, Notice, TableWrap } from "@/components/ui";
@@ -30,16 +30,18 @@ export default async function OverviewPage() {
   const lowestRow = tw.rows[tw.lowestCashWeek - 1] ?? tw.rows.find((r) => r.weekIndex === tw.lowestCashWeek);
   const ni = pnl.map((p) => toNum(p.netIncome));
   const redCount = attention.filter((a) => a.severity === "RED").length;
+  const books = hasBookData(rt.dataset);
+  const noAccounts = cash.accounts.length === 0;
 
   return (
     <>
       <PageHeader eyebrow={`As of ${fmtDate(asOf)}`} title="Overview" description={`${rt.dataset.profile.displayName} — cash, obligations, plan vs actual and the CFO's readiness at a glance.`} />
 
       <Grid cols={4}>
-        <Stat label="Cash today" value={fmtMoney(cash.totalCash)} sub={`${cash.accounts.filter((a) => a.kind === "BANK").length} bank accounts · cards owe ${fmtMoney(cash.cardBalances)}`} href="/cash" size="lg" />
-        <Stat label="13-week lowest cash" value={fmtMoney(tw.lowestCash)} sub={lowestRow ? `Week ${tw.lowestCashWeek} starting ${fmtDate(lowestRow.weekStart)}${tw.minimumCash === null ? " · reserve policy not set" : tw.weeksBelowMinimum ? ` · ${tw.weeksBelowMinimum} wk below minimum` : ""}` : undefined} tone={toNum(tw.lowestCash) < 0 ? "bad" : tw.weeksBelowMinimum ? "warn" : "neutral"} href="/cash" size="lg" />
-        <Stat label={`Revenue MTD · ${fmtMonth(rev.month)}`} value={fmtMoney(rev.actual)} sub={rev.budget === null ? "No budget line for this month" : `Budget ${fmtMoney(rev.budget)} · variance ${fmtMoney(rev.variance)}`} tone={rev.variance === null ? "neutral" : toNum(rev.variance) < 0 ? "warn" : "ok"} href="/budget" size="lg" />
-        <Stat label="AR overdue" value={fmtMoney(ar.overdueTotal)} sub={`${ar.overdue.length} invoices · open AR ${fmtMoney(ar.total)}`} tone={toNum(ar.overdueTotal) > 0 ? "warn" : "ok"} href="/ar" size="lg" />
+        <Stat label="Cash today" value={cashLabel(cash, cash.totalCash, fmtMoney)} sub={cash.known ? `${cash.accounts.filter((a) => a.kind === "BANK").length} bank accounts · cards owe ${fmtMoney(cash.cardBalances)}` : noAccounts ? "No bank accounts or cards registered — add them on Company setup" : "No posted entries — enter or import bank/card activity"} href={cash.known ? "/cash" : noAccounts ? "/company?tab=accounts" : "/transactions"} size="lg" tone={cash.known ? "neutral" : "warn"} />
+        <Stat label="13-week lowest cash" value={cash.known ? fmtMoney(tw.lowestCash) : CASH_UNKNOWN_LABEL} sub={!cash.known ? "Opening cash unknown — no forecast" : lowestRow ? `Week ${tw.lowestCashWeek} starting ${fmtDate(lowestRow.weekStart)}${tw.minimumCash === null ? " · reserve policy not set" : tw.weeksBelowMinimum ? ` · ${tw.weeksBelowMinimum} wk below minimum` : ""}` : undefined} tone={!cash.known ? "warn" : toNum(tw.lowestCash) < 0 ? "bad" : tw.weeksBelowMinimum ? "warn" : "neutral"} href="/cash" size="lg" />
+        <Stat label={`Revenue MTD · ${fmtMonth(rev.month)}`} value={books ? fmtMoney(rev.actual) : "—"} sub={!books ? "No posted entries yet" : rev.budget === null ? "No budget line for this month" : `Budget ${fmtMoney(rev.budget)} · variance ${fmtMoney(rev.variance)}`} tone={!books || rev.variance === null ? "neutral" : toNum(rev.variance) < 0 ? "warn" : "ok"} href="/budget" size="lg" />
+        <Stat label="AR overdue" value={rt.dataset.invoices.length ? fmtMoney(ar.overdueTotal) : "—"} sub={rt.dataset.invoices.length ? `${ar.overdue.length} invoices · open AR ${fmtMoney(ar.total)}` : "No invoices recorded yet"} tone={toNum(ar.overdueTotal) > 0 ? "warn" : rt.dataset.invoices.length ? "ok" : "neutral"} href="/ar" size="lg" />
       </Grid>
 
       <Grid cols={4} className="mt-3">
@@ -52,6 +54,12 @@ export default async function OverviewPage() {
       <div className="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <CardHeader title="Net income — trailing 12 months" subtitle="From posted journal entries; current month is month-to-date." actions={<Link href="/reports" className="text-[12px] text-accent">Reports →</Link>} />
+          {!books ? (
+            <EmptyState title="No posted entries yet — nothing to chart">
+              Revenue, expenses and net income appear here once transactions are entered or imported and posted. Nothing is estimated.
+            </EmptyState>
+          ) : null}
+          <div className={books ? "" : "hidden"}>
           <Sparkline values={ni} labels={pnl.map((p) => fmtMonth(p.month))} height={72} width={640} />
           <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
             <div>
@@ -89,6 +97,7 @@ export default async function OverviewPage() {
               </TableWrap>
             </div>
           </div>
+          </div>
         </Card>
 
         <Card>
@@ -115,8 +124,13 @@ export default async function OverviewPage() {
 
       <div className="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card>
-          <CardHeader title="Cash by account" subtitle={`Ledger balances as of ${fmtDate(asOf)}`} />
-          <TableWrap>
+          <CardHeader title="Cash by account" subtitle={cash.known ? `Ledger balances as of ${fmtDate(asOf)}` : `${CASH_UNKNOWN_LABEL} — no posted entries as of ${fmtDate(asOf)}`} />
+          {noAccounts ? (
+            <EmptyState title="No bank accounts or cards registered">
+              <Link href="/company?tab=accounts" className="text-accent underline">Register them on Company setup</Link> (last four digits only), then enter or import transactions.
+            </EmptyState>
+          ) : null}
+          <TableWrap className={noAccounts ? "hidden" : ""}>
             <table className="tbl">
               <thead>
                 <tr>
@@ -136,16 +150,12 @@ export default async function OverviewPage() {
                     <td>
                       <StatusPill status={a.kind} label={a.kind === "BANK" ? "Bank" : "Card"} />
                     </td>
-                    <td className="r">
-                      <Money value={a.balance} currency={a.currency} colorize={a.kind === "BANK"} />
-                    </td>
+                    <td className="r">{cash.known ? <Money value={a.balance} currency={a.currency} colorize={a.kind === "BANK"} /> : <span className="text-warn">UNKNOWN</span>}</td>
                   </tr>
                 ))}
                 <tr className="total">
                   <td colSpan={3}>Total cash (bank)</td>
-                  <td className="r">
-                    <Money value={cash.totalCash} />
-                  </td>
+                  <td className="r">{cash.known ? <Money value={cash.totalCash} /> : <span className="text-warn">{CASH_UNKNOWN_LABEL}</span>}</td>
                 </tr>
               </tbody>
             </table>

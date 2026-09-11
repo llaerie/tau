@@ -10,6 +10,7 @@ export { getPrismaClient, disconnectPrisma } from "./prisma-client";
 
 /** Default on-disk snapshot for the in-memory lab store (gitignored). */
 export const LAB_SNAPSHOT_PATH = resolve(process.cwd(), ".tau", "lab-snapshot.json");
+export { COMPANY_SNAPSHOT_PATH, buildCompanyWorkspace, currentWorkspace, hasBookData, isCompanyWorkspace, type Workspace } from "./workspace";
 
 export interface CreateStoreOptions {
   /** Overrides TAU_STORE. */

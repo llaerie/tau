@@ -1,16 +1,13 @@
 import type { ConfigField } from "@/lib/core/types";
+import type { LabRuntime } from "@/lib/db/runtime";
+import type { Actor, FieldStatus } from "@/lib/core/types";
+import { applyConfigAnswer, getField, mergeBibleFields, sectionOf } from "@/lib/knowledge/finance-bible";
 
 /** Merged view: real bible fields overlaid with persisted answers from dataset.configFields (same key). */
 export function mergedConfigFields(bible: ConfigField[], persisted: ConfigField[]): ConfigField[] {
-  const byKey = new Map<string, ConfigField>();
-  for (const f of bible) if (f.status !== "SUPERSEDED") byKey.set(f.key, f);
-  for (const f of persisted) if (f.status !== "SUPERSEDED" && !f.synthetic) byKey.set(f.key, f);
-  return Array.from(byKey.values());
+  return mergeBibleFields(bible, persisted);
 }
 
-import type { LabRuntime } from "@/lib/db/runtime";
-import type { Actor, FieldStatus } from "@/lib/core/types";
-import { applyConfigAnswer, getField, sectionOf } from "@/lib/knowledge/finance-bible";
 import { thresholdsFromConfig } from "@/lib/risk/materiality";
 import { TauError } from "@/lib/core/errors";
 

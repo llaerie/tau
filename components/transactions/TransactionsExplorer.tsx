@@ -194,7 +194,7 @@ export function TransactionsExplorer({ rows, accounts, sources, initialTab, canP
             {filtered.length === 0 ? (
               <tr>
                 <td colSpan={7} className="py-8 text-center text-muted">
-                  No transactions match these filters.
+                  {rows.length === 0 ? "No transactions imported yet — import or enter data to begin." : "No transactions match these filters."}
                 </td>
               </tr>
             ) : null}

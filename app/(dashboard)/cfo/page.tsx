@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { pageCtx } from "@/lib/ui/page";
-import { cashPosition, thirteenWeek, arReport, nextPayroll, localAttentionQueue, localFinancialHealth, type AttentionItem, type HealthScorecard } from "@/lib/ui/data";
+import { cashPosition, cashLabel, thirteenWeek, arReport, nextPayroll, localAttentionQueue, localFinancialHealth, CASH_UNKNOWN_LABEL, type AttentionItem, type HealthScorecard } from "@/lib/ui/data";
 import { callOptional, loadMonitors, loadWorkflows } from "@/lib/ui/optional";
 import { normalizeAttention, normalizeBrief, normalizeHealth } from "@/lib/ui/normalize";
 import { fmtDate, fmtDateTime, fmtMoney, titleCase } from "@/lib/ui/format";
@@ -90,14 +90,23 @@ export default async function CfoPage() {
             ) : (
               <>
                 <p className="text-[15px] leading-relaxed">
-                  Cash is <strong className="num">{fmtMoney(cash.totalCash)}</strong> across {cash.accounts.filter((a) => a.kind === "BANK").length} bank accounts. The 13-week low point is <strong className="num">{fmtMoney(tw.lowestCash)}</strong> in week {tw.lowestCashWeek}
-                  {tw.minimumCash === null ? " (no reserve policy set to compare against)" : tw.weeksBelowMinimum ? ` — ${tw.weeksBelowMinimum} week(s) fall below the reserve policy` : " — above the reserve policy all 13 weeks"}. Overdue receivables total <strong className="num">{fmtMoney(ar.overdueTotal)}</strong> across {ar.overdue.length} invoices.
+                  {cash.known ? (
+                    <>
+                      Cash is <strong className="num">{fmtMoney(cash.totalCash)}</strong> across {cash.accounts.filter((a) => a.kind === "BANK").length} bank accounts. The 13-week low point is <strong className="num">{fmtMoney(tw.lowestCash)}</strong> in week {tw.lowestCashWeek}
+                      {tw.minimumCash === null ? " (no reserve policy set to compare against)" : tw.weeksBelowMinimum ? ` — ${tw.weeksBelowMinimum} week(s) fall below the reserve policy` : " — above the reserve policy all 13 weeks"}.
+                    </>
+                  ) : (
+                    <>
+                      Cash is <strong>{CASH_UNKNOWN_LABEL}</strong>: the ledger has no posted entries, so no cash balance or 13-week forecast can be stated.
+                    </>
+                  )}{" "}
+                  Overdue receivables total <strong className="num">{fmtMoney(ar.overdueTotal)}</strong> across {ar.overdue.length} invoices.
                   {pay.date ? ` Next payroll is expected ${fmtDate(pay.date)} at roughly ${fmtMoney(pay.expectedEmployerCost)} employer cost.` : " Payroll cadence could not be determined."} {pending.length} decision{pending.length === 1 ? "" : "s"} await approval.
                 </p>
                 <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
                   {[
-                    ["Cash", fmtMoney(cash.totalCash)],
-                    ["13-wk low", fmtMoney(tw.lowestCash)],
+                    ["Cash", cashLabel(cash, cash.totalCash, fmtMoney)],
+                    ["13-wk low", cashLabel(cash, tw.lowestCash, fmtMoney)],
                     ["AR overdue", fmtMoney(ar.overdueTotal)],
                     ["Open approvals", String(pending.length)],
                   ].map(([l, v]) => (

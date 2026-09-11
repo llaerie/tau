@@ -10,6 +10,7 @@ import { D, add, money } from "@/lib/core/money";
 import { makeCalc } from "@/lib/finance/calc-result";
 import { buildThirteenWeekForecast, flowsFromDataset, type DerivedFlows, type ThirteenWeekForecast } from "@/lib/forecasting/thirteen-week";
 import { POLICY_KEYS, policyParameter } from "@/lib/knowledge/policies";
+import { hasBookData } from "@/lib/db/workspace";
 import { buildTaxCalendar } from "@/lib/tax/calendar";
 import type { TaxRuleStore } from "@/lib/tax/rule-store";
 import { SEVERITY_RANK, type AttentionItem, type AttentionSeverity, type MonitorContext } from "./types";
@@ -87,15 +88,32 @@ export interface CashAccountBalance {
 export interface CashPosition {
   asOf: ISODate;
   accounts: CashAccountBalance[];
+  /** Sum of cash GL balances. Meaningful only when `known`; otherwise a structural 0.0000 placeholder. */
   total: DecimalString;
-  calc: CalcResult<{ accounts: CashAccountBalance[]; total: DecimalString }>;
+  /** false when the ledger has no posted activity: cash is UNKNOWN (no bank data), never 0.00. */
+  known: boolean;
+  calc: CalcResult<{ accounts: CashAccountBalance[]; total: DecimalString | null; known: boolean }>;
 }
 
-/** Cash per bank account from the ledger (GL balances of each account's cash GL). */
+export const CASH_UNKNOWN_ASSUMPTION_KEY = "cash_unknown_no_book_data";
+
+/**
+ * Cash per bank account from the ledger (GL balances of each account's cash GL). With no posted
+ * activity the position is UNKNOWN: `known` is false, the calc value is null and an UNCONFIRMED
+ * assumption records why. Callers must never present `total` as a balance when `known` is false.
+ */
 export function cashPosition(dataset: CompanyDataset, ledger: LedgerEngine, asOf: ISODate): CashPosition {
-  const accounts: CashAccountBalance[] = dataset.bankAccounts.map((b: BankAccount) => ({ bankAccountId: b.id, name: b.name, glAccountId: b.glAccountId, balance: ledger.accountBalance(b.glAccountId, asOf) }));
+  const known = hasBookData(dataset);
+  // One row per GL account: registered accounts that share a GL are reported once, never double-counted.
+  const accounts: CashAccountBalance[] = [];
+  const mapped = new Set<ID>();
+  for (const b of dataset.bankAccounts as BankAccount[]) {
+    if (mapped.has(b.glAccountId)) continue;
+    mapped.add(b.glAccountId);
+    const sharing = dataset.bankAccounts.filter((x) => x.glAccountId === b.glAccountId);
+    accounts.push({ bankAccountId: b.id, name: sharing.length > 1 ? `${b.name} (+${sharing.length - 1} sharing this GL account)` : b.name, glAccountId: b.glAccountId, balance: ledger.accountBalance(b.glAccountId, asOf) });
+  }
   // Cash GL accounts not mapped to a bank account still count as cash.
-  const mapped = new Set(accounts.map((a) => a.glAccountId));
   for (const a of dataset.accounts) {
     if (a.subtype === "CASH" && a.isActive && !mapped.has(a.id)) {
       const bal = ledger.accountBalance(a.id, asOf);
@@ -105,14 +123,16 @@ export function cashPosition(dataset: CompanyDataset, ledger: LedgerEngine, asOf
   const total = accounts.reduce((acc, a) => add(acc, a.balance), money(0));
   const calc = makeCalc({
     name: "cash_position",
-    value: { accounts, total },
+    value: { accounts, total: known ? total : null, known },
     unit: "USD",
-    formula: "cash_total = sum(GL balance of every cash account as of date)",
-    inputs: { asOf, balances: accounts.map((a) => ({ glAccountId: a.glAccountId, balance: a.balance })) },
+    formula: "cash_total = sum(GL balance of every cash account as of date); UNKNOWN (null) when no entry has been posted",
+    inputs: { asOf, known, balances: accounts.map((a) => ({ glAccountId: a.glAccountId, balance: a.balance })) },
     sourceIds: accounts.map((a) => a.glAccountId),
     asOfDate: asOf,
+    notes: known ? undefined : ["INSUFFICIENT_INFORMATION: no posted ledger activity — no bank data has been entered or imported, so cash is unknown (not zero)."],
+    assumptions: known ? undefined : [{ key: CASH_UNKNOWN_ASSUMPTION_KEY, description: "Cash position is UNKNOWN — no bank data. 0.0000 appears only as a structural placeholder in downstream forecasts.", value: null, status: "UNCONFIRMED" }],
   });
-  return { asOf, accounts, total, calc };
+  return { asOf, accounts, total, known, calc };
 }
 
 // ---------------------------------------------------------------------------
@@ -128,6 +148,7 @@ export interface ThirteenWeekBundle {
 export function thirteenWeekFor(dataset: CompanyDataset, ledger: LedgerEngine, thresholds: MaterialityThresholds, asOf: ISODate): ThirteenWeekBundle {
   const cash = cashPosition(dataset, ledger, asOf);
   const flows = flowsFromDataset(dataset, asOf);
+  if (!cash.known) flows.assumptions.unshift(openingCashUnknownAssumption());
   const forecast = buildThirteenWeekForecast({
     asOfDate: asOf,
     openingCash: cash.total,
@@ -138,6 +159,13 @@ export function thirteenWeekFor(dataset: CompanyDataset, ledger: LedgerEngine, t
     sourceIds: [cash.calc.id],
   });
   return { forecast, flows, cash };
+}
+
+export const OPENING_CASH_UNKNOWN_KEY = "opening_cash_unknown";
+
+/** Assumption attached to any forecast built on an unknown opening balance. */
+export function openingCashUnknownAssumption() {
+  return { key: OPENING_CASH_UNKNOWN_KEY, description: "Opening cash is UNKNOWN — no posted bank/ledger activity. The forecast's 0.0000 opening is a structural placeholder, not a balance; closing figures are not cash projections until bank data exists.", value: null, status: "UNCONFIRMED" as const };
 }
 
 // ---------------------------------------------------------------------------

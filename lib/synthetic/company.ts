@@ -5,7 +5,8 @@
 import { buildChartOfAccounts } from "@/lib/accounting/chart-of-accounts";
 import { addMonths } from "@/lib/core/dates";
 import { money } from "@/lib/core/money";
-import type { CompanyProfile, ConfigField, Customer, ISODate, Role, Vendor, Worker } from "@/lib/core/types";
+import type { CompanyProfile, ConfigField, Customer, ISODate, Vendor, Worker } from "@/lib/core/types";
+import { internationalReviewFields } from "@/lib/knowledge/international-review";
 import { acct, sid, ts, type GenContext } from "./context";
 
 export const SYNTHETIC_COMPANY_ID = "co_northlight_synthetic";
@@ -93,34 +94,8 @@ function buildVendors(start: ISODate): Record<string, Vendor> {
   return out;
 }
 
-const CN_REVIEW_FIELDS: { key: string; label: string }[] = [
-  { key: "employment_status", label: "Employment vs. contractor status" },
-  { key: "employing_entity", label: "Employing / contracting entity" },
-  { key: "work_location", label: "Work location" },
-  { key: "citizenship_residency", label: "Citizenship and tax residency" },
-  { key: "payment_method", label: "Payment method" },
-  { key: "contract", label: "Written contract on file" },
-  { key: "local_payroll_arrangement", label: "Local payroll / employer-of-record arrangement" },
-  { key: "benefits", label: "Benefits and social insurance obligations" },
-  { key: "withholding_responsibilities", label: "Withholding responsibilities (US and local)" },
-  { key: "currency", label: "Contract and payment currency" },
-  { key: "tax_documentation", label: "Tax documentation (W-8BEN / local forms)" },
-  { key: "permanent_establishment_concern", label: "Permanent-establishment concern" },
-  { key: "labor_law_review_status", label: "Local labor-law review status" },
-];
-
 function cnReviewFields(workerKey: string): ConfigField[] {
-  const reviewer: Role = "ATTORNEY";
-  return CN_REVIEW_FIELDS.map((f) => ({
-    key: `worker.${workerKey}.${f.key}`,
-    section: "international_worker",
-    label: f.label,
-    value: null,
-    status: "PROFESSIONAL_REVIEW_REQUIRED",
-    requiredConfirmer: reviewer,
-    note: "Unknown. Cross-border worker facts must be confirmed by counsel before any classification or filing.",
-    synthetic: true,
-  }));
+  return internationalReviewFields(workerKey, { synthetic: true, reviewer: "ATTORNEY" });
 }
 
 function buildWorkers(start: ISODate): Refs["workers"] {

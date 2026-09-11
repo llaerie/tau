@@ -5,6 +5,7 @@
  */
 import type { AttentionItem, HealthScorecard, HealthMetric } from "./data";
 import { fmtMoney } from "./format";
+import { CASH_UNKNOWN_LABEL } from "@/lib/db/workspace";
 
 type Rec = Record<string, unknown>;
 const isRec = (v: unknown): v is Rec => !!v && typeof v === "object" && !Array.isArray(v);
@@ -66,6 +67,7 @@ const HEALTH_LABELS: Record<string, string> = {
 
 function healthDisplay(key: string, m: Rec): string {
   const v = m.value;
+  if (key === "cash" && (m.known === false || v === null)) return CASH_UNKNOWN_LABEL;
   if (key === "cash" || key === "arOverdue" || key === "budgetVariance") return typeof v === "string" ? fmtMoney(v) : v === null ? "unknown" : s(v, "—");
   if (key === "runwayMonths") return typeof v === "number" ? `${v.toFixed(1)} months` : typeof m.burnRate === "string" && m.burnRate.startsWith("-") ? "Cash-flow positive" : "unknown";
   if (key === "integrityPassed") return v === true ? "All checks pass" : `${Array.isArray(m.failingChecks) ? m.failingChecks.length : "?"} failing`;
@@ -101,13 +103,14 @@ export interface BriefView {
 
 export function normalizeBrief(raw: unknown, markdown: string | null): BriefView {
   const r = isRec(raw) ? raw : {};
-  const money = (v: unknown) => (typeof v === "string" && /^-?\d/.test(v) ? fmtMoney(v) : s(v, "—"));
+  const money = (v: unknown) => (v === null ? CASH_UNKNOWN_LABEL : typeof v === "string" && /^-?\d/.test(v) ? fmtMoney(v) : s(v, "—"));
   const keyNumbers: BriefView["keyNumbers"] = [];
   // lib/workflows WeeklyBrief shape
-  if (isRec(r.cashToday)) keyNumbers.push({ label: "Cash today", value: money((r.cashToday as Rec).total) });
+  const cashKnown = !isRec(r.cashToday) || (r.cashToday as Rec).known !== false;
+  if (isRec(r.cashToday)) keyNumbers.push({ label: "Cash today", value: cashKnown ? money((r.cashToday as Rec).total) : CASH_UNKNOWN_LABEL, note: cashKnown ? undefined : "no posted entries" });
   if (isRec(r.thirteenWeekLowestCash)) {
     const t = r.thirteenWeekLowestCash as Rec;
-    keyNumbers.push({ label: "13-week lowest cash", value: money(t.amount), note: t.weekStart ? `week ${s(t.weekIndex)} · ${s(t.weekStart)}` : undefined });
+    keyNumbers.push({ label: "13-week lowest cash", value: cashKnown ? money(t.amount) : CASH_UNKNOWN_LABEL, note: cashKnown && t.weekStart ? `week ${s(t.weekIndex)} · ${s(t.weekStart)}` : cashKnown ? undefined : "opening cash unknown" });
   }
   if (isRec(r.revenueReceived)) keyNumbers.push({ label: "Revenue MTD", value: money((r.revenueReceived as Rec).monthToDate), note: `7-day ${money((r.revenueReceived as Rec).trailing7Days)}` });
   if (isRec(r.revenueExpected)) keyNumbers.push({ label: "AR overdue", value: money((r.revenueExpected as Rec).overdueTotal), note: `next 30d ${money((r.revenueExpected as Rec).next30Days)}` });

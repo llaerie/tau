@@ -162,14 +162,14 @@ export default async function ApPage({ searchParams }: { searchParams: SearchPar
 
       {tab === "schedule" ? (
         <div className="space-y-3">
-          <Notice>Recommendation only. Bills are grouped by the week they fall due (overdue bills go into the current week) with running cash after each week, starting from today&apos;s bank cash of {fmtMoney(cash.totalCash)}. Receipts are not netted here — see the 13-week forecast for the full picture.</Notice>
+          <Notice>Recommendation only. Bills are grouped by the week they fall due (overdue bills go into the current week) with running cash after each week, starting from today&apos;s bank cash of {cash.known ? fmtMoney(cash.totalCash) : "UNKNOWN (no posted entries — running cash cannot be computed)"}. Receipts are not netted here — see the 13-week forecast for the full picture.</Notice>
           {schedule.length === 0 ? <EmptyState title="Nothing to schedule" /> : null}
           {schedule.map((w) => {
             running = sub(running, w.total);
             const after = running;
             return (
               <Card key={w.weekStart} padded={false}>
-                <CardHeader title={`Week of ${fmtDate(w.weekStart)}`} className="px-4 pt-3" subtitle={`${w.bills.length} bills · ${fmtMoney(w.total)} · cash after ${fmtMoney(after)}`} actions={toNum(after) < 0 ? <Badge tone="bad">cash shortfall</Badge> : rt.thresholds.minimumCashReserve && toNum(after) < toNum(rt.thresholds.minimumCashReserve) ? <Badge tone="warn">below reserve</Badge> : <Badge tone="ok">fundable</Badge>} />
+                <CardHeader title={`Week of ${fmtDate(w.weekStart)}`} className="px-4 pt-3" subtitle={`${w.bills.length} bills · ${fmtMoney(w.total)} · cash after ${cash.known ? fmtMoney(after) : "UNKNOWN"}`} actions={!cash.known ? <Badge tone="warn">cash unknown</Badge> : toNum(after) < 0 ? <Badge tone="bad">cash shortfall</Badge> : rt.thresholds.minimumCashReserve && toNum(after) < toNum(rt.thresholds.minimumCashReserve) ? <Badge tone="warn">below reserve</Badge> : <Badge tone="ok">fundable</Badge>} />
                 <TableWrap className="border-0">
                   <table className="tbl">
                     <thead>

@@ -4,7 +4,8 @@
  * not built yet (the agent answers with an OUT_OF_SCOPE escalation instead of crashing).
  */
 import type { ToolContext } from "@/lib/core/contracts";
-import { buildFinanceBible } from "@/lib/knowledge/finance-bible";
+import { buildFinanceBible, mergeBibleFields } from "@/lib/knowledge/finance-bible";
+import { hasBookData } from "@/lib/db/workspace";
 import { GuidanceStore } from "@/lib/knowledge/guidance";
 import { CpaReviewQueue } from "@/lib/tax/cpa-queue";
 import { TaxRuleStore } from "@/lib/tax/rule-store";
@@ -55,9 +56,11 @@ export function runtimeFromContext(ctx: ToolContext): Record<string, unknown> {
     taxRules: taxRuleStoreFor(ctx.dataset),
     cpaQueue: cpaQueueFor(ctx.dataset),
     guidance: new GuidanceStore(ctx.dataset.professionalGuidance),
-    bible: buildFinanceBible(),
+    bible: mergeBibleFields(buildFinanceBible(), ctx.dataset.configFields),
     policies: ctx.dataset.policies,
     asOfDate: ctx.asOfDate,
+    workspace: ctx.dataset.profile.isSynthetic ? "lab" : "company",
+    hasBookData: hasBookData(ctx.dataset),
     simulationOnly: true,
     async reindex() {},
     async flush() {

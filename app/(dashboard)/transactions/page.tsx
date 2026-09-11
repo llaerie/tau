@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { pageCtx, type SearchParams, sp } from "@/lib/ui/page";
 import { PageHeader, Grid, Stat } from "@/components/ui";
 import { TransactionsExplorer, type TxRow, type AccountOption } from "@/components/transactions/TransactionsExplorer";
+import { AddTransactionForm, type TxSourceOption } from "@/components/transactions/AddTransactionForm";
+import { canEnterManually } from "@/lib/ui/manual-entry";
 import { fmtMoney } from "@/lib/ui/format";
 import { can } from "@/lib/security/rbac";
 import { add, abs } from "@/lib/core/money";
@@ -47,6 +49,7 @@ export default async function TransactionsPage({ searchParams }: { searchParams:
     });
   const accounts: AccountOption[] = ds.accounts.filter((a) => a.isActive).map((a) => ({ id: a.id, code: a.code, name: a.name, type: a.type }));
   const sources = [...ds.bankAccounts.map((b) => ({ id: b.id, name: `${b.name} ····${b.last4}` })), ...ds.cards.map((c) => ({ id: c.id, name: `${c.name} ····${c.last4}` }))];
+  const txSources: TxSourceOption[] = [...ds.bankAccounts.map<TxSourceOption>((b) => ({ id: b.id, name: `${b.name} ····${b.last4}`, kind: "BANK" })), ...ds.cards.map<TxSourceOption>((c) => ({ id: c.id, name: `${c.name} ····${c.last4}`, kind: "CARD" }))];
   const uncategorized = rows.filter((r) => r.categoryStatus === "UNCATEGORIZED");
   const suggested = rows.filter((r) => r.categoryStatus === "SUGGESTED");
   const missingReceipt = rows.filter((r) => r.flags.includes("MISSING_RECEIPT"));
@@ -60,8 +63,9 @@ export default async function TransactionsPage({ searchParams }: { searchParams:
         <Stat label="Transactions" value={rows.length} sub={`${ds.bankAccounts.length} bank · ${ds.cards.length} card sources`} />
         <Stat label="Uncategorized" value={uncategorized.length} sub={`${suggested.length} suggestions awaiting approval`} tone={uncategorized.length ? "warn" : "ok"} />
         <Stat label="Missing receipts" value={missingReceipt.length} sub="Flagged MISSING_RECEIPT" tone={missingReceipt.length ? "warn" : "ok"} />
-        <Stat label="Personal / duplicate flags" value={fmtMoney(flaggedAmount)} sub="Absolute amount of flagged items" tone={flaggedAmount !== "0.0000" ? "bad" : "ok"} />
+        <Stat label="Personal / duplicate flags" value={rows.length ? fmtMoney(flaggedAmount) : "—"} sub={rows.length ? "Absolute amount of flagged items" : "No transactions yet"} tone={flaggedAmount !== "0.0000" ? "bad" : "ok"} />
       </Grid>
+      <AddTransactionForm sources={txSources} canEnter={canEnterManually(actor)} defaultDate={rt.asOfDate} />
       <TransactionsExplorer rows={rows} accounts={accounts} sources={sources} initialTab={tab} canPropose={can(actor.role, "PROPOSE_ACTIONS")} />
     </>
   );

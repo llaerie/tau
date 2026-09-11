@@ -2,13 +2,15 @@
  * CFO orchestrator tools: financial health summary, concept explanations, finance-setup status,
  * and the weekly brief / attention queue (delegated to lib/workflows and lib/monitors, lazily).
  */
-import type { DecimalString } from "@/lib/core/types";
+import type { CalcResult, DecimalString } from "@/lib/core/types";
 import { D } from "@/lib/core/money";
 import { arAging } from "@/lib/finance/aging";
 import { makeCalc } from "@/lib/finance/calc-result";
 import { burnRate, cashRunway } from "@/lib/finance/cash";
 import { EDUCATION_SNIPPETS, educationFor, type EducationConceptKey } from "@/lib/knowledge/education";
-import { blockedCapabilities, buildFinanceBible, unknownsRegistry } from "@/lib/knowledge/finance-bible";
+import { blockedCapabilities, buildFinanceBible, mergeBibleFields, unknownsRegistry } from "@/lib/knowledge/finance-bible";
+import { CASH_UNKNOWN_LABEL, hasBookData } from "@/lib/db/workspace";
+import { insufficient as insufficientCalc } from "@/lib/finance/calc-result";
 import { TASKS } from "../task-catalog";
 import { defineTool } from "../types";
 import { esc, figure, insufficient, moneyFigure, ok, textFigure } from "./common";
@@ -23,13 +25,17 @@ export const healthSummaryTool = defineTool({
   inputSchema: TASKS["cfo.health"].params,
   async execute(input, ctx) {
     const asOf = input.asOf ?? ctx.asOfDate;
+    const books = hasBookData(ctx.dataset);
     const cash = ledgerCash(ctx, asOf);
-    const cashCalc = makeCalc<DecimalString>({ name: "cash_position", value: cash.total, unit: "USD", formula: "sum(cash account balances)", inputs: { asOf }, asOfDate: asOf, sourceIds: cash.byAccount.map((b) => b.accountId) });
-    const burn = burnRate({ monthlyCashBalances: monthlyCashBalances(ctx, asOf, 3), months: 3, asOfDate: asOf });
-    const runway = cashRunway({ cash: cash.total, burnRate: burn.value, asOfDate: asOf });
+    // With no posted entries there is no cash balance and no history: the calc is INSUFFICIENT_INFORMATION, never 0.
+    const cashCalc: CalcResult<DecimalString | null> = books
+      ? makeCalc<DecimalString>({ name: "cash_position", value: cash.total, unit: "USD", formula: "sum(cash account balances)", inputs: { asOf }, asOfDate: asOf, sourceIds: cash.byAccount.map((b) => b.accountId) })
+      : insufficientCalc({ name: "cash_position", unit: "USD", formula: "sum(cash account balances)", inputs: { asOf }, asOfDate: asOf, missing: ["posted bank/card activity (no bank data)"] });
+    const burn = burnRate({ monthlyCashBalances: books ? monthlyCashBalances(ctx, asOf, 3) : [], months: 3, asOfDate: asOf });
+    const runway = cashRunway({ cash: books ? cash.total : null, burnRate: burn.value, asOfDate: asOf });
     const ar = arAging(ctx.dataset.invoices, asOf, ctx.dataset.customers);
     const integrity = ctx.ledger.runIntegrityChecks(asOf);
-    const unknowns = unknownsRegistry(buildFinanceBible()).filter((u) => u.status !== "CONFIRMED");
+    const unknowns = unknownsRegistry(mergeBibleFields(buildFinanceBible(), ctx.dataset.configFields)).filter((u) => u.status !== "CONFIRMED");
     const ytd = ctx.ledger.incomeStatement(`${asOf.slice(0, 4)}-01-01`, asOf);
     const failing = integrity.checks.filter((c) => !c.passed);
     const risks: string[] = [];
@@ -37,15 +43,17 @@ export const healthSummaryTool = defineTool({
     if (runway.value !== null && runway.value < 6) risks.push(`Runway ${runway.value.toFixed(1)} months at the trailing burn.`);
     if (D(ar.value.overdueTotal).gt(0)) risks.push(`Overdue receivables ${ar.value.overdueTotal} across ${ar.value.overdue.length} invoice(s).`);
     if (ctx.thresholds.minimumCashReserve === null) risks.push("Minimum cash reserve policy is not set; reserve coverage cannot be judged.");
+    if (!books) risks.push("The ledger has no posted entries: cash, burn and runway are unknown until bank/card activity is entered or imported and posted.");
     return ok({
-      answer: `As of ${asOf}: cash ${cash.total}; ${burn.value === null ? "burn unknown (no history)" : D(burn.value).lte(0) ? "cash-flow positive over the trailing 3 months" : `burn ${burn.value}/month → runway ${runway.value === null ? "n/a" : `${runway.value.toFixed(1)} months`}`}; YTD revenue ${ytd.revenue} and net income ${ytd.netIncome}; AR ${ar.value.total} (${ar.value.overdueTotal} overdue); ledger integrity ${integrity.passed ? "clean" : `${failing.length} issue(s)`}; ${unknowns.length} finance-setup item(s) still unconfirmed.`,
+      answer: `As of ${asOf}: cash ${books ? cash.total : CASH_UNKNOWN_LABEL}; ${burn.value === null ? (books ? "burn unknown (no history)" : "burn and runway unknown (no posted activity)") : D(burn.value).lte(0) ? "cash-flow positive over the trailing 3 months" : `burn ${burn.value}/month → runway ${runway.value === null ? "n/a" : `${runway.value.toFixed(1)} months`}`}; YTD revenue ${ytd.revenue} and net income ${ytd.netIncome}${books ? "" : " (no entries posted)"}; AR ${ar.value.total} (${ar.value.overdueTotal} overdue); ledger integrity ${integrity.passed ? "clean" : `${failing.length} issue(s)`}; ${unknowns.length} finance-setup item(s) still unconfirmed.`,
       numbers: [figure("Cash", cashCalc), figure("Monthly burn", burn), figure("Runway", runway), moneyFigure("YTD revenue", ytd.revenue), moneyFigure("YTD net income", ytd.netIncome), moneyFigure("AR total", ar.value.total, ar.id), moneyFigure("AR overdue", ar.value.overdueTotal), textFigure("Integrity checks failing", failing.length), textFigure("Setup unknowns", unknowns.length)],
       why: ["Cash and statements come from posted ledger entries; burn is the trailing 3-month average change in cash; AR from open invoices; unknowns from the finance bible."],
       risks,
       recommendation: risks.length ? "Address the flagged items in order: integrity, cash reserve policy, collections." : "No urgent issues; keep the weekly brief cadence.",
       educationKey: "cash_vs_profit",
       confidence: integrity.passed ? 0.85 : 0.65,
-      structured: { value: cash.total, values: { cash: cash.total, monthlyBurn: burn.value, runwayMonths: runway.value, ytdRevenue: ytd.revenue, ytdNetIncome: ytd.netIncome, arTotal: ar.value.total, arOverdue: ar.value.overdueTotal, integrityFailing: failing.length, setupUnknowns: unknowns.length }, integrityPassed: integrity.passed, unknownKeys: unknowns.map((u) => u.key) },
+      ...(books ? {} : { escalation: esc("INSUFFICIENT_INFORMATION", "No posted ledger activity: cash, burn and runway are unknown (not zero).", { missingItems: ["posted bank/card activity"] }) }),
+      structured: { value: books ? cash.total : null, values: { cash: books ? cash.total : null, monthlyBurn: burn.value, runwayMonths: runway.value, ytdRevenue: ytd.revenue, ytdNetIncome: ytd.netIncome, arTotal: ar.value.total, arOverdue: ar.value.overdueTotal, integrityFailing: failing.length, setupUnknowns: unknowns.length }, integrityPassed: integrity.passed, hasBookData: books, unknownKeys: unknowns.map((u) => u.key) },
     }, { calcs: [cashCalc, burn, runway, ar] });
   },
 });
@@ -99,8 +107,8 @@ export const configStatusTool = defineTool({
   riskLevel: "GREEN",
   capabilityKey: "policy_management",
   inputSchema: TASKS["cfo.config_status"].params,
-  async execute() {
-    const bible = buildFinanceBible();
+  async execute(_input, ctx) {
+    const bible = mergeBibleFields(buildFinanceBible(), ctx.dataset.configFields);
     const items = unknownsRegistry(bible);
     const byStatus: Record<string, number> = {};
     for (const i of items) byStatus[i.status] = (byStatus[i.status] ?? 0) + 1;

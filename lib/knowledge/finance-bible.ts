@@ -361,6 +361,17 @@ export function getField<T = unknown>(fields: ConfigField[], key: string): Confi
   return currentFields(fields).find((f) => f.key === key) as ConfigField<T> | undefined;
 }
 
+/**
+ * Overlay persisted (non-synthetic, non-superseded) answers on top of the static bible, keyed by
+ * field key. Synthetic lab fields never overlay the real bible.
+ */
+export function mergeBibleFields(bible: ConfigField[], persisted: ConfigField[]): ConfigField[] {
+  const byKey = new Map<string, ConfigField>();
+  for (const f of bible) if (f.status !== "SUPERSEDED") byKey.set(f.key, f);
+  for (const f of persisted) if (f.status !== "SUPERSEDED" && !f.synthetic) byKey.set(f.key, f);
+  return Array.from(byKey.values());
+}
+
 /** Value of a field only if CONFIRMED; otherwise null (never a guess). */
 export function confirmedValue<T = unknown>(fields: ConfigField[], key: string): T | null {
   const f = getField<T>(fields, key);

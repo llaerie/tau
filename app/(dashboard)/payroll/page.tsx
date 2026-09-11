@@ -44,7 +44,7 @@ export default async function PayrollPage({ searchParams }: { searchParams: Sear
       <Grid cols={4} className="mb-5">
         <Stat label="Next pay date" value={next.date ? fmtDate(next.date) : "Unknown"} sub={`${titleCase(pattern.cadence)} cadence · last ${pattern.lastPayDate ?? "—"}`} />
         <Stat label="Expected employer cost" value={next.expectedEmployerCost ? fmtMoney(next.expectedEmployerCost) : "—"} sub={next.basis} />
-        <Stat label="Open payroll liabilities" value={fmtMoney(openLiabTotal)} sub={`${openLiab.length} accrued · ${openLiab.filter((l) => l.dueDate === null).length} with unknown due date`} tone={openLiab.some((l) => l.dueDate === null) ? "warn" : "neutral"} />
+        <Stat label="Open payroll liabilities" value={openLiab.length ? fmtMoney(openLiabTotal) : "None accrued"} sub={openLiab.length ? `${openLiab.length} accrued · ${openLiab.filter((l) => l.dueDate === null).length} with unknown due date` : ds.payrollRuns.length ? "No open liabilities" : "No payroll runs recorded — nothing accrued"} tone={openLiab.some((l) => l.dueDate === null) ? "warn" : "neutral"} />
         <Stat label="Workers" value={workers.length} sub={`${workers.filter((w) => w.workerType === "EMPLOYEE").length} employees · ${workers.filter((w) => w.workerType === "CONTRACTOR").length} contractors · ${unresolved.length} unresolved`} tone={unresolved.length ? "bad" : "ok"} />
       </Grid>
       <Tabs basePath="/payroll" active={tab} tabs={[{ key: "calendar", label: "Calendar" }, { key: "runs", label: "Runs", count: runs.length }, { key: "liabilities", label: "Liabilities", count: openLiab.length }, { key: "workers", label: "Workers", count: workers.length }, { key: "calculator", label: "Employer cost calculator" }]} />

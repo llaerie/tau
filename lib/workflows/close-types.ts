@@ -86,7 +86,8 @@ export interface ManagementReport {
   statements: { revenue: string; costOfRevenue: string; grossProfit: string; operatingExpenses: string; netIncome: string; totalAssets: string; totalLiabilities: string; totalEquity: string; cash: string; closingCash: string };
   ratios: Record<string, { value: number | string | null; calcId: ID; formula: string }>;
   variances: { budgetId?: ID; flagged: { accountCode?: string; accountName?: string; month: string; actual: string; budget: string; variance: string; favorable: boolean | null }[]; note?: string; calcId?: ID };
-  cashPosition: { total: string; calcId: ID };
+  /** `total` is null (UNKNOWN — no bank data) when nothing has been posted. */
+  cashPosition: { total: string | null; calcId: ID };
   arOverdue: { total: string; count: number; calcId: ID };
   apOpen: { total: string; count: number; calcId: ID };
   calcIds: ID[];

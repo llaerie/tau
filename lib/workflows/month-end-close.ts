@@ -213,7 +213,7 @@ function stepManagementReport(ctx: CloseContext, s: StatementBundle): { step: Cl
     apOpen: { total: ap.value.total, count: ap.value.items.length, calcId: ap.id },
     calcIds: [...Object.values(ratios).map((c) => c.id), cash.id, ar.id, ap.id, ...(variances.calcId ? [variances.calcId] : [])],
   };
-  const details = [`Net income ${is.netIncome}; gross margin ${ratios.grossMargin.value ?? "n/a"}; current ratio ${ratios.currentRatio.value ?? "n/a"}; cash ${cash.value.total}; AR overdue ${ar.value.overdueTotal}; ${variances.flagged.length} flagged budget variance(s).`];
+  const details = [`Net income ${is.netIncome}; gross margin ${ratios.grossMargin.value ?? "n/a"}; current ratio ${ratios.currentRatio.value ?? "n/a"}; cash ${cash.value.total ?? "UNKNOWN (no posted entries)"}; AR overdue ${ar.value.overdueTotal}; ${variances.flagged.length} flagged budget variance(s).`];
   return { step: finishStep(20, details, [], { calcIds: report.calcIds }), report };
 }
 

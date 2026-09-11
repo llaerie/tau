@@ -12,6 +12,7 @@ import { makeCalc } from "@/lib/finance/calc-result";
 import { buildThirteenWeekForecast, delayedReceiptScenario, flowsFromDataset, stressTest, type ScheduledFlow, type ThirteenWeekForecast, type ThirteenWeekInput } from "@/lib/forecasting/thirteen-week";
 import type { FlowCategory } from "@/lib/forecasting/drivers";
 import { MATERIALITY_CONFIG_KEYS } from "@/lib/risk/materiality";
+import { CASH_UNKNOWN_LABEL, hasBookData } from "@/lib/db/workspace";
 import { TASKS } from "../task-catalog";
 import { defineTool } from "../types";
 import { esc, figure, insufficient, moneyFigure, monthsBefore, ok, textFigure, toDec } from "./common";
@@ -20,8 +21,13 @@ export function hasLedgerActivity(ctx: ToolContext, asOf: string): boolean {
   return ctx.dataset.journalEntries.some((e) => (e.status === "POSTED" || e.status === "REVERSED") && e.date <= asOf);
 }
 
-/** Provenance note appended to cash answers: Phase One has no live bank connection. */
+/** Provenance note appended to cash answers: no live bank connection exists in either workspace. */
 export const DATA_PROVENANCE = "Source: posted ledger entries in the Phase One lab — this is synthetic data, not a live bank feed; no bank connection exists and balances are not pulled from any bank.";
+export const COMPANY_DATA_PROVENANCE = "Source: posted ledger entries in the company workspace — Phase Two is read-only: no bank, card, payroll or accounting connection exists, so balances reflect only what has been entered or imported and are not bank-confirmed.";
+
+export function dataProvenance(ctx: ToolContext): string {
+  return ctx.dataset.profile.isSynthetic ? DATA_PROVENANCE : COMPANY_DATA_PROVENANCE;
+}
 
 export function ledgerCash(ctx: ToolContext, asOf: string): { total: DecimalString; byAccount: { accountId: string; code: string; name: string; balance: DecimalString }[] } {
   const cashAccounts = ctx.dataset.accounts.filter((a) => a.subtype === "CASH" && a.isActive);
@@ -43,19 +49,30 @@ export const cashPositionTool = defineTool({
   async execute(input, ctx) {
     const asOf = input.asOf ?? ctx.asOfDate;
     if (!ctx.dataset.bankAccounts.length && ctx.dataset.accounts.every((a) => a.subtype !== "CASH")) return ok(insufficient(["bank accounts"], "No bank accounts or cash accounts are configured, so the cash position is unknown."));
+    if (!hasBookData(ctx.dataset)) {
+      // Empty books: there is no balance to report. Zero would be a fabricated number.
+      const missing = ctx.dataset.bankAccounts.length ? ["posted bank/card activity (no transactions entered or imported, no opening balances posted)"] : ["bank accounts and cards", "posted bank/card activity (no transactions entered or imported, no opening balances posted)"];
+      return ok(insufficient(missing, `Cash position as of ${asOf}: ${CASH_UNKNOWN_LABEL}. The ledger has no posted entries, so no cash balance exists to report — there is no zero balance, only an unknown one. ${ctx.dataset.bankAccounts.length ? `${ctx.dataset.bankAccounts.length} bank account(s) are registered but carry no activity.` : "No bank accounts or cards are registered yet."} Add accounts, enter or import transactions and post opening balances first. ${dataProvenance(ctx)}`, {
+        why: ["Cash is derived only from posted journal entries; with none posted there is no measured balance.", "No live bank connection exists; nothing is pulled from any bank."],
+        risks: ["Do not rely on any cash figure until bank data has been entered or imported and posted."],
+        recommendation: ctx.dataset.bankAccounts.length ? "Enter or import bank and card transactions, then post opening balances." : "Register bank accounts and cards on Company setup, then enter or import transactions.",
+        sourceLayers: ["COMPANY"],
+        structured: { values: { totalCash: null, cardOwed: null }, byAccount: [], ledgerHasActivity: false, dataProvenance: ctx.dataset.profile.isSynthetic ? "SYNTHETIC_LEDGER_NO_BANK_CONNECTION" : "COMPANY_LEDGER_EMPTY_NO_BANK_CONNECTION" },
+      }));
+    }
     const cash = ledgerCash(ctx, asOf);
     const active = hasLedgerActivity(ctx, asOf);
     const calc = makeCalc<DecimalString>({ name: "cash_position", value: cash.total, unit: "USD", formula: "sum(cash account balances) from posted journal entries", inputs: { asOf, accounts: cash.byAccount }, asOfDate: asOf, sourceIds: cash.byAccount.map((b) => b.accountId) });
     const card = ctx.dataset.accounts.find((a) => a.subtype === "CREDIT_CARD");
     const cardBalance = card ? ctx.ledger.accountBalance(card.id, asOf) : null;
     return ok({
-      answer: active ? `Cash as of ${asOf}: ${cash.total} across ${cash.byAccount.length} account(s) (${cash.byAccount.map((b) => `${b.name} ${b.balance}`).join("; ")})${cardBalance ? `; card balance owed ${cardBalance}` : ""}. ${DATA_PROVENANCE}` : `The ledger has no posted entries as of ${asOf} (empty books, no bank activity recorded), so cash is ${cash.total} by construction — not a measured balance. ${DATA_PROVENANCE}`,
+      answer: active ? `Cash as of ${asOf}: ${cash.total} across ${cash.byAccount.length} account(s) (${cash.byAccount.map((b) => `${b.name} ${b.balance}`).join("; ")})${cardBalance ? `; card balance owed ${cardBalance}` : ""}. ${dataProvenance(ctx)}` : `The ledger has no posted entries as of ${asOf} (empty books, no bank activity recorded), so cash is ${cash.total} by construction — not a measured balance. ${dataProvenance(ctx)}`,
       numbers: [figure("Total cash", calc), ...cash.byAccount.map((b) => moneyFigure(b.name, b.balance)), ...(cardBalance ? [moneyFigure("Credit card owed", cardBalance)] : [])],
       why: ["Balances are ledger balances from posted entries; unreconciled bank activity is not included until categorized.", "No live bank connection exists in Phase One; figures cannot be forwarded as a bank-confirmed balance."],
       risks: active ? [] : ["Empty books: import and post bank activity before relying on any cash figure."],
       confidence: active ? 0.9 : 0.5,
       sourceLayers: ["COMPANY"],
-      structured: { value: cash.total, values: { totalCash: cash.total, cardOwed: cardBalance }, byAccount: cash.byAccount, ledgerHasActivity: active, dataProvenance: "SYNTHETIC_LEDGER_NO_BANK_CONNECTION" },
+      structured: { value: cash.total, values: { totalCash: cash.total, cardOwed: cardBalance }, byAccount: cash.byAccount, ledgerHasActivity: active, dataProvenance: ctx.dataset.profile.isSynthetic ? "SYNTHETIC_LEDGER_NO_BANK_CONNECTION" : "COMPANY_LEDGER_NO_BANK_CONNECTION" },
     }, { calcs: [calc] });
   },
 });

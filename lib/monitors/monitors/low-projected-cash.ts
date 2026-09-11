@@ -7,6 +7,7 @@ import { makeItem, thirteenWeekFor } from "../helpers";
 import type { AttentionItem, Monitor } from "../types";
 
 export const CASH_RESERVE_NOT_SET_TITLE = "Cash reserve policy not set";
+export const CASH_UNKNOWN_TITLE = "Cash position unknown — no bank data";
 
 export const lowProjectedCash: Monitor = {
   key: "low_projected_cash",
@@ -15,6 +16,21 @@ export const lowProjectedCash: Monitor = {
     const { forecast, cash } = thirteenWeekFor(ctx.dataset, ctx.ledger, ctx.thresholds, ctx.asOf);
     const calcIds = [ctx.recordCalc(cash.calc), ctx.recordCalc(forecast.calc)];
     const items: AttentionItem[] = [];
+    if (!cash.known) {
+      // No posted activity: there is no cash balance to judge and no forecast to alarm about.
+      items.push(
+        makeItem(ctx, {
+          kind: "low_projected_cash",
+          severity: "INFO",
+          title: CASH_UNKNOWN_TITLE,
+          detail: "The ledger has no posted entries, so there is no cash balance and the 13-week forecast has no opening position. Nothing is assumed: add bank accounts, then enter or import transactions and post opening balances.",
+          relatedIds: ["cash_position"],
+          calcIds,
+          suggestedTask: { kind: "cash.position", params: { asOf: ctx.asOf } },
+        }),
+      );
+      return items;
+    }
     const lowAt = `week of ${forecast.lowestCashWeekStart} (week ${forecast.lowestCashWeek})`;
     if (D(forecast.lowestCash).lt(0)) {
       items.push(

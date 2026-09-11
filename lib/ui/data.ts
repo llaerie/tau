@@ -16,6 +16,10 @@ import { grossMargin, netMargin } from "@/lib/finance/margins";
 import { buildThirteenWeekForecast, delayedReceiptScenario, stressTest, flowsFromDataset, type ThirteenWeekForecast, type ThirteenWeekInput } from "@/lib/forecasting/thirteen-week";
 import { detectPayrollCadence, projectPayDates } from "@/lib/forecasting/drivers";
 import { LAB_SNAPSHOT_PATH } from "@/lib/db/index";
+import { CASH_UNKNOWN_LABEL, COMPANY_SNAPSHOT_PATH, currentWorkspace, hasBookData, type Workspace } from "@/lib/db/workspace";
+import { openingCashUnknownAssumption } from "@/lib/monitors/helpers";
+
+export { CASH_UNKNOWN_LABEL, hasBookData };
 
 export interface AccountBalance {
   id: string;
@@ -31,11 +35,20 @@ export interface AccountBalance {
 export interface CashPosition {
   asOf: ISODate;
   accounts: AccountBalance[];
+  /** Structural 0.0000 when `known` is false — never display it as a balance then. */
   totalCash: DecimalString;
   cardBalances: DecimalString;
+  /** false when the ledger has no posted activity: cash is UNKNOWN (no bank data), not 0.00. */
+  known: boolean;
+}
+
+/** Display string for a cash figure that respects `known`. */
+export function cashLabel(cash: Pick<CashPosition, "known">, value: DecimalString | null | undefined, format: (v: DecimalString) => string): string {
+  return cash.known && value !== null && value !== undefined ? format(value) : CASH_UNKNOWN_LABEL;
 }
 
 export function cashPosition(rt: LabRuntime, asOf: ISODate = rt.asOfDate): CashPosition {
+  const known = hasBookData(rt.dataset);
   const banks = rt.dataset.bankAccounts.map<AccountBalance>((b: BankAccount) => ({
     id: b.id,
     name: b.name,
@@ -56,9 +69,11 @@ export function cashPosition(rt: LabRuntime, asOf: ISODate = rt.asOfDate): CashP
     balance: rt.ledger.accountBalance(c.glAccountId, asOf),
     isSynthetic: c.isSynthetic,
   }));
-  const totalCash = banks.reduce((acc, b) => add(acc, b.balance), "0.0000");
-  const cardBalances = cards.reduce((acc, c) => add(acc, c.balance), "0.0000");
-  return { asOf, accounts: [...banks, ...cards], totalCash, cardBalances };
+  // Totals are over distinct GL accounts: two registered accounts sharing a GL must not double-count.
+  const uniqueGl = (list: (BankAccount | Card)[]) => Array.from(new Map(list.map((x) => [x.glAccountId, x])).values());
+  const totalCash = uniqueGl(rt.dataset.bankAccounts).reduce((acc, b) => add(acc, rt.ledger.accountBalance(b.glAccountId, asOf)), "0.0000");
+  const cardBalances = uniqueGl(rt.dataset.cards).reduce((acc, c) => add(acc, rt.ledger.accountBalance(c.glAccountId, asOf)), "0.0000");
+  return { asOf, accounts: [...banks, ...cards], totalCash, cardBalances, known };
 }
 
 export interface ThirteenWeekOptions {
@@ -70,6 +85,7 @@ export interface ThirteenWeekOptions {
 export function thirteenWeekInput(rt: LabRuntime, asOf: ISODate = rt.asOfDate): ThirteenWeekInput {
   const flows = flowsFromDataset(rt.dataset, asOf, { weeks: 13 });
   const cash = cashPosition(rt, asOf);
+  if (!cash.known) flows.assumptions.unshift(openingCashUnknownAssumption());
   return {
     asOfDate: asOf,
     openingCash: cash.totalCash,
@@ -171,14 +187,18 @@ export interface RunwayInfo {
 }
 
 export function runwayInfo(rt: LabRuntime, asOf: ISODate = rt.asOfDate): RunwayInfo {
+  const position = cashPosition(rt, asOf);
   const points = [];
-  for (let i = 3; i >= 0; i--) {
-    const m = addMonths(monthStart(asOf), -i);
-    const end = i === 0 ? asOf : monthEnd(m);
-    points.push({ month: monthKey(m), balance: cashPosition(rt, end).totalCash });
+  if (position.known) {
+    for (let i = 3; i >= 0; i--) {
+      const m = addMonths(monthStart(asOf), -i);
+      const end = i === 0 ? asOf : monthEnd(m);
+      points.push({ month: monthKey(m), balance: cashPosition(rt, end).totalCash });
+    }
   }
+  // With no posted activity there is no history and no balance: every result is INSUFFICIENT_INFORMATION.
   const burn = burnRate({ monthlyCashBalances: points, months: 3, asOfDate: asOf });
-  const cash = cashPosition(rt, asOf).totalCash;
+  const cash = position.known ? position.totalCash : null;
   const runway = cashRunway({ cash, burnRate: burn.value, asOfDate: asOf });
   const reserve = cashReserveCoverage({ cash, minimumReserve: rt.thresholds.minimumCashReserve, asOfDate: asOf, policyStatus: rt.thresholds.minimumCashReserve === null ? "UNCONFIRMED" : rt.thresholds.status === "CONFIRMED" ? "CONFIRMED" : "UNCONFIRMED" });
   return { burn, runway, reserve };
@@ -200,6 +220,7 @@ export interface AttentionItem {
 export function localAttentionQueue(rt: LabRuntime, asOf: ISODate = rt.asOfDate): AttentionItem[] {
   const items: AttentionItem[] = [];
   const ds = rt.dataset;
+  if (!hasBookData(ds)) items.push({ id: "books:empty", severity: "INFO", kind: "BOOKS", title: "No posted entries yet — cash and balances are unknown", detail: ds.bankAccounts.length || ds.cards.length ? "Enter or import bank/card transactions, then post opening balances." : "Add bank accounts and cards on Company setup, then enter or import transactions.", href: ds.bankAccounts.length || ds.cards.length ? "/transactions" : "/company?tab=accounts" });
   const pending = ds.approvals.filter((a: ApprovalRequest) => a.status === "PENDING");
   for (const a of pending.slice(0, 5)) {
     items.push({ id: `apr:${a.id}`, severity: a.risk.level === "RED" ? "RED" : "YELLOW", kind: "APPROVAL", title: `Approval pending: ${a.action.kind}`, detail: a.action.description, href: "/approvals" });
@@ -246,6 +267,10 @@ function pct(v: number | null): string {
   return v === null ? "—" : `${(v * 100).toFixed(1)}%`;
 }
 
+function fmtCash(v: DecimalString): string {
+  return `$${D(v).toFixed(2)}`;
+}
+
 export function localFinancialHealth(rt: LabRuntime, asOf: ISODate = rt.asOfDate): HealthScorecard {
   const ytdStart = `${asOf.slice(0, 4)}-01-01`;
   const is: IncomeStatement = rt.ledger.incomeStatement(ytdStart, asOf);
@@ -254,17 +279,19 @@ export function localFinancialHealth(rt: LabRuntime, asOf: ISODate = rt.asOfDate
   const nm = netMargin(is);
   const cr = currentRatio(bs);
   const rw = runwayInfo(rt, asOf);
+  const books = hasBookData(rt.dataset);
   const ar = arReport(rt, asOf).value;
   const overdueRatio = ratio(ar.overdueTotal, ar.total);
   const integrity = rt.ledger.runIntegrityChecks(asOf);
   const metrics: HealthMetric[] = [
     { key: "gross_margin", label: "Gross margin (YTD)", value: pct(gm.value), status: gm.value === null ? "UNKNOWN" : gm.value >= 0.5 ? "GREEN" : gm.value >= 0.3 ? "YELLOW" : "RED", note: gm.formula, calcId: gm.id },
     { key: "net_margin", label: "Net margin (YTD)", value: pct(nm.value), status: nm.value === null ? "UNKNOWN" : nm.value >= 0.1 ? "GREEN" : nm.value >= 0 ? "YELLOW" : "RED", note: nm.formula, calcId: nm.id },
-    { key: "current_ratio", label: "Current ratio", value: cr.value === null ? "—" : cr.value.toFixed(2), status: cr.value === null ? "UNKNOWN" : cr.value >= 1.5 ? "GREEN" : cr.value >= 1 ? "YELLOW" : "RED", note: cr.formula, calcId: cr.id },
+    { key: "cash", label: "Cash", value: books ? fmtCash(bs.cash) : CASH_UNKNOWN_LABEL, status: books ? (isNeg(bs.cash) ? "RED" : "GREEN") : "UNKNOWN", note: books ? "sum of cash GL balances (posted entries)" : "no posted entries — nothing to score" },
+    { key: "current_ratio", label: "Current ratio", value: !books || cr.value === null ? "—" : cr.value.toFixed(2), status: !books || cr.value === null ? "UNKNOWN" : cr.value >= 1.5 ? "GREEN" : cr.value >= 1 ? "YELLOW" : "RED", note: books ? cr.formula : "no posted entries", calcId: cr.id },
     {
       key: "runway",
       label: "Cash runway",
-      value: rw.runway.value === null ? (rw.burn.value !== null && !gt(rw.burn.value, 0) ? "Cash-flow positive" : "—") : `${rw.runway.value.toFixed(1)} months`,
+      value: rw.runway.value === null ? (rw.burn.value !== null && !gt(rw.burn.value, 0) ? "Cash-flow positive" : books ? "—" : CASH_UNKNOWN_LABEL) : `${rw.runway.value.toFixed(1)} months`,
       status: rw.runway.value === null ? (rw.burn.value !== null && !gt(rw.burn.value, 0) ? "GREEN" : "UNKNOWN") : rw.runway.value >= 6 ? "GREEN" : rw.runway.value >= 3 ? "YELLOW" : "RED",
       note: rw.runway.formula,
       calcId: rw.runway.id,
@@ -315,6 +342,12 @@ export function evalSummaryOf(raw: unknown): EvalSummaryLite | null {
 
 export function labSnapshotInfo(): { path: string; exists: boolean } {
   return { path: LAB_SNAPSHOT_PATH, exists: existsSync(LAB_SNAPSHOT_PATH) };
+}
+
+/** Snapshot info for the active workspace (lab or company). */
+export function workspaceSnapshotInfo(workspace: Workspace = currentWorkspace()): { workspace: Workspace; path: string; exists: boolean } {
+  const path = workspace === "company" ? COMPANY_SNAPSHOT_PATH : LAB_SNAPSHOT_PATH;
+  return { workspace, path, exists: existsSync(path) };
 }
 
 export function accountName(rt: LabRuntime, id: string | null | undefined): string {

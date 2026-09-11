@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { pageCtx, type SearchParams, sp } from "@/lib/ui/page";
-import { cashPosition, thirteenWeek, runwayInfo, decimalOrNull } from "@/lib/ui/data";
+import { cashPosition, thirteenWeek, runwayInfo, decimalOrNull, CASH_UNKNOWN_LABEL } from "@/lib/ui/data";
 import { PageHeader, Grid, Stat, Card, CardHeader, TableWrap, Money, StatusPill, Badge, Notice, KeyValue, Details, Sparkline } from "@/components/ui";
 import { fmtDate, fmtMoney, fmtPercent, toNum, titleCase } from "@/lib/ui/format";
 import { isValidISODate } from "@/lib/core/dates";
@@ -30,11 +30,16 @@ export default async function CashPage({ searchParams }: { searchParams: SearchP
   return (
     <>
       <PageHeader eyebrow={`As of ${fmtDate(asOf)}`} title="Cash" description="Cash position, the 13-week forecast built from open invoices, bills, payroll cadence and recurring vendors, plus runway and reserve policy." />
+      {!cash.known ? (
+        <Notice tone="warn" className="mb-4" title={`Cash position: ${CASH_UNKNOWN_LABEL}`}>
+          The ledger has no posted entries, so there is no cash balance and the 13-week forecast has no opening position. {cash.accounts.length === 0 ? "Register bank accounts and cards on Company setup, then " : ""}enter or import bank/card transactions and post opening balances. The zeros in the forecast table below are structural placeholders, not projections.
+        </Notice>
+      ) : null}
       <Grid cols={4} className="mb-5">
-        <Stat label="Cash today" value={fmtMoney(cash.totalCash)} sub={`${cash.accounts.filter((a) => a.kind === "BANK").length} accounts`} size="lg" />
-        <Stat label="Lowest 13-week cash" value={fmtMoney(fc.lowestCash)} sub={`Week ${fc.lowestCashWeek} · ${fmtDate(fc.lowestCashWeekStart)}${scenarioActive ? ` · base ${fmtMoney(base.lowestCash)}` : ""}`} tone={toNum(fc.lowestCash) < 0 ? "bad" : fc.weeksBelowMinimum ? "warn" : "ok"} size="lg" />
-        <Stat label="Monthly burn (3-mo avg)" value={rw.burn.value === null ? "—" : fmtMoney(rw.burn.value)} sub={rw.burn.value !== null && toNum(rw.burn.value) <= 0 ? "Net cash generation" : rw.burn.notes?.[0] ?? rw.burn.formula} tone={rw.burn.value !== null && toNum(rw.burn.value) > 0 ? "warn" : "ok"} />
-        <Stat label="Runway" value={rw.runway.value === null ? (rw.burn.value !== null && toNum(rw.burn.value) <= 0 ? "Unbounded" : "—") : `${rw.runway.value.toFixed(1)} mo`} sub={rw.runway.notes?.[0] ?? rw.runway.formula} tone={rw.runway.value === null ? "ok" : rw.runway.value < 3 ? "bad" : rw.runway.value < 6 ? "warn" : "ok"} />
+        <Stat label="Cash today" value={cash.known ? fmtMoney(cash.totalCash) : CASH_UNKNOWN_LABEL} sub={cash.known ? `${cash.accounts.filter((a) => a.kind === "BANK").length} accounts` : `${cash.accounts.filter((a) => a.kind === "BANK").length} accounts registered · no posted entries`} size="lg" tone={cash.known ? "neutral" : "warn"} />
+        <Stat label="Lowest 13-week cash" value={cash.known ? fmtMoney(fc.lowestCash) : CASH_UNKNOWN_LABEL} sub={cash.known ? `Week ${fc.lowestCashWeek} · ${fmtDate(fc.lowestCashWeekStart)}${scenarioActive ? ` · base ${fmtMoney(base.lowestCash)}` : ""}` : "Opening cash unknown"} tone={!cash.known ? "warn" : toNum(fc.lowestCash) < 0 ? "bad" : fc.weeksBelowMinimum ? "warn" : "ok"} size="lg" />
+        <Stat label="Monthly burn (3-mo avg)" value={rw.burn.value === null ? (cash.known ? "—" : "Unknown") : fmtMoney(rw.burn.value)} sub={rw.burn.value !== null && toNum(rw.burn.value) <= 0 ? "Net cash generation" : rw.burn.notes?.[0] ?? rw.burn.formula} tone={rw.burn.value !== null && toNum(rw.burn.value) > 0 ? "warn" : cash.known ? "ok" : "neutral"} />
+        <Stat label="Runway" value={rw.runway.value === null ? (rw.burn.value !== null && toNum(rw.burn.value) <= 0 ? "Unbounded" : cash.known ? "—" : "Unknown") : `${rw.runway.value.toFixed(1)} mo`} sub={rw.runway.notes?.[0] ?? rw.runway.formula} tone={rw.runway.value === null ? (cash.known ? "ok" : "neutral") : rw.runway.value < 3 ? "bad" : rw.runway.value < 6 ? "warn" : "ok"} />
       </Grid>
 
       <div className="mb-5 grid grid-cols-1 gap-4 lg:grid-cols-3">
@@ -51,6 +56,13 @@ export default async function CashPage({ searchParams }: { searchParams: SearchP
                 </tr>
               </thead>
               <tbody>
+                {cash.accounts.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="py-6 text-center text-muted">
+                      No bank accounts or cards registered — add them on Company setup (last four digits only).
+                    </td>
+                  </tr>
+                ) : null}
                 {cash.accounts.map((a) => (
                   <tr key={a.id}>
                     <td>
@@ -58,16 +70,12 @@ export default async function CashPage({ searchParams }: { searchParams: SearchP
                     </td>
                     <td className="text-muted">{a.institution}</td>
                     <td>{a.kind === "BANK" ? "Bank" : "Card liability"}</td>
-                    <td className="r">
-                      <Money value={a.balance} currency={a.currency} />
-                    </td>
+                    <td className="r">{cash.known ? <Money value={a.balance} currency={a.currency} /> : <span className="text-warn">UNKNOWN</span>}</td>
                   </tr>
                 ))}
                 <tr className="total">
                   <td colSpan={3}>Total bank cash</td>
-                  <td className="r">
-                    <Money value={cash.totalCash} />
-                  </td>
+                  <td className="r">{cash.known ? <Money value={cash.totalCash} /> : <span className="text-warn">{CASH_UNKNOWN_LABEL}</span>}</td>
                 </tr>
               </tbody>
             </table>
@@ -133,7 +141,7 @@ export default async function CashPage({ searchParams }: { searchParams: SearchP
       </Card>
 
       <Card padded={false} className="mb-5">
-        <CardHeader title={`13-week cash forecast${scenarioActive ? " — scenario" : ""}`} subtitle={`Opening cash ${fmtMoney(fc.openingCash)} · receipts ${fmtMoney(fc.totalReceipts)} · disbursements ${fmtMoney(fc.totalDisbursements)} · ending ${fmtMoney(fc.endingCash)}`} className="px-4 pt-3" />
+        <CardHeader title={`13-week cash forecast${scenarioActive ? " — scenario" : ""}`} subtitle={cash.known ? `Opening cash ${fmtMoney(fc.openingCash)} · receipts ${fmtMoney(fc.totalReceipts)} · disbursements ${fmtMoney(fc.totalDisbursements)} · ending ${fmtMoney(fc.endingCash)}` : `Opening cash ${CASH_UNKNOWN_LABEL} · scheduled receipts ${fmtMoney(fc.totalReceipts)} · scheduled disbursements ${fmtMoney(fc.totalDisbursements)} · closing balances not meaningful`} className="px-4 pt-3" />
         <TableWrap className="border-0">
           <table className="tbl">
             <thead>

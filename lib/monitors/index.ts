@@ -7,6 +7,7 @@
  */
 import type { LabRuntime } from "@/lib/db/runtime";
 import type { CalcResult, ID, ISODate } from "@/lib/core/types";
+import { mergeBibleFields } from "@/lib/knowledge/finance-bible";
 import { makeItem, sortItems } from "./helpers";
 import { accountNotReconciled } from "./monitors/account-not-reconciled";
 import { budgetOverrun } from "./monitors/budget-overrun";
@@ -31,7 +32,7 @@ import type { AttentionItem, Monitor, MonitorContext, MonitorRunResult } from ".
 
 export * from "./types";
 export * from "./helpers";
-export { CASH_RESERVE_NOT_SET_TITLE } from "./monitors/low-projected-cash";
+export { CASH_RESERVE_NOT_SET_TITLE, CASH_UNKNOWN_TITLE } from "./monitors/low-projected-cash";
 export { TAX_DUE_DATES_PENDING_TITLE } from "./monitors/tax-deadline-approaching";
 
 export const MONITORS: readonly Monitor[] = Object.freeze([
@@ -70,7 +71,8 @@ export function buildMonitorContext(rt: LabRuntime, asOf: ISODate = rt.asOfDate)
     dataset: rt.dataset,
     ledger: rt.ledger,
     thresholds: rt.thresholds,
-    bible: rt.bible,
+    // The static bible overlaid with the answers persisted in this workspace (synthetic fields never overlay).
+    bible: mergeBibleFields(rt.bible, rt.dataset.configFields),
     policies: rt.policies,
     taxRules: rt.taxRules,
     asOf,

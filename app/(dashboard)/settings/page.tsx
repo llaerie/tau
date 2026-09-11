@@ -8,7 +8,8 @@ import { permissionsFor } from "@/lib/security/rbac";
 import { LAB_ROLES } from "@/lib/ui/session";
 import { listUsers, MIN_PASSWORD_LENGTH } from "@/lib/security/users";
 import { LogoutButton, ChangePasswordForm } from "@/components/auth/AccountForms";
-import { labSnapshotInfo } from "@/lib/ui/data";
+import { workspaceSnapshotInfo } from "@/lib/ui/data";
+import { currentWorkspace, hasBookData } from "@/lib/db/workspace";
 import { PageHeader, Tabs, pickTab, Card, CardHeader, TableWrap, StatusPill, Badge, Notice, KeyValue } from "@/components/ui";
 import { RoleSwitcher, ProviderWizard, MaterialityForm, ResetLab } from "@/components/settings/SettingsForms";
 import { fmtDate, fmtDateTime, fmtMoney, titleCase } from "@/lib/ui/format";
@@ -39,14 +40,15 @@ export default async function SettingsPage({ searchParams }: { searchParams: Sea
   const fallbackEvents = [...getFallbackEvents()].reverse().slice(0, 25);
   const thr = rt.thresholds;
   const materialityFields = Object.entries(MATERIALITY_CONFIG_KEYS).map(([k, key]) => ({ k, key, field: current(key) }));
-  const snapshot = labSnapshotInfo();
+  const snapshot = workspaceSnapshotInfo();
+  const workspace = currentWorkspace();
   const labMode = isLabMode();
   const users = !labMode && can(actor.role, "MANAGE_USERS") ? listUsers() : null;
 
   return (
     <>
       <PageHeader title="Settings" description="Provider setup (choices only), model provider status, materiality thresholds, lab session role, and lab data controls." />
-      <Tabs basePath="/settings" active={tab} tabs={[{ key: "providers", label: "Providers" }, { key: "models", label: "Model providers" }, { key: "materiality", label: "Materiality" }, { key: "session", label: "Session & roles" }, { key: "data", label: "Lab data" }]} />
+      <Tabs basePath="/settings" active={tab} tabs={[{ key: "providers", label: "Providers" }, { key: "models", label: "Model providers" }, { key: "materiality", label: "Materiality" }, { key: "session", label: "Session & roles" }, { key: "data", label: workspace === "company" ? "Workspace & data" : "Lab data" }]} />
 
       {tab === "providers" ? (
         <div className="space-y-4">
@@ -285,22 +287,43 @@ export default async function SettingsPage({ searchParams }: { searchParams: Sea
             Household and personal finances are a separate system by design. No business role — including OWNER — is granted VIEW_HOUSEHOLD, and personal items found in business accounts are flagged, never categorized as business.
           </Notice>
           <Card>
-            <CardHeader title="Lab dataset" />
+            <CardHeader title="Workspace" subtitle="Which dataset this console serves. The lab and company snapshots are separate files and never mix." actions={<Badge tone={workspace === "company" ? "accent" : "warn"}>{workspace === "company" ? "TAU_WORKSPACE=company" : "TAU_WORKSPACE=lab (default)"}</Badge>} />
+            <KeyValue
+              dense
+              items={[
+                { k: "Active workspace", v: workspace === "company" ? "Your company — real books (Phase Two read-only; no bank, card, payroll or accounting connection)" : "Synthetic training lab — Northlight AI Services LLC (fictional)" },
+                { k: "Switch", v: <span>Set the <span className="mono">TAU_WORKSPACE</span> environment variable to <span className="mono">company</span> or <span className="mono">lab</span> and restart the server (e.g. <span className="mono">TAU_WORKSPACE=company npm run dev</span>). Create the company snapshot first with <span className="mono">npm run company:init</span>; the lab is seeded with <span className="mono">npm run lab:seed</span>.</span> },
+                { k: "Snapshot", v: `${snapshot.path}${snapshot.exists ? "" : " (not created yet)"}`, mono: true },
+              ]}
+            />
+          </Card>
+          <Card>
+            <CardHeader title={workspace === "company" ? "Company dataset" : "Lab dataset"} />
             <KeyValue
               dense
               items={[
                 { k: "Company", v: `${rt.dataset.profile.displayName}${rt.dataset.profile.isSynthetic ? " (synthetic)" : ""}` },
                 { k: "As of", v: rt.asOfDate },
                 { k: "Store", v: `${rt.store.kind}${snapshot.exists ? ` · snapshot at ${snapshot.path}` : " · no snapshot yet"}` },
-                { k: "Records", v: `${rt.dataset.transactions.length} transactions · ${rt.dataset.journalEntries.length} entries · ${rt.dataset.documents.length} documents · ${rt.dataset.auditEvents.length} audit events` },
+                { k: "Books", v: hasBookData(rt.dataset) ? "posted entries present" : "EMPTY — no posted entries; cash and balances are UNKNOWN (not zero)" },
+                { k: "Records", v: `${rt.dataset.transactions.length} transactions · ${rt.dataset.journalEntries.length} entries · ${rt.dataset.bankAccounts.length} bank accounts · ${rt.dataset.cards.length} cards · ${rt.dataset.documents.length} documents · ${rt.dataset.auditEvents.length} audit events` },
                 { k: "Simulation only", v: rt.simulationOnly ? "yes — nothing leaves the system" : "no" },
               ]}
             />
           </Card>
-          <Card>
-            <CardHeader title="Reset lab data" />
-            <ResetLab canReset={can(actor.role, "MANAGE_USERS")} />
-          </Card>
+          {workspace === "company" ? (
+            <Card>
+              <CardHeader title="Reset" />
+              <Notice tone="bad" title="Reset is disabled in the company workspace">
+                Resetting would delete the owners&apos; real entries, so the console does not offer it. To start over deliberately, stop the server and run <span className="mono">npm run company:init -- --force</span> (the previous snapshot is kept as a .bak file). Lab data is never loaded into this workspace.
+              </Notice>
+            </Card>
+          ) : (
+            <Card>
+              <CardHeader title="Reset lab data" />
+              <ResetLab canReset={can(actor.role, "MANAGE_USERS")} />
+            </Card>
+          )}
         </div>
       ) : null}
     </>
