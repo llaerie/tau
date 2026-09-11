@@ -1,11 +1,11 @@
 # Tau AI CFO — Readiness Report
 
-Generated 2026-09-11T02:23:00.877Z. **This system is NOT production-ready. Phase One runs exclusively on synthetic data; no real bank, payroll, tax or accounting integration is live and no real money moves. No score in this report changes that.**
+Generated 2026-09-11T02:27:27.752Z. **This system is NOT production-ready. Phase One runs exclusively on synthetic data; no real bank, payroll, tax or accounting integration is live and no real money moves. No score in this report changes that.**
 
 ## Overall competency
 
-- Run: `run_20260911022247_a9260ae9` at 2026-09-11T02:22:47.239Z — model local/local-deterministic (deterministic)
-- Cases: 743 — passed 743, failed 0 — pass rate **100.0%**
+- Run: `run_20260911022721_b71ea6c6` at 2026-09-11T02:27:21.271Z — model local/local-deterministic (deterministic)
+- Cases: 746 — passed 746, failed 0 — pass rate **100.0%**
 
 | Metric | Value |
 |---|---|
@@ -19,13 +19,13 @@ Generated 2026-09-11T02:23:00.877Z. **This system is NOT production-ready. Phase
 | hallucinationRate | 0.0% |
 | unsupportedSourceRate | 0.0% |
 | passRate | 100.0% |
-| count | 743 |
+| count | 746 |
 
 - Capability levels: L0 × 5, L1 × 35 (autonomy is granted per capability, never globally)
 
 ## Accounting score
 
-100.0% — 147/147 cases passed (evals/accounting).
+100.0% — 150/150 cases passed (evals/accounting).
 
 ## FP&A score
 
@@ -69,7 +69,7 @@ None.
 |---|---|---|---|---|---|
 | Transaction categorization (`transaction_categorization`) | ACCOUNTING_FOUNDATIONS | 1 Apprentice | 5 | 100.0% (31) | no |
 | Duplicate detection (`duplicate_detection`) | ACCOUNTING_FOUNDATIONS | 1 Apprentice | 5 | 100.0% (1) | no |
-| Transfer matching (`transfer_matching`) | ACCOUNTING_FOUNDATIONS | 1 Apprentice | 5 | untested | no |
+| Transfer matching (`transfer_matching`) | ACCOUNTING_FOUNDATIONS | 1 Apprentice | 5 | 100.0% (3) | no |
 | Receipt matching (`receipt_matching`) | ACCOUNTING_FOUNDATIONS | 1 Apprentice | 5 | 100.0% (14) | no |
 | Journal entry drafting (`journal_entry_drafting`) | ACCOUNTING_FOUNDATIONS | 1 Apprentice | 5 | 100.0% (91) | no |
 | Journal entry posting (`journal_entry_posting`) | ACCOUNTING_FOUNDATIONS | 1 Apprentice | 5 | 100.0% (1) | yes |
@@ -117,7 +117,7 @@ Phase One prohibited action kinds (never execute, even with an approval): `EXECU
 
 ## Known weaknesses
 
-- Transfer matching (transfer_matching): no eval coverage in the latest run.
+- None identified in the latest run.
 
 ## Failed evaluations (ids + reasons)
 

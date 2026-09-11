@@ -6,7 +6,7 @@
  */
 import { SeededRandom } from "@/lib/core/random";
 import { D, add, mul, money, sub } from "@/lib/core/money";
-import { addMonths, isWeekend, monthEnd, monthKey } from "@/lib/core/dates";
+import { addDays, addMonths, isWeekend, monthEnd, monthKey } from "@/lib/core/dates";
 import { ACCT } from "@/lib/accounting/chart-of-accounts";
 import { Ledger } from "@/lib/accounting/ledger";
 import { depreciationSchedule, accumulatedDepreciationThrough } from "@/lib/accounting/depreciation";
@@ -626,6 +626,50 @@ function syntheticCases(): EvalCase[] {
       tags: ["integrity", "synthetic"],
     }),
   );
+  // Transfer matching: expected pair counts are derived from the dataset's TRANSFER-flagged legs (two legs per pair).
+  const transferLegs = ds.transactions.filter((t) => t.flags.includes("TRANSFER") && t.date <= asOf);
+  out.push(
+    mkCase({
+      directory: DIR,
+      slug: "match_transfers_synthetic_all",
+      competency: "journal_entries",
+      capabilityKey: "transfer_matching",
+      difficulty: 2,
+      title: "Match all inter-account transfers on the synthetic company",
+      scenario: `${transferLegs.length} bank/card legs are transfers between company accounts (checking→savings and card autopay); every leg must pair and none may be treated as revenue or expense.`,
+      message: "Identify the transfer pairs between our bank accounts and the card.",
+      task: { kind: "accounting.match_transfers", params: {} },
+      fixture: "synthetic-default",
+      expected: { numbers: [{ path: "value", value: transferLegs.length / 2, tolerance: 0 }], escalation: null, noActionExecuted: true },
+      rubric: [R.number("pair-count", "value", transferLegs.length / 2, { tolerance: "0" }), R.escalation("none", null), R.noAction({ weight: 1 })],
+      tags: ["transfers", "synthetic"],
+    }),
+  );
+  for (const gtKey of ["transfer_between_accounts", "card_payment_transfer"] as const) {
+    const gt = ds.groundTruth?.find((g) => g.key === gtKey);
+    const leg = gt ? ds.transactions.find((t) => t.id === gt.transactionIds[0]) : undefined;
+    if (!gt || !leg) continue;
+    const from = leg.date;
+    const to = addDays(leg.date, 3);
+    const legsInWindow = ds.transactions.filter((t) => t.flags.includes("TRANSFER") && t.date >= from && t.date <= to);
+    out.push(
+      mkCase({
+        directory: DIR,
+        slug: `match_transfers_synthetic_${gtKey}`,
+        competency: "journal_entries",
+        capabilityKey: "transfer_matching",
+        difficulty: 3,
+        title: `Transfer pair for ground-truth case ${gtKey}`,
+        scenario: gt.correctTreatment,
+        message: `Match transfers between company accounts from ${from} to ${to}.`,
+        task: { kind: "accounting.match_transfers", params: { from, to } },
+        fixture: "synthetic-default",
+        expected: { numbers: [{ path: "value", value: legsInWindow.length / 2, tolerance: 0 }], escalation: null, noActionExecuted: true },
+        rubric: [R.number("pair-count", "value", legsInWindow.length / 2, { tolerance: "0" }), R.escalation("none", null), R.noAction({ weight: 1 })],
+        tags: ["transfers", "synthetic", gtKey],
+      }),
+    );
+  }
   const checking = ds.bankAccounts.find((b) => b.glAccountId === "acct_1000");
   if (checking) {
     const glCash = ledger.accountBalance("acct_1000", asOf);

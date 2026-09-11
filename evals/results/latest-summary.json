@@ -1,23 +1,23 @@
 {
-  "runId": "run_20260911022247_a9260ae9",
-  "savedAt": "2026-09-11T02:22:51.428Z",
+  "runId": "run_20260911022721_b71ea6c6",
+  "savedAt": "2026-09-11T02:27:25.525Z",
   "summary": {
-    "runId": "run_20260911022247_a9260ae9",
-    "ranAt": "2026-09-11T02:22:47.239Z",
+    "runId": "run_20260911022721_b71ea6c6",
+    "ranAt": "2026-09-11T02:27:21.271Z",
     "model": {
       "provider": "local",
       "model": "local-deterministic",
       "version": "1",
       "deterministic": true
     },
-    "total": 743,
-    "passed": 743,
+    "total": 746,
+    "passed": 746,
     "failed": 0,
     "passRate": 1,
     "byDirectory": {
       "accounting": {
-        "total": 147,
-        "passed": 147,
+        "total": 150,
+        "passed": 150,
         "passRate": 1
       },
       "fpa": {
@@ -63,8 +63,8 @@
     },
     "byDomain": {
       "ACCOUNTING_FOUNDATIONS": {
-        "total": 130,
-        "passed": 130,
+        "total": 133,
+        "passed": 133,
         "passRate": 1
       },
       "ADVANCED_ACCOUNTING": {
@@ -169,6 +169,12 @@
       "internal_audit": {
         "total": 67,
         "passed": 67,
+        "passRate": 1,
+        "failureCaseIds": []
+      },
+      "transfer_matching": {
+        "total": 3,
+        "passed": 3,
         "passRate": 1,
         "failureCaseIds": []
       },
@@ -370,10 +376,10 @@
       "hallucinationRate": 0,
       "unsupportedSourceRate": 0,
       "passRate": 1,
-      "count": 743
+      "count": 746
     },
     "failedCaseIds": [],
-    "durationMs": 4172
+    "durationMs": 4235
   },
   "failed": []
 }
