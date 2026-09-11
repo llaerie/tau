@@ -1,0 +1,251 @@
+@import "tailwindcss";
+
+/* ------------------------------------------------------------------ */
+/* Design tokens — executive finance console                           */
+/* ------------------------------------------------------------------ */
+:root {
+  color-scheme: light;
+  --bg: #f5f4f0;
+  --surface: #ffffff;
+  --surface-2: #efeee9;
+  --fg: #141410;
+  --fg-muted: #64635c;
+  --fg-faint: #9b9990;
+  --border: #e2e0d9;
+  --border-strong: #c9c7be;
+  --accent: #1d4ed8;
+  --accent-fg: #ffffff;
+  --accent-soft: #e4ecfb;
+  --green: #15803d;
+  --green-soft: #e1f3e7;
+  --yellow: #b45309;
+  --yellow-soft: #fdf0d9;
+  --red: #b91c1c;
+  --red-soft: #fbe4e4;
+  --shadow: 0 1px 2px rgba(20, 20, 16, 0.05);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --bg: #121211;
+    --surface: #1a1a18;
+    --surface-2: #232320;
+    --fg: #ebeae4;
+    --fg-muted: #a5a39a;
+    --fg-faint: #6f6e66;
+    --border: #2b2b27;
+    --border-strong: #3d3d37;
+    --accent: #8db0ff;
+    --accent-fg: #0b1633;
+    --accent-soft: #1b2745;
+    --green: #4ade80;
+    --green-soft: #10301b;
+    --yellow: #fbbf24;
+    --yellow-soft: #3a2a08;
+    --red: #f87171;
+    --red-soft: #3b1414;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+  }
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-fg: var(--fg);
+  --color-muted: var(--fg-muted);
+  --color-faint: var(--fg-faint);
+  --color-line: var(--border);
+  --color-line-strong: var(--border-strong);
+  --color-accent: var(--accent);
+  --color-accent-fg: var(--accent-fg);
+  --color-accent-soft: var(--accent-soft);
+  --color-ok: var(--green);
+  --color-ok-soft: var(--green-soft);
+  --color-warn: var(--yellow);
+  --color-warn-soft: var(--yellow-soft);
+  --color-bad: var(--red);
+  --color-bad-soft: var(--red-soft);
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+}
+
+html,
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.45;
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: inherit;
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-size: 0.82em;
+  letter-spacing: 0;
+}
+
+/* Tables */
+.tbl {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 13px;
+}
+.tbl th {
+  text-align: left;
+  font-weight: 600;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border-strong);
+  background: var(--surface);
+  white-space: nowrap;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+.tbl td {
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+.tbl tr:last-child td {
+  border-bottom: none;
+}
+.tbl tbody tr:hover td {
+  background: var(--surface-2);
+}
+.tbl .r {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.tbl .c {
+  text-align: center;
+}
+.tbl tr.hl td {
+  background: var(--yellow-soft);
+}
+.tbl tr.hl-bad td {
+  background: var(--red-soft);
+}
+.tbl tr.total td {
+  font-weight: 600;
+  border-top: 1px solid var(--border-strong);
+  background: var(--surface-2);
+}
+
+/* Form controls */
+.input,
+.select,
+.textarea {
+  width: 100%;
+  background: var(--surface);
+  color: var(--fg);
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  padding: 7px 10px;
+  font-size: 13px;
+  outline: none;
+}
+.input:focus,
+.select:focus,
+.textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-soft);
+}
+.textarea {
+  min-height: 72px;
+  resize: vertical;
+}
+
+/* Markdown-lite */
+.md h1,
+.md h2,
+.md h3 {
+  font-weight: 600;
+  margin: 1em 0 0.4em;
+  line-height: 1.3;
+}
+.md h1 {
+  font-size: 18px;
+}
+.md h2 {
+  font-size: 15px;
+}
+.md h3 {
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--fg-muted);
+}
+.md p {
+  margin: 0.4em 0;
+}
+.md ul {
+  margin: 0.3em 0 0.6em 1.2em;
+  list-style: disc;
+}
+.md li {
+  margin: 0.15em 0;
+}
+.md table {
+  border-collapse: collapse;
+  margin: 0.5em 0;
+  font-size: 13px;
+}
+.md th,
+.md td {
+  border: 1px solid var(--border);
+  padding: 4px 8px;
+}
+.md th {
+  background: var(--surface-2);
+  font-weight: 600;
+}
+.md code {
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  background: var(--surface-2);
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+.md hr {
+  border: 0;
+  border-top: 1px solid var(--border);
+  margin: 0.8em 0;
+}
+
+/* Scrollbars in overflow containers */
+.scroll-x {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.fade-in {
+  animation: fade-in 120ms ease-out;
+}
