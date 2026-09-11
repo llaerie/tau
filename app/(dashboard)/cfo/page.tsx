@@ -124,7 +124,7 @@ export default async function CfoPage() {
                 <EmptyState title="Nothing needs attention" className="m-3" />
               ) : (
                 <ul className="divide-y divide-line">
-                  {attention.map((a) => (
+                  {attention.slice(0, 12).map((a) => (
                     <li key={a.id} className="flex items-start gap-3 px-4 py-2.5">
                       <RiskChip level={a.severity === "INFO" ? null : a.severity} className="mt-0.5" />
                       <div className="min-w-0 flex-1">
@@ -134,6 +134,11 @@ export default async function CfoPage() {
                       <Badge className="shrink-0">{a.kind}</Badge>
                     </li>
                   ))}
+                  {attention.length > 12 ? (
+                    <li className="px-4 py-2.5 text-[12px] text-muted">
+                      {attention.length - 12} more item(s) not shown; each is also surfaced in its own section (Transactions, Documents, Payroll, Tax).
+                    </li>
+                  ) : null}
                 </ul>
               )}
             </Card>
