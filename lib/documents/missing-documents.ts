@@ -2,7 +2,7 @@
  * Missing-document alerts. Never assumes which tax form applies to a worker, never assumes
  * a receipt threshold that has not been set.
  */
-import type { CompanyDataset, DecimalString, ISODate } from "@/lib/core/types";
+import type { Transaction, CompanyDataset, DecimalString, ISODate } from "@/lib/core/types";
 import { abs, gte } from "@/lib/core/money";
 
 export type MissingDocumentAlertKind =
@@ -43,11 +43,38 @@ export function missingDocumentAlerts(dataset: CompanyDataset, thresholds: Missi
   if (thresholds.receiptThreshold === null) {
     alerts.push({ id: "mda_config_receipt_threshold", kind: "RECEIPT_THRESHOLD_UNCONFIRMED", severity: "WARNING", targetType: "CONFIG", targetId: "expense_policy.receipt_required_above", message: "Receipt threshold is UNCONFIRMED; per-transaction receipt checks are skipped until the owner sets it." });
   } else {
+    // Outflows that are not purchases (payroll net pay, tax deposits, card payments, distributions,
+    // loan payments) are evidenced by payroll reports, government confirmations or statements, not receipts.
+    const NON_PURCHASE_SUBTYPES = new Set(["PAYROLL_EXPENSE", "PAYROLL_LIABILITY", "TAX_LIABILITY", "TAX_EXPENSE", "CREDIT_CARD", "CASH", "OWNER_EQUITY", "SHAREHOLDER_DISTRIBUTIONS", "LONG_TERM_DEBT", "OTHER_CURRENT_LIABILITY"]);
+    const accountById = new Map(dataset.accounts.map((a) => [a.id, a]));
+    const entryById = new Map(dataset.journalEntries.map((e) => [e.id, e]));
+    const billsWithDocsByPayment = new Set<string>();
+    for (const p of dataset.payments) {
+      if (!p.transactionId) continue;
+      if (p.applications.some((ap) => ap.targetType === "BILL" && dataset.bills.find((b) => b.id === ap.targetId)?.documentId)) billsWithDocsByPayment.add(p.transactionId);
+    }
+    // Contractor / international worker payments are purchases of services: an invoice is required.
+    const CONTRACTOR_CODES = new Set(["6050", "6060", "5200"]);
+    const needsInvoice = (accountId: string) => CONTRACTOR_CODES.has(accountById.get(accountId)?.code ?? "");
+    const isNonPurchase = (t: Transaction): boolean => {
+      if (t.category.accountId && needsInvoice(t.category.accountId)) return false;
+      const cat = t.category.accountId ? accountById.get(t.category.accountId) : undefined;
+      if (cat && NON_PURCHASE_SUBTYPES.has(cat.subtype)) return true;
+      const je = t.journalEntryId ? entryById.get(t.journalEntryId) : undefined;
+      if (!je) return false;
+      if (je.lines.some((l) => needsInvoice(l.accountId))) return false;
+      const nonCashLines = je.lines.filter((l) => accountById.get(l.accountId)?.subtype !== "CASH");
+      return nonCashLines.length > 0 && nonCashLines.every((l) => NON_PURCHASE_SUBTYPES.has(accountById.get(l.accountId)?.subtype ?? ""));
+    };
     for (const t of dataset.transactions) {
       if (!t.amount.startsWith("-")) continue; // outflows only
       if (t.flags.includes("TRANSFER") || t.transferPairId) continue;
       if (!gte(abs(t.amount), thresholds.receiptThreshold)) continue;
-      const linked = t.documentIds.some((id) => receiptKinds.has(docs.find((d) => d.id === id)?.kind ?? "")) || docs.some((d) => receiptKinds.has(d.kind) && d.linkedTransactionIds.includes(t.id));
+      if (isNonPurchase(t)) continue;
+      const linked =
+        t.documentIds.some((id) => receiptKinds.has(docs.find((d) => d.id === id)?.kind ?? "")) ||
+        docs.some((d) => receiptKinds.has(d.kind) && d.linkedTransactionIds.includes(t.id)) ||
+        billsWithDocsByPayment.has(t.id);
       if (!linked) {
         alerts.push({ id: `mda_receipt_${t.id}`, kind: "MISSING_RECEIPT", severity: "WARNING", targetType: "TRANSACTION", targetId: t.id, message: `Transaction ${t.date} ${t.descriptionRaw} (${t.amount}) is at/above the receipt threshold and has no linked receipt.`, amount: t.amount, date: t.date });
       }

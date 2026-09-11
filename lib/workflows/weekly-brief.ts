@@ -80,7 +80,7 @@ export async function buildWeeklyBrief(rt: LabRuntime, asOf: ISODate = rt.asOfDa
   const lastRun = [...ds.payrollRuns].filter((r) => r.status !== "DRAFT").sort((a, b) => a.payDate.localeCompare(b.payDate)).pop();
   let payrollUpcoming: WeeklyBrief["payrollUpcoming"];
   if (lastRun && pattern.cadence !== "UNKNOWN") {
-    const dates = projectPayDates(pattern, addDays(asOf, -1), addDays(asOf, 14));
+    const dates = projectPayDates(pattern, addDays(asOf, -1), addDays(asOf, 45));
     const taxes = add(lastRun.totals.employeeTaxes, lastRun.totals.employerTaxes);
     const calc = calcs.add(
       makeCalc({
@@ -216,8 +216,9 @@ function executiveSummary(b: WeeklyBrief, reserve: DecimalString | null): string
   const topExp = b.expenses.monthToDate.byAccount[0];
   s.push(`Spending was ${fmtMoney(b.expenses.week.total)} this week and ${fmtMoney(b.expenses.monthToDate.total)} month-to-date${topExp ? `, led by ${topExp.name}` : ""}.`);
   const pay = b.payrollUpcoming.nextPayDates[0];
-  if (pay) s.push(`Next payroll is ${fmtDate(pay.date)}, about ${fmtMoney(pay.projectedTotalEmployerCost)} all-in based on the last run.`);
-  else s.push("No payroll date could be projected (cadence unknown).");
+  if (pay && daysBetween(b.asOf, pay.date) <= 14) s.push(`Next payroll is ${fmtDate(pay.date)}, about ${fmtMoney(pay.projectedTotalEmployerCost)} all-in based on the last run.`);
+  else if (pay) s.push(`No payroll falls in the next two weeks; the next run is ${fmtDate(pay.date)}, about ${fmtMoney(pay.projectedTotalEmployerCost)} all-in based on the last run.`);
+  else s.push(b.payrollUpcoming.cadence === "UNKNOWN" ? "No payroll date could be projected (cadence unknown)." : "No payroll date falls within the next 45 days.");
   if (b.billsUpcoming.bills.length) s.push(`${b.billsUpcoming.bills.length} bill(s) totalling ${fmtMoney(b.billsUpcoming.total)} fall due within 30 days.`);
   s.push(`Tax: ${b.taxObligations.known.length} obligation(s) due within 60 days; ${b.taxObligations.pending.length} due date(s) are pending authoritative sources and CPA confirmation.`);
   if (b.budgetVsActual.topVariances[0]) {

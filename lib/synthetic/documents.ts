@@ -35,6 +35,7 @@ function statements(ctx: GenContext): void {
         storagePath: `synthetic://statements/${src.key}/${month}.pdf`,
         extracted: {
           account: src.label,
+          ...(src.kind === "CARD_STATEMENT" ? { cardId: src.id } : { accountId: src.id }),
           period: month,
           openingBalance: money(opening.times(sign)),
           closingBalance: money(running.times(sign)),
@@ -42,7 +43,7 @@ function statements(ctx: GenContext): void {
           totalDebits: money(txs.filter((t) => D(t.amount).lt(0)).reduce((a, t) => a.plus(D(t.amount).abs()), D(0))),
           totalCredits: money(txs.filter((t) => D(t.amount).gt(0)).reduce((a, t) => a.plus(D(t.amount)), D(0))),
         },
-        tags: ["statement", src.key],
+        tags: ["statement", src.key, src.kind === "CARD_STATEMENT" ? `card:${src.id}` : `account:${src.id}`, `period:${month}`],
       });
     }
   }

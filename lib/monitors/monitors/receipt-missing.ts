@@ -16,7 +16,7 @@ export const receiptMissing: Monitor = {
       makeItem(ctx, {
         kind: RECEIPT_KINDS.has(a.kind) ? "receipt_missing" : "document_missing",
         severity: a.kind === "RECEIPT_THRESHOLD_UNCONFIRMED" ? "INFO" : SEVERITY[a.severity],
-        title: a.kind === "RECEIPT_THRESHOLD_UNCONFIRMED" ? "Receipt threshold not set" : `${a.kind.replace(/_/g, " ").toLowerCase()}: ${a.targetId}`,
+        title: a.kind === "RECEIPT_THRESHOLD_UNCONFIRMED" ? "Receipt threshold not set" : `${a.kind.replace(/_/g, " ").toLowerCase()}: ${describeTarget(ctx.dataset, a)}`,
         detail: a.message,
         amount: a.amount === undefined ? undefined : a.amount.startsWith("-") ? a.amount.slice(1) : a.amount,
         dueDate: a.date,
@@ -26,3 +26,16 @@ export const receiptMissing: Monitor = {
     );
   },
 };
+
+function describeTarget(dataset: import("@/lib/core/types").CompanyDataset, a: { targetType: string; targetId: string; amount?: string; date?: string }): string {
+  if (a.targetType === "TRANSACTION") {
+    const t = dataset.transactions.find((x) => x.id === a.targetId);
+    if (t) return `${t.date} ${t.merchantNormalized ?? t.descriptionRaw} (${t.amount.startsWith("-") ? t.amount.slice(1) : t.amount})`;
+  }
+  if (a.targetType === "BANK_ACCOUNT") return dataset.bankAccounts.find((b) => b.id === a.targetId)?.name ?? a.targetId;
+  if (a.targetType === "CARD") return dataset.cards.find((c) => c.id === a.targetId)?.name ?? a.targetId;
+  if (a.targetType === "WORKER") return dataset.workers.find((w) => w.id === a.targetId)?.displayName ?? a.targetId;
+  if (a.targetType === "BILL") return dataset.bills.find((b) => b.id === a.targetId)?.number ?? a.targetId;
+  if (a.targetType === "CUSTOMER") return dataset.customers.find((c) => c.id === a.targetId)?.name ?? a.targetId;
+  return a.targetId;
+}
