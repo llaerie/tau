@@ -85,6 +85,7 @@ tests/          Vitest suites
 
 ## Documentation
 
+- `docs/GETTING_STARTED.md` — owner's guide: create your company workspace, logins, first hour
 - `docs/ARCHITECTURE.md` — layers, request lifecycle, invariants, model strategy, autonomy model
 - `docs/SECURITY.md` — implemented controls and what is required before real data
 - `docs/OPERATIONS.md` — how to run, commands, PostgreSQL, providers, roles, backups
