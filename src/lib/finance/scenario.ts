@@ -25,6 +25,8 @@ export interface ScenarioBaseline {
   goals: GoalInput[];
   /** Optional cash floor the space wants to keep (e.g. company reserve target). */
   cashFloorCents?: number | null;
+  /** Planned discretionary spending (budgets) that comes after goals. */
+  plannedSpendingCents?: number;
   /** Monthly surplus after goals, for context. */
   monthlySurplus?: Total;
 }
@@ -98,6 +100,12 @@ export function evaluatePurchase(baseline: ScenarioBaseline, purchase: PurchaseI
     };
   });
 
+  // Recurring costs also squeeze the spending plan once goals are funded.
+  const planned = baseline.plannedSpendingCents ?? 0;
+  const headroomBefore = baseline.availableComplete ? baseline.availableForGoalsCents - goalsBefore.totalFundedCents - planned : null;
+  const headroomAfter = baseline.availableComplete ? baseline.availableForGoalsCents - monthlyCost - goalsAfter.totalFundedCents - planned : null;
+  const squeezesPlan = purchase.kind === "recurring" && headroomBefore !== null && headroomAfter !== null && headroomAfter < 0 && headroomAfter < headroomBefore;
+
   const totalCost = purchase.kind === "one_time" ? purchase.amountCents : purchase.recurringMonths ? purchase.amountCents * purchase.recurringMonths : null;
   const endingDelta = before.endingCashCents !== null && after.endingCashCents !== null ? after.endingCashCents - before.endingCashCents : null;
   const floor = baseline.cashFloorCents ?? 0;
@@ -110,7 +118,7 @@ export function evaluatePurchase(baseline: ScenarioBaseline, purchase: PurchaseI
   const recurringShortfall = purchase.kind === "recurring" && baseline.availableComplete && baseline.availableForGoalsCents - monthlyCost - goalsAfter.totalWantedCents < 0 && goalsAfter.totalShortfallCents > goalsBefore.totalShortfallCents;
 
   if (negativeCash || (recurringShortfall && goalsAfter.allocations.some((g) => g.priority === 1 && g.shortfallCents > 0))) verdict = "creates_shortfall";
-  else if (cutsGoals) verdict = "affordable_with_goal_cuts";
+  else if (cutsGoals || squeezesPlan) verdict = "affordable_with_goal_cuts";
   else if (unknown) verdict = "unknown";
   else verdict = "affordable";
 
@@ -123,6 +131,7 @@ export function evaluatePurchase(baseline: ScenarioBaseline, purchase: PurchaseI
       notes.push(`${g.name} (priority ${g.priority}) drops from ${formatCents(g.fundedBeforeCents)} to ${formatCents(g.fundedAfterCents)} per month and ${delay}.`);
     }
   }
+  if (squeezesPlan && headroomAfter !== null) notes.push(`The spending plan (${formatCents(planned)} a month) would be short by ${formatCents(-headroomAfter)} after this cost${headroomBefore !== null && headroomBefore < 0 ? ` (it was already short by ${formatCents(-headroomBefore)})` : ""}.`);
   if (endingDelta !== null) notes.push(`Cash after ${baseline.projection.months} months changes by ${formatCents(endingDelta, { signed: true })}.`);
 
   return {

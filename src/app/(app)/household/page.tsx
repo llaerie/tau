@@ -8,6 +8,7 @@ import { FlowsCard } from "@/components/space/FlowsCard";
 import { GoalsCard } from "@/components/space/GoalsCard";
 import { MonthNav } from "@/components/space/MonthNav";
 import { ProjectionSection } from "@/components/space/ProjectionSection";
+import { SpendingPlanCard } from "@/components/space/SpendingPlanCard";
 import { UnresolvedCard } from "@/components/space/UnresolvedCard";
 import { Card, Notice, PageHeader, Section } from "@/components/ui";
 import { Waterfall } from "@/components/Waterfall";
@@ -27,8 +28,8 @@ export default async function HouseholdPage({ searchParams }: { searchParams: Pr
 
   return (
     <>
-      <PageHeader eyebrow="Household" title="Shared household" description="Funded by each person's contribution and any planned company distribution. Shared bills and goals come out of that, in order." actions={<MonthNav month={month} basePath="/household" />} />
-      <div className="mb-8 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <PageHeader eyebrow="Household" title="Shared household" description="Funded by the planned company distribution, anything the company pays for directly, and any personal contributions. Rent, cars, groceries and dining together come out of here, not out of personal budgets." actions={<MonthNav month={month} basePath="/household" />} />
+      <div className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard metric={r.funding} testId="metric-household-funding" />
         <MetricCard metric={r.bills} />
         <MetricCard metric={r.surplus} testId="metric-household-surplus" />
@@ -38,15 +39,15 @@ export default async function HouseholdPage({ searchParams }: { searchParams: Pr
       {shortfall && (
         <div className="mb-6">
           <Notice tone="bad">
-            Planned funding does not cover shared bills and goals. The gap is <Cents value={-r.surplus.total.knownCents} />. Options: raise a contribution, plan a company distribution (see what the company can afford on its page), or lower a goal. Nothing here was adjusted automatically.
+            Planned funding does not cover shared bills, goals and the spending plan. The gap is <Cents value={-r.surplus.total.knownCents} />. Options: raise the planned company distribution (see what the company can afford on its page), add a contribution, or lower a goal or budget. Nothing here was adjusted automatically.
           </Notice>
         </div>
       )}
 
       <Section title="Monthly waterfall">
         <Card>
-          <Waterfall lines={r.lines} />
-          {r.contributionSplit && (
+          <div className="-mx-4 sm:-mx-5"><Waterfall lines={r.lines} /></div>
+          {r.contributionSplit && r.contributionSplit.some((c) => c.amountCents > 0) && (
             <div className="mt-4">
               <StackBar segments={r.contributionSplit.map((c, i) => ({ label: `${c.name} (${(c.shareBps / 100).toFixed(0)}%)`, cents: c.amountCents, color: i === 0 ? "#2a78d6" : "#eb6834" }))} caption="Contribution split" />
             </div>
@@ -54,18 +55,19 @@ export default async function HouseholdPage({ searchParams }: { searchParams: Pr
         </Card>
       </Section>
 
-      <div className="mb-8 grid gap-3 lg:grid-cols-2">
-        <GoalsCard goals={r.goals} editHref={`/accounts?space=${v.space.id}#goals`} title="Shared goals" />
+      <div className="mb-7 grid gap-3 lg:grid-cols-2">
         <BillsCard bills={v.data.bills} statuses={v.bills} unpaidCommittedCents={v.unpaidCommittedCents} editHref={`/accounts?space=${v.space.id}#bills`} />
+        <SpendingPlanCard budgets={r.budgets} planned={r.plannedSpending} editHref={`/accounts?space=${v.space.id}#budgets`} title="Variable spending plan" />
       </div>
 
-      <div className="mb-8 grid gap-3 lg:grid-cols-2">
+      <div className="mb-7 grid gap-3 lg:grid-cols-2">
+        <GoalsCard goals={r.goals} editHref={`/accounts?space=${v.space.id}#goals`} title="Shared goals" />
         <FlowsCard flows={v.flows} month={month} spaceKind="household" />
-        <Card>
-          <h3 className="font-medium">Accounts</h3>
-          <div className="mt-3"><AccountsStrip accounts={v.data.accounts} /></div>
-        </Card>
       </div>
+
+      <Section title="Accounts">
+        <AccountsStrip accounts={v.data.accounts} />
+      </Section>
 
       <Section title="Projection">
         <ProjectionSection projection={v.projection} />

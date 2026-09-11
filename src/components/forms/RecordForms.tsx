@@ -2,7 +2,7 @@
 
 import { useActionState, useRef, useState, useTransition } from "react";
 import type { ActionResult } from "@/lib/actions/helpers";
-import { archiveAccount, deleteBill, deleteGoal, saveAccount, saveBill, saveGoal } from "@/lib/actions/records";
+import { archiveAccount, deleteBill, deleteBudget, deleteGoal, saveAccount, saveBill, saveBudget, saveGoal } from "@/lib/actions/records";
 
 function dollars(cents: number | null | undefined): string {
   return cents === null || cents === undefined ? "" : (cents / 100).toFixed(2).replace(/\.00$/, "");
@@ -105,6 +105,33 @@ export function GoalForm({ spaceId, goal, compact }: { spaceId: string; compact?
         <div className="flex flex-wrap items-center gap-2 sm:col-span-2 lg:col-span-3">
           <button className="btn btn-primary" disabled={pending}>{pending ? "Saving…" : goal ? "Save" : "Add goal"}</button>
           {goal && <button type="button" className="btn btn-danger" disabled={busy} onClick={() => confirm("Delete this goal?") && start(async () => { await deleteGoal(goal.id); })}>Delete</button>}
+          <Status state={state} />
+        </div>
+      </form>
+    </Editor>
+  );
+}
+
+export function BudgetForm({ spaceId, budget, categories, compact }: { spaceId: string; compact?: boolean; categories: { id: string; name: string }[]; budget?: { id: string; name: string; monthlyCents: number | null; categoryId: string | null; sortOrder: number } }) {
+  const [state, action, pending] = useActionState<ActionResult | undefined, FormData>(saveBudget, undefined);
+  const [busy, start] = useTransition();
+  return (
+    <Editor compact={compact} label={budget ? `Edit ${budget.name}` : "Add budget"}>
+      <form action={action} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <input type="hidden" name="spaceId" value={spaceId} />
+        {budget && <input type="hidden" name="id" value={budget.id} />}
+        <label className="text-sm"><span className="label">Name</span><input name="name" className="input mt-1" required defaultValue={budget?.name} placeholder="e.g. Shopping" /></label>
+        <label className="text-sm"><span className="label">Planned per month (blank = unknown)</span><input name="monthly" className="input mt-1" inputMode="decimal" defaultValue={dollars(budget?.monthlyCents)} placeholder="Unknown" /></label>
+        <label className="text-sm"><span className="label">Tracks category</span>
+          <select name="categoryId" className="input mt-1" defaultValue={budget?.categoryId ?? ""}>
+            <option value="">Create one named after the budget</option>
+            {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+        </label>
+        <label className="text-sm"><span className="label">Order</span><input name="sortOrder" className="input mt-1" inputMode="numeric" defaultValue={budget?.sortOrder ?? 0} /></label>
+        <div className="flex flex-wrap items-center gap-2 sm:col-span-2 lg:col-span-4">
+          <button className="btn btn-primary" disabled={pending}>{pending ? "Saving…" : budget ? "Save" : "Add budget"}</button>
+          {budget && <button type="button" className="btn btn-danger" disabled={busy} onClick={() => confirm("Remove this budget?") && start(async () => { await deleteBudget(budget.id); })}>Remove</button>}
           <Status state={state} />
         </div>
       </form>

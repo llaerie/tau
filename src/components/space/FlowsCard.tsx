@@ -1,5 +1,5 @@
 import { Cents } from "@/components/Money";
-import { Card, monthLabel } from "@/components/ui";
+import { Card, CardTitle, monthLabel } from "@/components/ui";
 import type { FlowSummary } from "@/lib/finance/classify";
 
 export function FlowsCard({ flows, month, spaceKind }: { flows: FlowSummary; month: string; spaceKind: "company" | "household" | "personal" }) {
@@ -11,11 +11,8 @@ export function FlowsCard({ flows, month, spaceKind }: { flows: FlowSummary; mon
   ].filter((r) => r.cents !== 0);
   return (
     <Card>
-      <div className="flex items-baseline justify-between gap-2">
-        <h3 className="font-medium">Ledger, {monthLabel(month)}</h3>
-        <span className="text-xs text-ink-3">{flows.transactionCount} transactions</span>
-      </div>
-      <dl className="mt-3 space-y-2 text-sm">
+      <CardTitle right={<span className="text-[12px] text-ink-3">{flows.transactionCount} transactions</span>}>Ledger, {monthLabel(month)}</CardTitle>
+      <dl className="space-y-2 text-[13px]">
         {rows.map((r) => (
           <div key={r.label} className="flex items-baseline justify-between gap-3">
             <dt className="text-ink-2">{r.label}</dt>

@@ -3,7 +3,7 @@
 import { useActionState, useState, useTransition } from "react";
 import { signOut } from "@/lib/actions/auth";
 import type { ActionResult } from "@/lib/actions/helpers";
-import { createInvite, resetDemoData, revokeInvite, setSpaceRole } from "@/lib/actions/settings";
+import { createInvite, renameWorkspace, resetDemoData, revokeInvite, setSpaceRole } from "@/lib/actions/settings";
 
 export function SignOutButton() {
   return (
@@ -72,4 +72,16 @@ export function InviteForm({ spaces }: { spaces: { id: string; name: string }[] 
 export function RevokeInviteButton({ id }: { id: string }) {
   const [pending, start] = useTransition();
   return <button type="button" className="btn btn-ghost btn-sm" disabled={pending} onClick={() => start(async () => { await revokeInvite(id); })}>Revoke</button>;
+}
+
+export function RenameWorkspaceForm({ name }: { name: string }) {
+  const [state, action, pending] = useActionState<ActionResult | undefined, FormData>(renameWorkspace, undefined);
+  return (
+    <form action={action} className="flex flex-col gap-2 sm:flex-row sm:items-end">
+      <label className="flex-1 text-sm"><span className="label">Company / workspace name</span><input name="name" className="input mt-1" defaultValue={name} required maxLength={80} /></label>
+      <button className="btn btn-secondary" disabled={pending}>{pending ? "Saving…" : "Rename"}</button>
+      {state && !state.ok && <p className="text-sm text-bad">{state.error}</p>}
+      {state?.ok && <p className="text-sm text-good">Renamed.</p>}
+    </form>
+  );
 }

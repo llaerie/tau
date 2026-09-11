@@ -7,7 +7,7 @@ export function AccountsStrip({ accounts }: { accounts: AccountWithBalance[] }) 
       {accounts
         .filter((a) => !a.isArchived)
         .map((a) => (
-          <li key={a.id} className="flex items-center justify-between gap-3 rounded-xl border border-line bg-surface px-3 py-2 text-sm">
+          <li key={a.id} className="flex items-center justify-between gap-3 rounded-lg border border-line bg-surface px-3 py-2 text-[13px]">
             <span className="min-w-0">
               <span className="block truncate font-medium">{a.name}</span>
               <span className="block text-xs text-ink-3">{a.type.replace("_", " ")}{a.institution ? ` · ${a.institution}` : ""}</span>

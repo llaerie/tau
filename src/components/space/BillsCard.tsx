@@ -1,5 +1,5 @@
 import { AmountText, Cents } from "@/components/Money";
-import { Card, EmptyState } from "@/components/ui";
+import { Card, CardTitle, EmptyState } from "@/components/ui";
 import type { Bill } from "@/lib/db/schema";
 import type { BillPeriodStatus } from "@/lib/finance/classify";
 import { amountFromNullable } from "@/lib/finance/money";
@@ -8,14 +8,11 @@ export function BillsCard({ bills, statuses, unpaidCommittedCents, editHref }: {
   const byId = new Map(statuses.map((s) => [s.billId, s]));
   return (
     <Card>
-      <div className="flex items-baseline justify-between gap-2">
-        <h3 className="font-medium">Bills this month</h3>
-        <a href={editHref} className="link text-xs">Manage</a>
-      </div>
+      <CardTitle right={<a href={editHref} className="link text-[12px]">Manage</a>}>Bills this month</CardTitle>
       {bills.length === 0 ? (
         <div className="mt-3"><EmptyState title="No bills yet">Add recurring bills so commitments are counted.</EmptyState></div>
       ) : (
-        <div className="table-wrap mt-2">
+        <div className="table-wrap -mx-4 sm:-mx-5">
           <table className="data">
             <thead>
               <tr>

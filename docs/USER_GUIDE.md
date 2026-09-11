@@ -16,7 +16,7 @@ pnpm demo                      # development server on http://localhost:3000
 pnpm build && pnpm start:demo
 ```
 
-Open http://localhost:3000, pick **Alex** or **Sam**. Both are owners of the company and the
+Open http://localhost:3000, pick **Will** or **Arielle**. Both see the company and the
 household; each sees only their own personal space. Everything you change is saved to
 `./data/finance-desk.db`. **Settings → Reset demo data** restores the original synthetic set.
 
@@ -44,17 +44,22 @@ Notes for live mode:
 
 ## 2. First-time setup in live mode
 
-1. Open `/sign-in` → **Create account**. Enter your name, email, a password of 10+ characters,
-   your company name, and your partner's first name. This creates the workspace, the company
-   space, the household space, your private personal space, and a private personal space for
-   your partner (they cannot see yours, you cannot see theirs).
+1. Open `/sign-in` → **Create account**. Enter your first name and role (Will, CEO), email, a
+   password of 10+ characters, the company name, and your partner's first name and role
+   (Arielle, Creative Director). This creates the workspace, the company space, the household
+   space, your private personal space, and a private personal space for your partner (they
+   cannot see yours, you cannot see theirs). Using the names Will and Arielle pre-fills the
+   plan: the $8,000 allocation, both $3,000 salaries with the FICA + income-tax estimate, the
+   household bills (rent, Tesla payments, utilities, car insurance, amounts unknown), and
+   Arielle's travel goal and spending plan.
 2. You land on **Set up**. Fill in what you know and leave the rest blank:
-   - each owner's gross monthly salary (gross, not take-home), a withholding estimate if you
-     have one, other net income, and the monthly household contribution;
-   - company revenue and whether it is anticipated or contracted, the employee allocation and
-     its payroll classification (leave **Unresolved** until decided), employer payroll cost
-     rate, income tax reserve rate, other overhead, reserve target, and the planned monthly
-     distribution to the household.
+   - each person's role, gross monthly salary (gross, not take-home), FICA rate, income-tax
+     withholding estimate with an optional range, other net income, and any household
+     contribution (0 when the company funds the household);
+   - company revenue and whether it is anticipated or contracted, the monthly allocations and
+     their kinds (split the $8,000 into a business line and a household line when you know the
+     amounts), employer payroll cost rate, income tax reserve rate, other overhead, reserve
+     target, and the planned monthly distribution to the household.
    Blank means unknown. Unknown is shown as unknown everywhere and never treated as zero.
 3. Go to **Accounts** and, for each space, add accounts with an opening balance and the date
    it was taken. Add recurring bills and goals (see section 4).
@@ -92,8 +97,14 @@ again. Leave the amount blank if you do not know it.
 
 **Goals**: priority 1 is funded first; a lower priority goal only gets money after every higher
 one is fully funded. Set the monthly contribution, an optional target total, and what is saved
-so far to get "months to target". Alex's "Friends travel" goal is priority 1 with the rule
-"funded before any discretionary spending"; set your own the same way.
+so far to get "months to target". Arielle's "Friends travel" goal is priority 1 with the rule
+"funded before any discretionary spending".
+
+**Spending plan (budgets)**: planned discretionary money by category, after goals. Each budget
+tracks a category, so expenses recorded with that category show as "spent" against it. The
+personal page shows what is left unallocated after the plan, and says so when the plan is
+larger than what is available. The household has its own plan for groceries and dining
+together.
 
 ## 5. Recording money
 
@@ -155,7 +166,8 @@ demo data (demo mode only), sign out.
 
 ## 9. A monthly routine
 
-1. Import or enter the month's transactions for each space; mark bills as bill payments.
+1. Import or enter the month's transactions for each space; mark bills as bill payments and
+   give discretionary expenses the category of their budget.
 2. Check **Overview**: is anything "unknown" that you now know? Enter it in Settings.
 3. Review the household surplus or shortfall and decide contributions or a company
    distribution; see Company for what is genuinely available after commitments.

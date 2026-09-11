@@ -22,7 +22,7 @@ export default async function OverviewPage() {
       <PageHeader
         eyebrow={monthLabel(o.month)}
         title={`Good to see you, ${viewer.person?.name ?? viewer.user.name}`}
-        description="Five questions, one honest answer each. Spaces are shown side by side and never added into one balance."
+        description="Five questions, one honest answer each. Company, household and personal money stay separate and are never added into one balance."
         actions={<ButtonLink href="/scenarios" variant="secondary">Try a purchase</ButtonLink>}
       />
 
@@ -50,12 +50,12 @@ export default async function OverviewPage() {
       )}
 
       {c && (
-        <Section title="2 · What is already committed" description="Employees, owner gross salaries, payroll costs, bills, overhead and the tax reserve.">
+        <Section title="2 · What is already committed" description="Gross salaries, monthly allocations, payroll costs, bills, overhead and the tax reserve.">
           <div className="grid gap-3 lg:grid-cols-[1fr_1.4fr]">
             <MetricCard metric={c.result.committed} />
             <Card>
-              <ul className="divide-y divide-line text-sm">
-                {c.result.lines.filter((l) => l.kind === "outflow" || l.kind === "reserve").map((l) => (
+              <ul className="divide-y divide-line text-[13px]">
+                {c.result.lines.filter((l) => (l.kind === "outflow" || l.kind === "reserve") && l.id !== "planned-distribution").map((l) => (
                   <li key={l.id} className="flex items-baseline justify-between gap-3 py-1.5">
                     <span className="text-ink-2">{l.label}</span>
                     <AmountText amount={l.amount} />
@@ -72,8 +72,8 @@ export default async function OverviewPage() {
         <Section title="3 · What can fund the shared household" description="What the company could distribute after commitments, against what the household actually needs.">
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {c && <MetricCard metric={c.result.distributable} tone={c.result.distributable.total.complete ? undefined : "warn"} hint={c.result.distributable.total.complete ? undefined : "Upper bound while items stay unknown"} />}
-            {h && <MetricCard metric={h.result.funding} hint="Planned contributions and distributions" />}
-            {h && <MetricCard metric={h.result.surplus} />}
+            {h && <MetricCard metric={h.result.funding} hint="Planned distribution plus contributions" />}
+            {h && <MetricCard metric={h.result.surplus} hint="After shared bills, goals and the spending plan" />}
           </div>
           {h && h.result.surplus.total.complete && h.result.surplus.total.knownCents < 0 && (
             <div className="mt-3">
@@ -83,24 +83,24 @@ export default async function OverviewPage() {
         </Section>
       )}
 
-      <Section title="4 · What each person actually has available" description="After withholding, obligations and goals in priority order. Only spaces you may see are listed.">
+      <Section title="4 · What each person actually has available" description="After withholding, obligations, goals in priority order and the spending plan. Only spaces you may see are listed.">
         <div className="grid gap-3 lg:grid-cols-2">
           {o.personal.map((p) => {
             const travel = p.result.goals?.allocations.find((g) => g.priority === 1);
             return (
               <Card key={p.space.id}>
                 <div className="flex items-baseline justify-between gap-3">
-                  <h3 className="font-medium">{p.personName}</h3>
-                  <Link href={`/personal/${p.space.id}`} className="link text-xs">Open</Link>
+                  <h3 className="text-[13.5px] font-semibold">{p.personName}{p.personTitle && <span className="ml-2 text-[12px] font-normal text-ink-3">{p.personTitle}</span>}</h3>
+                  <Link href={`/personal/${p.space.id}`} className="link text-[12px]">Open</Link>
                 </div>
-                <dl className="mt-3 grid grid-cols-2 gap-3 text-sm">
+                <dl className="mt-3 grid grid-cols-2 gap-3 text-[13px]">
                   <div><dt className="label">Gross salary</dt><dd className="mt-0.5"><TotalText total={p.result.gross.total} size="sm" /></dd></div>
                   <div><dt className="label">Net take-home</dt><dd className="mt-0.5"><TotalText total={p.result.net.total} size="sm" /></dd></div>
-                  <div><dt className="label">Obligations + goals</dt><dd className="mt-0.5 num">{p.result.obligations.total.complete ? <Cents value={p.result.obligations.total.knownCents + (p.result.goals?.totalWantedCents ?? 0)} /> : <TotalText total={p.result.obligations.total} size="sm" />}</dd></div>
                   <div><dt className="label">Available after goals</dt><dd className="mt-0.5"><TotalText total={p.result.discretionary.total} size="sm" className={p.result.discretionary.total.complete && p.result.discretionary.total.knownCents < 0 ? "text-bad" : ""} /></dd></div>
+                  <div><dt className="label">Spending plan</dt><dd className="mt-0.5"><TotalText total={p.result.plannedSpending} size="sm" /></dd></div>
                 </dl>
                 {travel && (
-                  <p className="mt-3 text-xs text-ink-3">
+                  <p className="mt-3 text-[12px] text-ink-3">
                     Priority 1 goal &ldquo;{travel.name}&rdquo; wants <Cents value={travel.wantedCents} /> a month{p.result.net.total.complete ? <> and is {travel.shortfallCents === 0 ? "fully funded" : `short by $${(travel.shortfallCents / 100).toLocaleString()}`}</> : "; funding depends on the unknown net take-home"}.
                   </p>
                 )}
@@ -113,7 +113,7 @@ export default async function OverviewPage() {
 
       <Section title="5 · How a purchase would change things" description="Model a one-time or recurring cost against any space you can see.">
         <Card className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-sm text-ink-2">Scenarios show the cash path, the reserve floor and which goals get delayed, in priority order. The friends-travel goal is protected first.</p>
+          <p className="text-[13px] text-ink-2">Scenarios show the cash path, the reserve floor and which goals get delayed, in priority order. Priority-1 goals like Arielle&apos;s friends-travel fund are protected first.</p>
           <ButtonLink href="/scenarios" variant="primary">Open scenarios</ButtonLink>
         </Card>
       </Section>

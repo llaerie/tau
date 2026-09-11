@@ -1,18 +1,15 @@
 import { Cents } from "@/components/Money";
-import { Card, EmptyState } from "@/components/ui";
+import { Card, CardTitle, EmptyState } from "@/components/ui";
 import type { GoalFundingResult } from "@/lib/finance/types";
 
 export function GoalsCard({ goals, editHref, netUnknown, title = "Goals in priority order" }: { goals: GoalFundingResult | null; editHref: string; netUnknown?: boolean; title?: string }) {
   return (
     <Card>
-      <div className="flex items-baseline justify-between gap-2">
-        <h3 className="font-medium">{title}</h3>
-        <a href={editHref} className="link text-xs">Manage</a>
-      </div>
+      <CardTitle right={<a href={editHref} className="link text-[12px]">Manage</a>}>{title}</CardTitle>
       {!goals || goals.allocations.length === 0 ? (
         <div className="mt-3"><EmptyState title="No goals yet" /></div>
       ) : (
-        <div className="table-wrap mt-2">
+        <div className="table-wrap -mx-4 sm:-mx-5">
           <table className="data">
             <thead>
               <tr>

@@ -1,33 +1,32 @@
 @import "tailwindcss";
 
 @theme {
-  --color-bg: #f7f5f0;
+  --color-bg: #f5f6f8;
   --color-surface: #ffffff;
-  --color-surface-2: #fbfaf7;
-  --color-surface-3: #f1eee7;
-  --color-ink: #1f1d1a;
-  --color-ink-2: #5c5751;
-  --color-ink-3: #8a847b;
-  --color-line: #e7e2d9;
-  --color-line-2: #d9d3c8;
-  --color-accent: #2e6b5e;
-  --color-accent-strong: #235349;
-  --color-accent-soft: #e6f0ed;
-  --color-good: #2f7d4f;
-  --color-good-soft: #e5f2ea;
-  --color-warn: #a66a12;
-  --color-warn-soft: #f8efdf;
-  --color-bad: #b23b34;
-  --color-bad-soft: #f8e6e4;
-  --color-unknown: #6f6a8f;
-  --color-unknown-soft: #ecebf4;
+  --color-surface-2: #f8fafc;
+  --color-surface-3: #f1f4f8;
+  --color-ink: #0f172a;
+  --color-ink-2: #475569;
+  --color-ink-3: #8b95a7;
+  --color-line: #e6e9ef;
+  --color-line-2: #d5dae3;
+  --color-accent: #1d4ed8;
+  --color-accent-strong: #1e40af;
+  --color-accent-soft: #eaf0ff;
+  --color-good: #15803d;
+  --color-good-soft: #e8f6ec;
+  --color-warn: #b45309;
+  --color-warn-soft: #fdf1e0;
+  --color-bad: #b91c1c;
+  --color-bad-soft: #fdeaea;
+  --color-unknown: #6d28d9;
+  --color-unknown-soft: #f1ecfd;
   --color-series-1: #2a78d6;
   --color-series-2: #eb6834;
   --color-series-3: #1baf7a;
-  --color-series-muted: #c8c2b6;
+  --color-series-muted: #cbd2dc;
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --radius-card: 14px;
-  --shadow-card: 0 1px 2px rgba(31, 29, 26, 0.04), 0 1px 0 rgba(31, 29, 26, 0.02);
+  --radius-card: 12px;
 }
 
 html {
@@ -38,8 +37,16 @@ body {
   background: var(--color-bg);
   color: var(--color-ink);
   font-family: var(--font-sans);
-  font-feature-settings: "cv11", "ss01";
+  font-feature-settings: "cv11", "ss01", "tnum";
   -webkit-font-smoothing: antialiased;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+h1,
+h2,
+h3 {
+  letter-spacing: -0.015em;
 }
 
 .num {
@@ -52,27 +59,27 @@ body {
   background: var(--color-surface);
   border: 1px solid var(--color-line);
   border-radius: var(--radius-card);
-  box-shadow: var(--shadow-card);
 }
 
 .label {
-  font-size: 0.75rem;
-  letter-spacing: 0.04em;
+  font-size: 11px;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--color-ink-3);
-  font-weight: 500;
+  font-weight: 600;
 }
 
 .input {
   width: 100%;
   border: 1px solid var(--color-line-2);
   background: var(--color-surface);
-  border-radius: 10px;
-  padding: 0.55rem 0.75rem;
-  font-size: 0.9375rem;
+  border-radius: 8px;
+  padding: 0.45rem 0.65rem;
+  font-size: 14px;
   color: var(--color-ink);
   outline: none;
-  min-height: 42px;
+  min-height: 38px;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
 }
 .input:focus {
   border-color: var(--color-accent);
@@ -90,18 +97,18 @@ select.input {
   align-items: center;
   justify-content: center;
   gap: 0.4rem;
-  border-radius: 10px;
-  padding: 0.55rem 0.95rem;
-  font-size: 0.9rem;
+  border-radius: 8px;
+  padding: 0.45rem 0.85rem;
+  font-size: 13.5px;
   font-weight: 500;
-  min-height: 42px;
+  min-height: 38px;
   border: 1px solid transparent;
   cursor: pointer;
   white-space: nowrap;
-  transition: background-color 120ms ease, border-color 120ms ease;
+  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
 }
 .btn:disabled {
-  opacity: 0.55;
+  opacity: 0.5;
   cursor: default;
 }
 .btn-primary {
@@ -118,6 +125,7 @@ select.input {
 }
 .btn-secondary:hover:not(:disabled) {
   background: var(--color-surface-2);
+  border-color: #c3cad6;
 }
 .btn-ghost {
   background: transparent;
@@ -125,6 +133,7 @@ select.input {
 }
 .btn-ghost:hover:not(:disabled) {
   background: var(--color-surface-3);
+  color: var(--color-ink);
 }
 .btn-danger {
   background: var(--color-surface);
@@ -132,20 +141,20 @@ select.input {
   color: var(--color-bad);
 }
 .btn-sm {
-  min-height: 34px;
-  padding: 0.35rem 0.7rem;
-  font-size: 0.85rem;
+  min-height: 30px;
+  padding: 0.25rem 0.6rem;
+  font-size: 12.5px;
 }
 
 .chip {
   display: inline-flex;
   align-items: center;
   gap: 0.3rem;
-  border-radius: 999px;
-  padding: 0.15rem 0.6rem;
-  font-size: 0.75rem;
+  border-radius: 6px;
+  padding: 0.1rem 0.45rem;
+  font-size: 11.5px;
   font-weight: 500;
-  line-height: 1.4;
+  line-height: 1.5;
   white-space: nowrap;
 }
 .chip-unknown {
@@ -182,21 +191,22 @@ select.input {
 table.data {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.9rem;
+  font-size: 13.5px;
 }
 table.data th {
   text-align: left;
-  font-weight: 500;
+  font-weight: 600;
   color: var(--color-ink-3);
-  font-size: 0.75rem;
-  letter-spacing: 0.04em;
+  font-size: 11px;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   padding: 0.5rem 0.75rem;
   border-bottom: 1px solid var(--color-line);
   white-space: nowrap;
+  background: var(--color-surface-2);
 }
 table.data td {
-  padding: 0.6rem 0.75rem;
+  padding: 0.55rem 0.75rem;
   border-bottom: 1px solid var(--color-line);
   vertical-align: top;
 }
@@ -207,23 +217,31 @@ table.data td.r,
 table.data th.r {
   text-align: right;
 }
+table.data tbody tr:hover td {
+  background: var(--color-surface-2);
+}
 
 dialog::backdrop {
-  background: rgba(31, 29, 26, 0.35);
+  background: rgba(15, 23, 42, 0.4);
 }
 
 .link {
   color: var(--color-accent);
+  text-decoration: none;
+}
+.link:hover {
   text-decoration: underline;
   text-underline-offset: 3px;
-  text-decoration-color: rgba(46, 107, 94, 0.35);
-}
-
-.prose-tight p + p {
-  margin-top: 0.5rem;
 }
 
 .recharts-cartesian-axis-tick text {
   fill: var(--color-ink-3);
   font-size: 11px;
+}
+
+.hero-value {
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
 }

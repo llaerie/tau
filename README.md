@@ -1,9 +1,10 @@
 # Finance Desk
 
-A calm, precise finance workspace for a small company, the shared household of its two owners, and
-each owner's private personal money. Company, household and the two personal spaces are kept
-separate; they connect through classified transactions, per-space permissions and consolidated
-views that show the spaces side by side without ever blending them into one balance.
+A crisp finance workspace for a small S corporation (Will, CEO), the shared household of its
+two people, and each person's private money (Will and Arielle, Creative Director). Company,
+household and the two personal spaces are kept separate; they connect through classified
+transactions, per-space permissions and consolidated views that show the spaces side by side
+without ever blending them into one balance.
 
 > `SPEC.md` was not present in the repository when this was built. The specification the app was
 > built against is reconstructed in [`docs/ASSUMED_SPEC.md`](docs/ASSUMED_SPEC.md); the plan is in
@@ -28,8 +29,9 @@ pnpm install
 pnpm demo            # http://localhost:3000, synthetic data, persona sign-in
 ```
 
-The demo seeds a synthetic workspace ("Halden Studio") into `./data/finance-desk.db`. Changes
-persist; **Settings → Reset demo data** restores the original set. Or run the production build:
+The demo seeds a workspace for Will and Arielle into `./data/finance-desk.db`: plan figures
+follow the stated plan, balances and bills are synthetic and labelled as such. Changes persist;
+**Settings → Reset demo data** restores the original set. Or run the production build:
 
 ```bash
 pnpm build && pnpm start:demo

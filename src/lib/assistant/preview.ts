@@ -74,7 +74,8 @@ export function renderPreview(calls: ToolCall[]): string {
           metricLine(r.committed as Rec),
           `${metricLine(r.available_for_household as Rec)}${(r.available_for_household as Rec).complete ? "" : ". Treat it as an upper bound until the unknown items are entered"}.`,
           r.runway_months_on_known_costs !== null ? `Runway on known operating cost: ${r.runway_months_on_known_costs} months.` : "Runway cannot be computed while cash is unknown.",
-          `Employee allocation classification: ${r.employee_classification}.`,
+          `${metricLine(r.retained_after_distributions as Rec)}.`,
+          `Allocations: ${(r.allocations as Rec[]).map((a) => `${a.name} ${a.amount} (${String(a.kind).replace(/_/g, " ")})`).join("; ")}.`,
         ];
         parts.push(lines.join("\n"));
         break;
@@ -95,6 +96,7 @@ export function renderPreview(calls: ToolCall[]): string {
             metricLine(r.obligations as Rec),
             goals ? `Goals in priority order: ${goals}.` : "",
             `${metricLine(r.available_after_goals as Rec)}${!net.complete && r.upper_bound_if_nothing_withheld ? `. Even with nothing withheld it would be at most ${r.upper_bound_if_nothing_withheld}` : ""}.`,
+            (r.spending_plan as Rec[]).length ? `Spending plan: ${(r.spending_plan as Rec[]).map((b) => `${b.name} ${b.planned}${b.spent_this_month !== "not tracked" ? ` (spent ${b.spent_this_month})` : ""}`).join("; ")}. ${metricLine(r.unallocated_after_spending_plan as Rec)}.` : "",
             r.ledger_evidence ? `Ledger evidence: last month's net deposits were ${(r.ledger_evidence as Rec).last_month_net_deposits}${(r.ledger_evidence as Rec).last_month_withheld ? ` with ${(r.ledger_evidence as Rec).last_month_withheld} withheld` : ""}.` : "",
           ]
             .filter(Boolean)

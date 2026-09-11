@@ -1,6 +1,6 @@
 "use server";
 
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { assertSpaceAccess } from "../auth/authorize";
@@ -155,6 +155,63 @@ export async function deleteGoal(id: string): Promise<ActionResult> {
     if (!goal) throw new ActionError("Goal not found.");
     assertSpaceAccess(viewer, goal.spaceId, "edit");
     db.delete(s.goals).where(eq(s.goals.id, id)).run();
+    revalidatePath("/", "layout");
+  });
+}
+
+// ---------- Budgets ----------
+
+const budgetSchema = z.object({
+  spaceId: z.string().min(1),
+  name: z.string().min(1).max(80),
+  monthlyCents: z.number().int().nonnegative().nullable(),
+  categoryId: z.string().nullable(),
+  sortOrder: z.number().int(),
+});
+
+export async function saveBudget(_prev: ActionResult | undefined, fd: FormData): Promise<ActionResult> {
+  return runAction(async () => {
+    const viewer = await requireViewer();
+    const id = str(fd, "id");
+    const input = budgetSchema.parse({
+      spaceId: str(fd, "spaceId"),
+      name: str(fd, "name"),
+      monthlyCents: moneyOrNull(fd, "monthly"),
+      categoryId: str(fd, "categoryId") || null,
+      sortOrder: intOrNull(fd, "sortOrder") ?? 0,
+    });
+    assertSpaceAccess(viewer, input.spaceId, "edit");
+    const db = getDb();
+    // A budget tracks spending through a category; create one named after it when none is chosen.
+    if (!input.categoryId) {
+      const existing = db.select().from(s.categories).where(and(eq(s.categories.workspaceId, viewer.workspace.id), eq(s.categories.name, input.name))).get();
+      if (existing) input.categoryId = existing.id;
+      else {
+        const space = viewer.spaces.find((x) => x.id === input.spaceId)!;
+        input.categoryId = newId("cat");
+        db.insert(s.categories).values({ id: input.categoryId, workspaceId: viewer.workspace.id, name: input.name, group: space.kind }).run();
+      }
+    }
+    if (id) {
+      const existing = db.select().from(s.budgets).where(eq(s.budgets.id, id)).get();
+      if (!existing) throw new ActionError("Budget not found.");
+      assertSpaceAccess(viewer, existing.spaceId, "edit");
+      db.update(s.budgets).set({ ...input, spaceId: existing.spaceId }).where(eq(s.budgets.id, id)).run();
+    } else {
+      db.insert(s.budgets).values({ ...input, id: newId("bud") }).run();
+    }
+    revalidatePath("/", "layout");
+  });
+}
+
+export async function deleteBudget(id: string): Promise<ActionResult> {
+  return runAction(async () => {
+    const viewer = await requireViewer();
+    const db = getDb();
+    const b = db.select().from(s.budgets).where(eq(s.budgets.id, id)).get();
+    if (!b) throw new ActionError("Budget not found.");
+    assertSpaceAccess(viewer, b.spaceId, "edit");
+    db.delete(s.budgets).where(eq(s.budgets.id, id)).run();
     revalidatePath("/", "layout");
   });
 }

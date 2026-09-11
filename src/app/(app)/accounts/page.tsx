@@ -1,5 +1,5 @@
 import { and, eq, inArray } from "drizzle-orm";
-import { AccountForm, BillForm, GoalForm } from "@/components/forms/RecordForms";
+import { AccountForm, BillForm, BudgetForm, GoalForm } from "@/components/forms/RecordForms";
 import { AmountText, Cents } from "@/components/Money";
 import { Card, EmptyState, PageHeader, Section } from "@/components/ui";
 import { requireViewer } from "@/lib/actions/helpers";
@@ -25,7 +25,7 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
 
   return (
     <>
-      <PageHeader eyebrow="Records" title="Accounts, bills & goals" description="Balances, recurring bills and savings goals per space. Leave a balance or amount blank when you do not know it; it will show as unknown rather than zero." />
+      <PageHeader eyebrow="Records" title="Accounts, bills, budgets & goals" description="Balances, recurring bills, spending plans and savings goals per space. Leave a balance or amount blank when you do not know it; it will show as unknown rather than zero." />
       <div className="mb-6 flex flex-wrap gap-1">
         {viewer.spaces.map((x) => (
           <Link key={x.id} href={`/accounts?space=${x.id}`} className={`chip ${space.id === x.id ? "chip-accent" : "chip-neutral"}`}>{x.name}</Link>
@@ -58,7 +58,7 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
             </div>
           )}
         </Card>
-        {editable && <div className="mt-3"><Card><h3 className="mb-2 font-medium">Add account</h3><AccountForm spaceId={space.id} today={today} /></Card></div>}
+        {editable && <div className="mt-3"><Card><h3 className="mb-2 text-[13.5px] font-semibold">Add account</h3><AccountForm spaceId={space.id} today={today} /></Card></div>}
       </Section>
 
       <Section title="Recurring bills" id="bills" description="Counted as committed until a bill payment is recorded for the period.">
@@ -84,7 +84,32 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
             </div>
           )}
         </Card>
-        {editable && <div className="mt-3"><Card><h3 className="mb-2 font-medium">Add bill</h3><BillForm spaceId={space.id} categories={categories} /></Card></div>}
+        {editable && <div className="mt-3"><Card><h3 className="mb-2 text-[13.5px] font-semibold">Add bill</h3><BillForm spaceId={space.id} categories={categories} /></Card></div>}
+      </Section>
+
+      <Section title="Spending plan" id="budgets" description="Planned discretionary money by category. Spending is tracked through the matching category on transactions.">
+        <Card className="!p-0">
+          {data.budgets.length === 0 ? (
+            <div className="p-4"><EmptyState title="No budgets yet" /></div>
+          ) : (
+            <div className="table-wrap">
+              <table className="data">
+                <thead><tr><th>Budget</th><th className="r">Planned / month</th><th>Category</th><th></th></tr></thead>
+                <tbody>
+                  {data.budgets.map((b) => (
+                    <tr key={b.id}>
+                      <td>{b.name}</td>
+                      <td className="r"><AmountText amount={amountFromNullable(b.monthlyCents, "not set")} /></td>
+                      <td className="text-ink-2">{data.categories.find((c) => c.id === b.categoryId)?.name ?? "—"}</td>
+                      <td className="r">{editable && <BudgetForm spaceId={space.id} categories={categories} budget={b} compact />}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Card>
+        {editable && <div className="mt-3"><Card><h3 className="mb-2 text-[13.5px] font-semibold">Add budget</h3><BudgetForm spaceId={space.id} categories={categories} /></Card></div>}
       </Section>
 
       <Section title="Goals" id="goals" description="Priority 1 is funded first. A lower priority goal only gets money once every higher one is fully funded.">
@@ -111,7 +136,7 @@ export default async function AccountsPage({ searchParams }: { searchParams: Pro
             </div>
           )}
         </Card>
-        {editable && <div className="mt-3"><Card><h3 className="mb-2 font-medium">Add goal</h3><GoalForm spaceId={space.id} /></Card></div>}
+        {editable && <div className="mt-3"><Card><h3 className="mb-2 text-[13.5px] font-semibold">Add goal</h3><GoalForm spaceId={space.id} /></Card></div>}
       </Section>
     </>
   );

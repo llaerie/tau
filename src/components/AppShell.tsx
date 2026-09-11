@@ -52,11 +52,14 @@ export function AppShell({
 
   return (
     <div className="min-h-dvh lg:grid lg:grid-cols-[248px_1fr]">
-      <aside className="hidden lg:sticky lg:top-0 lg:flex lg:h-dvh lg:flex-col lg:border-r lg:border-line lg:bg-surface-2">
-        <div className="px-5 pb-4 pt-6">
-          <Link href="/" className="block">
-            <p className="text-[15px] font-semibold tracking-tight">Finance Desk</p>
-            <p className="mt-0.5 truncate text-sm text-ink-3">{workspaceName}</p>
+      <aside className="hidden lg:sticky lg:top-0 lg:flex lg:h-dvh lg:flex-col lg:border-r lg:border-line lg:bg-surface">
+        <div className="px-4 pb-3 pt-5">
+          <Link href="/" className="flex items-center gap-2.5">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-ink text-[13px] font-bold text-white">F</span>
+            <span className="min-w-0">
+              <span className="block text-[14px] font-semibold leading-tight">Finance Desk</span>
+              <span className="block truncate text-[12px] text-ink-3">{workspaceName}</span>
+            </span>
           </Link>
           <ModeBadge isDemo={isDemo} className="mt-3" />
         </div>
@@ -66,40 +69,43 @@ export function AppShell({
               <li key={it.href}>
                 <Link
                   href={it.href}
-                  className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors ${active(it.href) ? "bg-surface font-medium text-ink shadow-card" : "text-ink-2 hover:bg-surface hover:text-ink"}`}
+                  className={`flex items-center gap-2.5 rounded-md px-2.5 py-[7px] text-[13.5px] transition-colors ${active(it.href) ? "bg-surface-3 font-medium text-ink" : "text-ink-2 hover:bg-surface-2 hover:text-ink"}`}
                   aria-current={active(it.href) ? "page" : undefined}
                 >
-                  <Icon name={it.icon} className="h-[18px] w-[18px] text-ink-3" />
+                  <Icon name={it.icon} className={`h-[17px] w-[17px] ${active(it.href) ? "text-accent" : "text-ink-3"}`} />
                   {it.label}
                 </Link>
               </li>
             ))}
           </ul>
         </nav>
-        <div className="border-t border-line px-5 py-4 text-sm">
+        <div className="border-t border-line px-4 py-3 text-[13px]">
           <p className="truncate font-medium">{userName}</p>
           <Link href="/settings" className="text-ink-3 hover:text-ink">
-            Settings & sign out
+            Settings &amp; sign out
           </Link>
         </div>
       </aside>
 
       <div className="flex min-h-dvh flex-col">
-        <header className="sticky top-0 z-20 flex items-center justify-between border-b border-line bg-bg/90 px-4 py-3 backdrop-blur lg:hidden">
-          <Link href="/" className="min-w-0">
-            <p className="text-[15px] font-semibold tracking-tight">Finance Desk</p>
-            <p className="truncate text-xs text-ink-3">{workspaceName}</p>
+        <header className="sticky top-0 z-20 flex items-center justify-between border-b border-line bg-surface/95 px-4 py-2.5 backdrop-blur lg:hidden">
+          <Link href="/" className="flex min-w-0 items-center gap-2">
+            <span className="flex h-7 w-7 items-center justify-center rounded-md bg-ink text-[12px] font-bold text-white">F</span>
+            <span className="min-w-0">
+              <span className="block text-[14px] font-semibold leading-tight">Finance Desk</span>
+              <span className="block truncate text-[11.5px] text-ink-3">{workspaceName}</span>
+            </span>
           </Link>
           <ModeBadge isDemo={isDemo} />
         </header>
-        <main className="mx-auto w-full max-w-6xl flex-1 px-4 pb-28 pt-5 sm:px-6 lg:px-10 lg:pb-16 lg:pt-10">{children}</main>
+        <main className="mx-auto w-full max-w-6xl flex-1 px-4 pb-28 pt-5 sm:px-6 lg:px-8 lg:pb-16 lg:pt-8">{children}</main>
         <nav className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden" aria-label="Primary">
-          <ul className="grid grid-cols-5">
+          <ul className="grid grid-cols-5 px-1">
             {mobileItems.map((it) => (
               <li key={it.href}>
                 <Link
                   href={it.href}
-                  className={`flex flex-col items-center gap-1 px-1 py-2 text-[11px] ${active(it.href) ? "text-accent" : "text-ink-3"}`}
+                  className={`flex flex-col items-center gap-0.5 px-1 pb-1.5 pt-2 text-[10.5px] font-medium ${active(it.href) ? "text-accent" : "text-ink-3"}`}
                   aria-current={active(it.href) ? "page" : undefined}
                 >
                   <Icon name={it.icon} />

@@ -1,16 +1,13 @@
 import { ProjectionChart } from "@/components/charts/ProjectionChart";
 import { Cents } from "@/components/Money";
-import { Card, Notice, shortMonth } from "@/components/ui";
+import { Card, CardTitle, Notice, shortMonth } from "@/components/ui";
 import type { Projection } from "@/lib/finance/projection";
 
 export function ProjectionSection({ projection, floorCents, title = "Next six months" }: { projection: Projection; floorCents?: number | null; title?: string }) {
   const points = projection.months.map((m) => ({ month: m.month, label: shortMonth(m.month), before: m.endingCashCents }));
   return (
     <Card>
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h3 className="font-medium">{title}</h3>
-        <p className="text-xs text-ink-3">Ending cash per month from today&apos;s known monthly flows.</p>
-      </div>
+      <CardTitle right={<span className="text-[12px] text-ink-3">Ending cash from today&apos;s known monthly flows</span>}>{title}</CardTitle>
       {projection.unknowns.length > 0 && (
         <div className="mt-3">
           <Notice tone="unknown">

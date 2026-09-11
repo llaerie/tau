@@ -11,13 +11,14 @@ import { getDb } from "../db";
 import { DEMO } from "../db/seed";
 import * as s from "../db/schema";
 import { newId, nowIso } from "../ids";
+import { applyTemplateRecords, TEMPLATE, templatePerson } from "../db/template";
 import { ActionError, runAction, str, type ActionResult } from "./helpers";
 
 /** Demo persona sign-in. Refused outright outside demo mode. */
 export async function signInDemo(persona: string): Promise<ActionResult> {
   const result = await runAction(async () => {
     if (getConfig().mode !== "demo") throw new ActionError("Demo sign-in is disabled in live mode.");
-    const user = persona === "alex" ? DEMO.users.alex : persona === "sam" ? DEMO.users.sam : null;
+    const user = persona === "will" ? DEMO.users.will : persona === "arielle" ? DEMO.users.arielle : null;
     if (!user) throw new ActionError("Unknown demo persona.");
     getDb();
     await createSession(user.id);
@@ -42,10 +43,12 @@ export async function signInWithPassword(_prev: ActionResult | undefined, fd: Fo
 
 const registration = z.object({
   name: z.string().min(1).max(80),
+  title: z.string().max(80),
   email: z.string().email().max(200),
   password: z.string().min(10, "Use at least 10 characters.").max(200),
   workspaceName: z.string().max(80),
   partnerName: z.string().max(80),
+  partnerTitle: z.string().max(80),
   inviteCode: z.string().max(200),
 });
 
@@ -60,10 +63,12 @@ export async function register(_prev: ActionResult | undefined, fd: FormData): P
     if (getConfig().mode !== "live") throw new ActionError("Registration is only available in live mode. Use a demo persona here.");
     const input = registration.parse({
       name: str(fd, "name"),
+      title: str(fd, "title"),
       email: str(fd, "email").toLowerCase(),
       password: str(fd, "password"),
       workspaceName: str(fd, "workspaceName"),
       partnerName: str(fd, "partnerName"),
+      partnerTitle: str(fd, "partnerTitle"),
       inviteCode: str(fd, "inviteCode"),
     });
     const db = getDb();
@@ -83,7 +88,7 @@ export async function register(_prev: ActionResult | undefined, fd: FormData): P
         let person = tx.select().from(s.persons).where(and(eq(s.persons.workspaceId, invite.workspaceId), eq(s.persons.name, invite.personName))).get();
         if (!person) {
           const personId = newId("per");
-          tx.insert(s.persons).values({ id: personId, workspaceId: invite.workspaceId, slug: slugify(invite.personName), name: invite.personName, userId }).run();
+          tx.insert(s.persons).values({ id: personId, workspaceId: invite.workspaceId, slug: slugify(invite.personName), name: invite.personName, title: templatePerson(invite.personName)?.title ?? null, userId }).run();
           person = tx.select().from(s.persons).where(eq(s.persons.id, personId)).get()!;
         } else {
           tx.update(s.persons).set({ userId }).where(eq(s.persons.id, person.id)).run();
@@ -105,32 +110,36 @@ export async function register(_prev: ActionResult | undefined, fd: FormData): P
       }
 
       const workspaceId = newId("ws");
-      tx.insert(s.workspaces).values({ id: workspaceId, name: input.workspaceName || `${input.name}'s workspace`, isDemo: false, createdAt }).run();
+      const companyName = input.workspaceName || TEMPLATE.companyName;
+      tx.insert(s.workspaces).values({ id: workspaceId, name: companyName, isDemo: false, createdAt }).run();
       tx.insert(s.memberships).values({ id: newId("mem"), workspaceId, userId, role: "owner", createdAt }).run();
       const me = newId("per");
-      tx.insert(s.persons).values({ id: me, workspaceId, slug: slugify(input.name), name: input.name, userId }).run();
+      tx.insert(s.persons).values({ id: me, workspaceId, slug: slugify(input.name), name: input.name, title: input.title || templatePerson(input.name)?.title || null, userId }).run();
       const personIds = [me];
       let partnerId: string | null = null;
       if (input.partnerName) {
         partnerId = newId("per");
-        tx.insert(s.persons).values({ id: partnerId, workspaceId, slug: slugify(input.partnerName), name: input.partnerName, userId: null }).run();
+        tx.insert(s.persons).values({ id: partnerId, workspaceId, slug: slugify(input.partnerName), name: input.partnerName, title: input.partnerTitle || templatePerson(input.partnerName)?.title || null, userId: null }).run();
         personIds.push(partnerId);
       }
       const company = newId("sp");
       const household = newId("sp");
       const mine = newId("sp");
-      tx.insert(s.spaces).values([
-        { id: company, workspaceId, kind: "company", name: input.workspaceName || "Company", personId: null },
-        { id: household, workspaceId, kind: "household", name: "Household", personId: null },
-        { id: mine, workspaceId, kind: "personal", name: input.name, personId: me },
-      ]).run();
-      if (partnerId) tx.insert(s.spaces).values({ id: newId("sp"), workspaceId, kind: "personal", name: input.partnerName, personId: partnerId }).run();
+      const spaces = [
+        { id: company, kind: "company" as const, name: companyName, personId: null },
+        { id: household, kind: "household" as const, name: "Household", personId: null },
+        { id: mine, kind: "personal" as const, name: input.name, personId: me },
+        ...(partnerId ? [{ id: newId("sp"), kind: "personal" as const, name: input.partnerName, personId: partnerId }] : []),
+      ];
+      tx.insert(s.spaces).values(spaces.map((sp) => ({ ...sp, workspaceId }))).run();
       tx.insert(s.spacePermissions).values([
         { id: newId("perm"), spaceId: company, userId, role: "owner" },
         { id: newId("perm"), spaceId: household, userId, role: "owner" },
         { id: newId("perm"), spaceId: mine, userId, role: "owner" },
       ]).run();
       tx.insert(s.assumptions).values({ workspaceId, json: JSON.stringify(defaultAssumptions(personIds)), updatedAt: createdAt, updatedBy: userId }).run();
+      // Bills, budgets and goals from the plan. Personal records apply to people whose name matches the plan.
+      applyTemplateRecords(tx, workspaceId, spaces, [{ id: me, name: input.name }, ...(partnerId ? [{ id: partnerId, name: input.partnerName }] : [])]);
     });
     await createSession(userId);
   });

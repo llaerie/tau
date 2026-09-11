@@ -87,3 +87,17 @@ export async function resetDemoData(): Promise<ActionResult> {
     revalidatePath("/", "layout");
   });
 }
+
+/** Rename the workspace and the company space together. */
+export async function renameWorkspace(_prev: ActionResult | undefined, fd: FormData): Promise<ActionResult> {
+  return runAction(async () => {
+    const viewer = await requireViewer();
+    assertWorkspaceOwner(viewer);
+    const name = str(fd, "name").slice(0, 80);
+    if (!name) throw new ActionError("Enter a name.");
+    const db = getDb();
+    db.update(s.workspaces).set({ name }).where(eq(s.workspaces.id, viewer.workspace.id)).run();
+    db.update(s.spaces).set({ name }).where(and(eq(s.spaces.workspaceId, viewer.workspace.id), eq(s.spaces.kind, "company"))).run();
+    revalidatePath("/", "layout");
+  });
+}

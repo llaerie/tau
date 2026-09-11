@@ -15,7 +15,7 @@ export const metadata = { title: "Scenarios" };
 
 const VERDICT: Record<ScenarioResult["verdict"], { label: string; chip: string }> = {
   affordable: { label: "Affordable", chip: "chip-good" },
-  affordable_with_goal_cuts: { label: "Affordable, but goals slip", chip: "chip-warn" },
+  affordable_with_goal_cuts: { label: "Affordable, but the plan slips", chip: "chip-warn" },
   creates_shortfall: { label: "Creates a shortfall", chip: "chip-bad" },
   unknown: { label: "Cannot tell yet", chip: "chip-unknown" },
 };

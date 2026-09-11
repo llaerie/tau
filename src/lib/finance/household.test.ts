@@ -8,6 +8,8 @@ const base: HouseholdInput = {
     { personId: "sam", name: "Sam", amount: known(80000) },
   ],
   companyDistribution: known(0),
+  companyPaidItems: known(0),
+  budgets: [],
   bills: [
     { id: "rent", name: "Rent", amount: known(120000), cadence: "monthly" },
     { id: "util", name: "Utilities", amount: known(18000), cadence: "monthly" },
@@ -38,5 +40,33 @@ describe("household", () => {
     expect(r.funding.total.complete).toBe(false);
     expect(r.contributionSplit).toBeNull();
     expect(r.unresolved).toEqual(["Sam's household contribution"]);
+  });
+});
+
+describe("household funded by company distributions", () => {
+  it("counts the planned distribution and company-paid items as funding and budgets as planned spending", () => {
+    const r = computeHousehold({
+      ...base,
+      contributions: [
+        { personId: "will", name: "Will", amount: known(0) },
+        { personId: "arielle", name: "Arielle", amount: known(0) },
+      ],
+      companyDistribution: known(600000),
+      companyPaidItems: known(300000),
+      budgets: [
+        { id: "groceries", name: "Groceries", monthly: known(90000), actualCents: 41000 },
+        { id: "dining", name: "Dining together", monthly: known(60000) },
+      ],
+    });
+    expect(r.funding.total.knownCents).toBe(900000);
+    expect(r.plannedSpending.knownCents).toBe(150000);
+    expect(r.surplus.total.knownCents).toBe(900000 - 138000 - 20000 - 150000);
+    expect(r.budgets[0]).toMatchObject({ plannedCents: 90000, actualCents: 41000, remainingCents: 49000 });
+  });
+
+  it("keeps funding unknown when the distribution is not decided", () => {
+    const r = computeHousehold({ ...base, companyDistribution: unknown("Planned distribution not set") });
+    expect(r.funding.total.complete).toBe(false);
+    expect(r.surplus.total.complete).toBe(false);
   });
 });

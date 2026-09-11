@@ -55,6 +55,7 @@ export const persons = sqliteTable(
     workspaceId: text("workspace_id").notNull().references(() => workspaces.id, { onDelete: "cascade" }),
     slug: text("slug").notNull(),
     name: text("name").notNull(),
+    title: text("title"),
     userId: text("user_id").references(() => users.id, { onDelete: "set null" }),
   },
   (t) => [uniqueIndex("persons_ws_slug_idx").on(t.workspaceId, t.slug)],
@@ -143,6 +144,20 @@ export const goals = sqliteTable(
   (t) => [index("goals_space_idx").on(t.spaceId)],
 );
 
+export const budgets = sqliteTable(
+  "budgets",
+  {
+    id: text("id").primaryKey(),
+    spaceId: text("space_id").notNull().references(() => spaces.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    /** Null = planned amount unknown. */
+    monthlyCents: integer("monthly_cents"),
+    categoryId: text("category_id").references(() => categories.id, { onDelete: "set null" }),
+    sortOrder: integer("sort_order").notNull().default(0),
+  },
+  (t) => [index("budgets_space_idx").on(t.spaceId)],
+);
+
 export const transactions = sqliteTable(
   "transactions",
   {
@@ -229,6 +244,7 @@ export type Account = typeof accounts.$inferSelect;
 export type Category = typeof categories.$inferSelect;
 export type Bill = typeof bills.$inferSelect;
 export type Goal = typeof goals.$inferSelect;
+export type Budget = typeof budgets.$inferSelect;
 export type Transaction = typeof transactions.$inferSelect;
 export type Scenario = typeof scenarios.$inferSelect;
 export type Invite = typeof invites.$inferSelect;

@@ -2,6 +2,7 @@ import { fundGoalsInPriorityOrder } from "./goals";
 import {
   addTotals,
   formatAmount,
+  formatCents,
   formatTotal,
   isKnown,
   known,
@@ -16,13 +17,29 @@ import {
 } from "./money";
 import type { BillInput, GoalFundingResult, GoalInput, Metric, WaterfallLine } from "./types";
 
+export interface WithholdingInput {
+  /** Employee FICA (Social Security + Medicare) as a percent of gross. Null = unknown. */
+  ficaRatePct: number | null;
+  /** Estimated federal + state income tax withheld per month. Null = unknown. */
+  incomeTax: Amount;
+  /** Optional range around the income-tax estimate, for the caveat. */
+  incomeTaxRangeCents?: [number, number] | null;
+}
+
+export interface BudgetInput {
+  id: string;
+  name: string;
+  monthly: Amount;
+  /** Actual spending recorded against this budget in the period, when known. */
+  actualCents?: number | null;
+}
+
 export interface PersonalInput {
   personId: string;
   name: string;
   /** GROSS salary from the company. */
   grossSalary: Amount;
-  /** Estimated total withholding (income tax + employee FICA) in percent. Null = unknown. */
-  withholdingRatePct: number | null;
+  withholding: WithholdingInput;
   /** Other net income (side income, already net). */
   otherNetIncome: Amount;
   /** Planned monthly contribution to the household. */
@@ -31,10 +48,19 @@ export interface PersonalInput {
   bills: BillInput[];
   /** Personal goals; priority 1 funded first. */
   goals: GoalInput[];
+  /** Planned discretionary spending by category. */
+  budgets: BudgetInput[];
   cashBalance: Amount;
-  /** When cash is partially unknown, the known portion and the list of unknown accounts. */
   cashKnownSoFar?: Total;
   cashAsOf?: string | null;
+}
+
+export interface BudgetLine {
+  id: string;
+  name: string;
+  plannedCents: number | null;
+  actualCents: number | null;
+  remainingCents: number | null;
 }
 
 export interface PersonalResult {
@@ -45,9 +71,13 @@ export interface PersonalResult {
   /** Money left for goals before any discretionary spending. */
   afterObligations: Total;
   goals: GoalFundingResult | null;
-  /** Discretionary money after goals; may be a shortfall (negative) when obligations exceed net. */
+  /** Discretionary money after goals; negative = shortfall. */
   discretionary: Metric;
-  /** Discretionary upper bound if withholding were zero (net = gross). Only reported when net is unknown. */
+  /** Planned spending budgets and what is left unallocated after them. */
+  budgets: BudgetLine[];
+  plannedSpending: Total;
+  unallocated: Metric;
+  /** Discretionary upper bound if nothing were withheld. Only reported when net is unknown. */
   discretionaryUpperBoundCents: number | null;
   cash: Metric;
   unresolved: string[];
@@ -69,37 +99,37 @@ export function computePersonal(input: PersonalInput): PersonalResult {
     label: "Gross salary from the company",
     kind: "inflow",
     amount: input.grossSalary,
-    source: "Settings → Owners → Gross salary",
+    source: "Settings → People → Gross salary",
     note: "Gross, before withholding. Not a spending allowance.",
   });
 
-  const withholding = percentOf(input.grossSalary, input.withholdingRatePct, "Withholding rate not set");
-  if (!isKnown(withholding)) unresolved.push("Payroll withholding rate (income tax + employee FICA)");
+  const fica = percentOf(input.grossSalary, input.withholding.ficaRatePct, "FICA rate not set");
+  if (!isKnown(fica)) unresolved.push("Employee FICA rate (Social Security + Medicare)");
   push({
-    id: "withholding",
-    label: "Payroll withholding",
+    id: "fica",
+    label: "Social Security & Medicare (employee share)",
     kind: "outflow",
-    amount: withholding,
-    source: "Settings → Owners → Withholding estimate",
-    note: isKnown(withholding) ? `${input.withholdingRatePct}% of gross (estimate)` : "Unknown until an estimate is entered. Net take-home stays unknown.",
+    amount: fica,
+    source: "Settings → People → Withholding",
+    note: isKnown(fica) ? `${input.withholding.ficaRatePct}% of gross` : "Unknown until a rate is entered.",
+  });
+
+  const incomeTax = input.withholding.incomeTax;
+  if (!isKnown(incomeTax)) unresolved.push("Federal + state income-tax withholding estimate");
+  const range = input.withholding.incomeTaxRangeCents;
+  push({
+    id: "income-tax",
+    label: "Federal + state income tax withheld",
+    kind: "outflow",
+    amount: incomeTax,
+    source: "Settings → People → Withholding",
+    note: isKnown(incomeTax) ? `Estimate${range ? `; plausible range ${formatCents(range[0])}–${formatCents(range[1])}` : ""}. Payroll will set the exact amount.` : "Unknown until an estimate is entered. Net take-home stays unknown.",
   });
 
   const net: Total = running;
-  push({
-    id: "other-income",
-    label: "Other net income",
-    kind: "inflow",
-    amount: input.otherNetIncome,
-    source: "Ledger / Settings → Owners → Other income",
-  });
+  push({ id: "other-income", label: "Other net income", kind: "inflow", amount: input.otherNetIncome, source: "Settings → People → Other income" });
 
-  push({
-    id: "household",
-    label: "Household contribution",
-    kind: "outflow",
-    amount: input.householdContribution,
-    source: "Settings → Household → Contributions",
-  });
+  push({ id: "household", label: "Household contribution", kind: "outflow", amount: input.householdContribution, source: "Settings → Household → Contributions" });
 
   const billsTotal = sumAmounts(input.bills.map((b) => monthlyEquivalent(b.amount, b.cadence)));
   push({
@@ -113,9 +143,6 @@ export function computePersonal(input: PersonalInput): PersonalResult {
   const afterObligations = running;
   const obligations = addTotals(totalOf(input.householdContribution), billsTotal);
 
-  // Goals are funded in priority order from what is left after obligations.
-  // When net is unknown we cannot say how much reaches the goals, so we report
-  // the wanted amounts and flag the result rather than pretending net = gross.
   const goalsResult = fundGoalsInPriorityOrder(input.goals, afterObligations.complete ? afterObligations.knownCents : 0);
   const goalWanted = goalsResult.totalWantedCents;
   push({
@@ -124,110 +151,131 @@ export function computePersonal(input: PersonalInput): PersonalResult {
     kind: "outflow",
     amount: known(goalWanted),
     source: "Goals → personal",
-    note: input.goals
-      .slice()
-      .sort((a, b) => a.priority - b.priority)
-      .map((g) => `${g.priority}. ${g.name}`)
-      .join(" → "),
+    note: input.goals.slice().sort((a, b) => a.priority - b.priority).map((g) => `${g.priority}. ${g.name}`).join(" → ") || undefined,
   });
 
   const discretionary = running;
   lines.push({
     id: "discretionary",
     label: "Available for discretionary spending",
-    kind: "result",
+    kind: "subtotal",
     amount: discretionary.complete ? known(discretionary.knownCents) : unknown("net take-home unknown"),
     running: discretionary,
     source: "Computed",
   });
 
+  const plannedSpending = sumAmounts(input.budgets.map((b) => b.monthly));
+  push({
+    id: "budgets",
+    label: `Planned spending (${input.budgets.length} ${input.budgets.length === 1 ? "budget" : "budgets"})`,
+    kind: "outflow",
+    amount: plannedSpending.complete ? known(plannedSpending.knownCents) : unknown(`budgets without an amount: ${plannedSpending.unknowns.join("; ")}`),
+    source: `Budgets → ${input.name}`,
+    note: input.budgets.map((b) => `${b.name} ${formatAmount(b.monthly)}`).join(" · ") || "No spending plan yet.",
+  });
+  const unallocated = running;
+  lines.push({
+    id: "unallocated",
+    label: unallocated.complete && unallocated.knownCents < 0 ? "Over-planned" : "Unallocated",
+    kind: "result",
+    amount: unallocated.complete ? known(unallocated.knownCents) : unknown("depends on unknown items"),
+    running: unallocated,
+    source: "Computed",
+  });
+
+  const budgetLines: BudgetLine[] = input.budgets.map((b) => {
+    const planned = isKnown(b.monthly) ? b.monthly.cents : null;
+    const actual = b.actualCents ?? null;
+    return { id: b.id, name: b.name, plannedCents: planned, actualCents: actual, remainingCents: planned !== null && actual !== null ? planned - actual : null };
+  });
+
   const upperBound = discretionary.complete
     ? null
-    : (isKnown(input.grossSalary) ? input.grossSalary.cents : 0) +
-      (isKnown(input.otherNetIncome) ? input.otherNetIncome.cents : 0) -
-      obligations.knownCents -
-      goalWanted;
+    : (isKnown(input.grossSalary) ? input.grossSalary.cents : 0) + (isKnown(input.otherNetIncome) ? input.otherNetIncome.cents : 0) - obligations.knownCents - goalWanted;
 
-  const withholdingAssumption =
-    input.withholdingRatePct === null
-      ? "Withholding rate is not set; net take-home is unknown."
-      : `Withholding estimated at ${input.withholdingRatePct}% of gross.`;
+  const withholdingAssumptions = [
+    input.withholding.ficaRatePct === null ? "FICA rate is not set." : `Employee FICA at ${input.withholding.ficaRatePct}% of gross.`,
+    isKnown(incomeTax) ? `Income tax withholding estimated at ${formatCents(incomeTax.cents)} per month${range ? ` (range ${formatCents(range[0])}–${formatCents(range[1])})` : ""}.` : "Income-tax withholding is not estimated; net take-home is unknown.",
+  ];
+
+  const metric = (id: string, label: string, t: Total, formula: string, inputs: Metric["provenance"]["inputs"], assumptions: string[], caveats: string[]): Metric => ({ id: `${input.personId}-${id}`, label, total: t, provenance: { formula, inputs, assumptions, caveats } });
 
   return {
     lines,
-    gross: {
-      id: `${input.personId}-gross`,
-      label: "Gross salary",
-      total: totalOf(input.grossSalary),
-      provenance: {
-        formula: "as entered",
-        inputs: [{ label: "Gross monthly salary", value: formatAmount(input.grossSalary), source: "Settings → Owners" }],
-        assumptions: [],
-        caveats: ["Gross, before withholding. Not a spending allowance."],
-      },
-    },
-    net: {
-      id: `${input.personId}-net`,
-      label: "Net take-home",
-      total: net,
-      provenance: {
-        formula: "gross − withholding",
-        inputs: [
-          { label: "Gross", value: formatAmount(input.grossSalary), source: "Settings → Owners" },
-          { label: "Withholding", value: formatAmount(withholding), source: "Settings → Owners → Withholding estimate" },
-        ],
-        assumptions: [withholdingAssumption],
-        caveats: net.complete ? [] : ["Unknown until a withholding estimate is entered. It is not assumed to be zero."],
-      },
-    },
-    obligations: {
-      id: `${input.personId}-obligations`,
-      label: "Fixed obligations",
-      total: obligations,
-      provenance: {
-        formula: "household contribution + fixed personal bills",
-        inputs: [
-          { label: "Household contribution", value: formatAmount(input.householdContribution), source: "Settings → Household" },
-          { label: "Fixed bills", value: formatTotal(billsTotal), source: `Bills → ${input.name}` },
-        ],
-        assumptions: [],
-        caveats: [],
-      },
-    },
+    gross: metric("gross", "Gross salary", totalOf(input.grossSalary), "as entered", [{ label: "Gross monthly salary", value: formatAmount(input.grossSalary), source: "Settings → People" }], [], ["Gross, before withholding. Not a spending allowance."]),
+    net: metric(
+      "net",
+      "Net take-home",
+      net,
+      "gross − FICA − income tax withheld",
+      [
+        { label: "Gross", value: formatAmount(input.grossSalary), source: "Settings → People" },
+        { label: "FICA", value: formatAmount(fica), source: "Settings → People → Withholding" },
+        { label: "Income tax withheld", value: formatAmount(incomeTax), source: "Settings → People → Withholding" },
+      ],
+      withholdingAssumptions,
+      net.complete
+        ? range && isKnown(input.grossSalary) && isKnown(fica)
+          ? [`With the range, net lands between ${formatCents(input.grossSalary.cents - fica.cents - range[1])} and ${formatCents(input.grossSalary.cents - fica.cents - range[0])}. Have payroll or a CPA set the exact withholding.`]
+          : []
+        : ["Unknown until withholding is entered. It is not assumed to be zero."],
+    ),
+    obligations: metric(
+      "obligations",
+      "Fixed obligations",
+      obligations,
+      "household contribution + fixed personal bills",
+      [
+        { label: "Household contribution", value: formatAmount(input.householdContribution), source: "Settings → Household" },
+        { label: "Fixed bills", value: formatTotal(billsTotal), source: `Bills → ${input.name}` },
+      ],
+      [],
+      [],
+    ),
     afterObligations,
     goals: goalsResult,
-    discretionary: {
-      id: `${input.personId}-discretionary`,
-      label: "Available after goals",
-      total: discretionary,
-      provenance: {
-        formula: "net + other income − obligations − goals (priority order)",
-        inputs: [
-          { label: "Net take-home", value: formatTotal(net), source: "Computed" },
-          { label: "Other net income", value: formatAmount(input.otherNetIncome), source: "Settings → Owners" },
-          { label: "Obligations", value: formatTotal(obligations), source: "Computed" },
-          { label: "Goals wanted", value: formatAmount(known(goalWanted)), source: "Goals" },
-        ],
-        assumptions: [withholdingAssumption, "Goals are funded in priority order before any discretionary spending."],
-        caveats: discretionary.complete
-          ? discretionary.knownCents < 0
-            ? [`Shortfall of ${formatAmount(known(-discretionary.knownCents))}: obligations and goals exceed net income.`]
-            : []
-          : [`Unknown. Even if nothing were withheld, at most ${formatAmount(known(upperBound ?? 0))} would remain.`],
-      },
-    },
+    discretionary: metric(
+      "discretionary",
+      "Available after goals",
+      discretionary,
+      "net + other income − obligations − goals (priority order)",
+      [
+        { label: "Net take-home", value: formatTotal(net), source: "Computed" },
+        { label: "Other net income", value: formatAmount(input.otherNetIncome), source: "Settings → People" },
+        { label: "Obligations", value: formatTotal(obligations), source: "Computed" },
+        { label: "Goals wanted", value: formatCents(goalWanted), source: "Goals" },
+      ],
+      [...withholdingAssumptions, "Goals are funded in priority order before any discretionary spending."],
+      discretionary.complete
+        ? discretionary.knownCents < 0
+          ? [`Shortfall of ${formatCents(-discretionary.knownCents)}: obligations and goals exceed net income.`]
+          : []
+        : [`Unknown. Even if nothing were withheld, at most ${formatCents(upperBound ?? 0)} would remain.`],
+    ),
+    budgets: budgetLines,
+    plannedSpending,
+    unallocated: metric(
+      "unallocated",
+      unallocated.complete && unallocated.knownCents < 0 ? "Over-planned" : "Unallocated after spending plan",
+      unallocated,
+      "available after goals − planned spending budgets",
+      [
+        { label: "Available after goals", value: formatTotal(discretionary), source: "Computed" },
+        { label: "Planned spending", value: formatTotal(plannedSpending), source: `Budgets → ${input.name}` },
+      ],
+      [],
+      unallocated.complete && unallocated.knownCents < 0 ? [`The spending plan exceeds what is available by ${formatCents(-unallocated.knownCents)}.`] : [],
+    ),
     discretionaryUpperBoundCents: upperBound,
-    cash: {
-      id: `${input.personId}-cash`,
-      label: `${input.name}'s cash`,
-      total: input.cashKnownSoFar ?? totalOf(input.cashBalance),
-      provenance: {
-        formula: "sum of personal account balances",
-        inputs: [{ label: "Personal accounts", value: formatAmount(input.cashBalance), source: input.cashAsOf ? `Accounts (as of ${input.cashAsOf})` : "Accounts" }],
-        assumptions: [],
-        caveats: isKnown(input.cashBalance) ? [] : ["At least one account has no balance entered."],
-      },
-    },
+    cash: metric(
+      "cash",
+      `${input.name}'s cash`,
+      input.cashKnownSoFar ?? totalOf(input.cashBalance),
+      "sum of personal account balances",
+      [{ label: "Personal accounts", value: formatAmount(input.cashBalance), source: input.cashAsOf ? `Accounts (as of ${input.cashAsOf})` : "Accounts" }],
+      [],
+      isKnown(input.cashBalance) ? [] : ["At least one account has no balance entered."],
+    ),
     unresolved,
   };
 }

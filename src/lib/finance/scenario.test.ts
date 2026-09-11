@@ -59,3 +59,12 @@ describe("purchase scenarios", () => {
     expect(r.verdict).toBe("unknown");
   });
 });
+
+describe("recurring costs against the spending plan", () => {
+  it("flags a recurring cost that squeezes the spending plan even when goals survive", () => {
+    const r = evaluatePurchase({ ...baseline, plannedSpendingCents: 30000 }, { name: "Streaming bundle", amountCents: 5000, kind: "recurring", recurringMonths: null, startMonthOffset: 0 });
+    // headroom before: 139,000 - 130,000 - 30,000 = -21,000 (already short); after: -26,000
+    expect(r.verdict).toBe("affordable_with_goal_cuts");
+    expect(r.notes.join(" ")).toMatch(/spending plan .* short by \$260/);
+  });
+});

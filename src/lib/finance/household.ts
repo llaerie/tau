@@ -1,5 +1,6 @@
 import { fundGoalsInPriorityOrder } from "./goals";
 import { addTotals, formatAmount, formatTotal, isKnown, known, monthlyEquivalent, sumAmounts, total, totalOf, unknown, type Amount, type Total } from "./money";
+import type { BudgetInput, BudgetLine } from "./personal";
 import type { BillInput, GoalFundingResult, GoalInput, Metric, WaterfallLine } from "./types";
 
 export interface HouseholdContribution {
@@ -12,8 +13,12 @@ export interface HouseholdInput {
   contributions: HouseholdContribution[];
   /** Planned owner distributions from the company paid into the household. */
   companyDistribution: Amount;
+  /** Household items the company pays for directly (household-kind allocations). */
+  companyPaidItems: Amount;
   bills: BillInput[];
   goals: GoalInput[];
+  /** Planned variable spending (groceries, dining together, ...). */
+  budgets: BudgetInput[];
   cashBalance: Amount;
   /** When cash is partially unknown, the known portion and the list of unknown accounts. */
   cashKnownSoFar?: Total;
@@ -25,6 +30,8 @@ export interface HouseholdResult {
   funding: Metric;
   bills: Metric;
   goals: GoalFundingResult;
+  budgets: BudgetLine[];
+  plannedSpending: Total;
   surplus: Metric;
   cash: Metric;
   /** Each person's share of total funding, in basis points, when all contributions are known. */
@@ -55,6 +62,14 @@ export function computeHousehold(input: HouseholdInput): HouseholdResult {
     source: "Settings → Household → Planned company distribution",
     note: "Only what is planned to be paid out. See Company for what is actually available.",
   });
+  push({
+    id: "company-paid-items",
+    label: "Household items paid by the company",
+    kind: "inflow",
+    amount: input.companyPaidItems,
+    source: "Settings → Company → Allocations (household kind)",
+    note: "Earmarked allocations such as apartment furnishing. Treated as an owner distribution.",
+  });
   const funding = running;
 
   const billsTotal = sumAmounts(input.bills.map((b) => monthlyEquivalent(b.amount, b.cadence)));
@@ -69,6 +84,21 @@ export function computeHousehold(input: HouseholdInput): HouseholdResult {
 
   const goals = fundGoalsInPriorityOrder(input.goals, afterBills.complete ? afterBills.knownCents : 0);
   push({ id: "goals", label: `Shared goals (${input.goals.length})`, kind: "outflow", amount: known(goals.totalWantedCents), source: "Goals → Household" });
+
+  const plannedSpending = sumAmounts(input.budgets.map((b) => b.monthly));
+  push({
+    id: "budgets",
+    label: `Planned variable spending (${input.budgets.length})`,
+    kind: "outflow",
+    amount: plannedSpending.complete ? known(plannedSpending.knownCents) : unknown(`budgets without an amount: ${plannedSpending.unknowns.join("; ")}`),
+    source: "Budgets → Household",
+    note: input.budgets.map((b) => `${b.name} ${formatAmount(b.monthly)}`).join(" · ") || undefined,
+  });
+  const budgetLines: BudgetLine[] = input.budgets.map((b) => {
+    const planned = isKnown(b.monthly) ? b.monthly.cents : null;
+    const actual = b.actualCents ?? null;
+    return { id: b.id, name: b.name, plannedCents: planned, actualCents: actual, remainingCents: planned !== null && actual !== null ? planned - actual : null };
+  });
 
   const surplus = running;
   lines.push({
@@ -96,10 +126,11 @@ export function computeHousehold(input: HouseholdInput): HouseholdResult {
       label: "Household funding",
       total: funding,
       provenance: {
-        formula: "sum of personal contributions + planned company distributions",
+        formula: "personal contributions + planned company distribution + household items paid by the company",
         inputs: [
           ...input.contributions.map((c) => ({ label: `${c.name}'s contribution`, value: formatAmount(c.amount), source: "Settings → Household" })),
           { label: "Company distribution", value: formatAmount(input.companyDistribution), source: "Settings → Household" },
+          { label: "Company-paid items", value: formatAmount(input.companyPaidItems), source: "Settings → Company → Allocations" },
         ],
         assumptions: ["Contributions are planned amounts; the ledger shows what was actually transferred."],
         caveats: funding.complete ? [] : ["At least one contribution is unknown."],
@@ -117,16 +148,19 @@ export function computeHousehold(input: HouseholdInput): HouseholdResult {
       },
     },
     goals,
+    budgets: budgetLines,
+    plannedSpending,
     surplus: {
       id: "household-surplus",
       label: surplus.complete && surplus.knownCents < 0 ? "Shortfall" : "Surplus",
       total: surplus,
       provenance: {
-        formula: "funding − shared bills − shared goals",
+        formula: "funding − shared bills − shared goals − planned variable spending",
         inputs: [
           { label: "Funding", value: formatTotal(funding), source: "Computed" },
           { label: "Shared bills", value: formatTotal(billsTotal), source: "Bills" },
           { label: "Shared goals wanted", value: formatAmount(known(goals.totalWantedCents)), source: "Goals" },
+          { label: "Planned variable spending", value: formatTotal(plannedSpending), source: "Budgets" },
         ],
         assumptions: [],
         caveats: surplus.complete && surplus.knownCents < 0 ? [`Shortfall of ${formatAmount(known(-surplus.knownCents))}. Assumptions were not changed to hide it.`] : [],

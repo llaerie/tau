@@ -36,6 +36,7 @@ export function scenarioBaseline(view: SpaceView): ScenarioBaseline {
     availableComplete: after.complete,
     goals: toGoalInputs(view.data.goals),
     cashFloorCents: 0,
-    monthlySurplus: view.result.discretionary.total,
+    plannedSpendingCents: view.result.plannedSpending.knownCents,
+    monthlySurplus: view.result.unallocated.total,
   };
 }

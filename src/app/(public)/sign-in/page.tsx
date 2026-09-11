@@ -20,13 +20,13 @@ export default async function SignInPage({ searchParams }: { searchParams: Promi
       <div className="mb-8">
         <p className="label">Finance Desk</p>
         <h1 className="mt-1 text-3xl font-semibold tracking-tight">Sign in</h1>
-        <p className="mt-2 text-sm text-ink-2">Company, household and two personal spaces. Kept separate, connected by classified transactions.</p>
+        <p className="mt-2 text-sm text-ink-2">The company, the shared household, and a private personal space each. Kept separate, connected by classified transactions.</p>
         <ModeBadge isDemo={config.mode === "demo"} className="mt-3" />
       </div>
       {config.mode === "demo" ? (
         <div className="card p-5">
           <h2 className="font-medium">Choose a demo persona</h2>
-          <p className="mt-1 text-sm text-ink-3">All figures are synthetic. Each person sees the company and household, plus only their own personal space.</p>
+          <p className="mt-1 text-sm text-ink-3">Plan figures follow the stated plan; balances and bills are synthetic. Each person sees the company and household, plus only their own personal space.</p>
           <DemoPersonaButtons />
           <p className="mt-4 text-xs text-ink-3">Changes you make persist in the local demo database. Reset them any time from Settings.</p>
         </div>

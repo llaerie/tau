@@ -134,6 +134,8 @@ function personalJson(v: PersonalView) {
     obligations: metricJson(v.result.obligations),
     available_after_goals: metricJson(v.result.discretionary),
     upper_bound_if_nothing_withheld: v.result.discretionaryUpperBoundCents === null ? null : formatCents(v.result.discretionaryUpperBoundCents),
+    spending_plan: v.result.budgets.map((b) => ({ name: b.name, planned: b.plannedCents === null ? "unknown" : formatCents(b.plannedCents), spent_this_month: b.actualCents === null ? "not tracked" : formatCents(b.actualCents), remaining: b.remainingCents === null ? null : formatCents(b.remainingCents) })),
+    unallocated_after_spending_plan: metricJson(v.result.unallocated),
     goals_in_priority_order: v.result.goals?.allocations.map((g) => ({
       priority: g.priority,
       name: g.name,
@@ -184,7 +186,8 @@ export function executeTool(viewer: Viewer, name: string, input: Record<string, 
         runway_months_on_known_costs: r.runwayMonths,
         waterfall: r.lines.map(lineJson),
         unpaid_bills_this_month: formatCents(v.unpaidCommittedCents),
-        employee_classification: viewer.assumptions.company.employeeClassification,
+        allocations: viewer.assumptions.company.allocations.map((a) => ({ name: a.name, amount: a.amountCents === null ? "unknown" : formatCents(a.amountCents), kind: a.kind, note: a.note ?? null })),
+        retained_after_distributions: metricJson(r.remaining),
         unresolved: r.unresolved,
       };
     }
@@ -198,6 +201,7 @@ export function executeTool(viewer: Viewer, name: string, input: Record<string, 
         cash: metricJson(r.cash),
         contribution_split: r.contributionSplit?.map((c) => ({ name: c.name, amount: formatCents(c.amountCents), share_percent: c.shareBps / 100 })) ?? "unknown (a contribution is not set)",
         goals_in_priority_order: r.goals.allocations.map((g) => ({ priority: g.priority, name: g.name, wanted: formatCents(g.wantedCents), funded: formatCents(g.fundedCents), months_to_target: g.monthsToTarget })),
+        spending_plan: r.budgets.map((b) => ({ name: b.name, planned: b.plannedCents === null ? "unknown" : formatCents(b.plannedCents), spent_this_month: b.actualCents === null ? "not tracked" : formatCents(b.actualCents) })),
         waterfall: r.lines.map(lineJson),
         unresolved: r.unresolved,
       };

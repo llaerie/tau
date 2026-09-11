@@ -17,18 +17,28 @@ import {
 import type { BillInput, Metric, WaterfallLine } from "./types";
 
 /**
- * How the $8,000/month employee allocation is classified for payroll purposes.
- * "unresolved" is the honest default: employer payroll costs on it cannot be
- * computed until it is resolved.
+ * How a monthly allocation of company money is classified. The kind decides
+ * whether it is a deductible operating expense, wages that attract employer
+ * payroll costs, or money that is really an owner distribution to the household.
  */
-export type EmployeeClassification = "unresolved" | "w2_gross" | "w2_gross_plus_employer_costs" | "contractor";
+export type AllocationKind = "business" | "employees_w2" | "employees_unresolved" | "contractors" | "household" | "mixed";
 
-export const EMPLOYEE_CLASSIFICATION_LABELS: Record<EmployeeClassification, string> = {
-  unresolved: "Unresolved — classification still to be decided",
-  w2_gross: "W-2 gross wages (employer payroll costs are extra)",
-  w2_gross_plus_employer_costs: "W-2 all-in (gross wages plus employer payroll costs)",
-  contractor: "Contractor payments (no employer payroll costs)",
+export const ALLOCATION_KIND_SHORT: Record<AllocationKind, string> = {
+  business: "business expense",
+  employees_w2: "W-2 wages",
+  employees_unresolved: "employees, classification unresolved",
+  contractors: "contractor payments",
+  household: "owner distribution to the household",
+  mixed: "business + household, split not entered",
 };
+
+export interface AllocationInput {
+  id: string;
+  name: string;
+  amount: Amount;
+  kind: AllocationKind;
+  note?: string;
+}
 
 export interface OwnerSalaryInput {
   personId: string;
@@ -45,8 +55,7 @@ export interface CompanyInput {
   cashAsOf?: string | null;
   anticipatedRevenue: Amount;
   revenueBasis: "anticipated" | "contracted";
-  employeeAllocation: Amount;
-  employeeClassification: EmployeeClassification;
+  allocations: AllocationInput[];
   /** Employer-side payroll cost rate in percent of W-2 gross wages (FICA, unemployment, etc.). Null = unknown. */
   employerPayrollCostRatePct: number | null;
   ownerSalaries: OwnerSalaryInput[];
@@ -58,15 +67,20 @@ export interface CompanyInput {
   otherOverhead: Amount;
   /** Months of operating cost to hold as a reserve. Null = no reserve rule. */
   cashReserveTargetMonths: number | null;
+  /** Planned monthly owner distribution that funds the household. Null = not decided. */
+  plannedHouseholdDistribution: Amount;
 }
 
 export interface CompanyResult {
   lines: WaterfallLine[];
   cash: Metric;
   revenue: Metric;
+  /** Operating commitments plus the tax reserve: everything before any distribution. */
   committed: Metric;
-  /** Cash-basis owner distributions available for the household after every commitment. */
+  /** What could be distributed to the household after every commitment (before the planned distribution). */
   distributable: Metric;
+  /** What is left after the planned household distribution and household-earmarked allocations. */
+  remaining: Metric;
   monthlyOperatingCost: Total;
   reserveTarget: Metric;
   runwayMonths: number | null;
@@ -89,7 +103,7 @@ export function computeCompany(input: CompanyInput): CompanyResult {
     lines.push({ ...line, running });
   };
 
-  // 1. Revenue — anticipated, not take-home.
+  // 1. Revenue — company money, never take-home.
   push({
     id: "revenue",
     label: input.revenueBasis === "contracted" ? "Contracted service revenue" : "Anticipated service revenue",
@@ -99,28 +113,32 @@ export function computeCompany(input: CompanyInput): CompanyResult {
     note: input.revenueBasis === "anticipated" ? "Anticipated, not yet invoiced. Company money, not personal take-home." : undefined,
   });
 
-  // 2. Employee allocation.
-  const classificationLabel = EMPLOYEE_CLASSIFICATION_LABELS[input.employeeClassification];
-  if (input.employeeClassification === "unresolved") unresolved.push("Employee allocation payroll classification");
-  push({
-    id: "employees",
-    label: "Employee allocation",
-    kind: "outflow",
-    amount: input.employeeAllocation,
-    source: "Settings → Company → Employee allocation",
-    note: classificationLabel,
-  });
-
-  // 3. Owner gross salaries.
+  // 2. Owner gross salaries (deductible wages).
   const ownerGross = sumAmounts(input.ownerSalaries.map((o) => o.grossMonthly));
   push({
     id: "owner-salaries",
-    label: `Owner gross salaries (${input.ownerSalaries.map((o) => o.name).join(", ") || "none"})`,
+    label: `Gross W-2 salaries (${input.ownerSalaries.map((o) => o.name).join(", ") || "none"})`,
     kind: "outflow",
     amount: ownerGross.complete ? known(ownerGross.knownCents) : unknown(ownerGross.unknowns.join("; ")),
-    source: "Settings → Owners → Gross salary",
-    note: "Gross wages. Net take-home depends on each owner's withholding assumption.",
+    source: "Settings → People → Gross salary",
+    note: "Gross wages. Net take-home depends on each person's withholding.",
   });
+
+  // 3. Operating allocations (business kinds) before tax; household kinds after tax.
+  const businessAllocations = input.allocations.filter((a) => a.kind !== "household");
+  const householdAllocations = input.allocations.filter((a) => a.kind === "household");
+  for (const a of businessAllocations) {
+    if (a.kind === "mixed") unresolved.push(`${a.name}: business vs household split`);
+    if (a.kind === "employees_unresolved") unresolved.push(`${a.name}: payroll classification`);
+    push({
+      id: `alloc-${a.id}`,
+      label: a.name,
+      kind: "outflow",
+      amount: a.amount,
+      source: "Settings → Company → Allocations",
+      note: [ALLOCATION_KIND_SHORT[a.kind], a.note].filter(Boolean).join(". "),
+    });
+  }
 
   // 4. Employer payroll costs on W-2 wages.
   const employerCosts = employerPayrollCosts(input, ownerGross);
@@ -152,35 +170,53 @@ export function computeCompany(input: CompanyInput): CompanyResult {
     source: "Settings → Company → Other monthly overhead",
   });
 
-  // Operating cost = everything above except revenue (used for reserve/runway).
-  const operatingCost = addTotals(
-    totalOf(input.employeeAllocation),
-    ownerGross,
-    totalOf(employerCosts),
-    billsTotal,
-    totalOf(input.otherOverhead),
-  );
+  const operatingCost = addTotals(ownerGross, sumAmounts(businessAllocations.map((a) => a.amount)), totalOf(employerCosts), billsTotal, totalOf(input.otherOverhead));
 
-  // 6. Income tax reserve on profit before owner distributions.
+  // 6. Income tax reserve on taxable profit. A mixed allocation makes the base uncertain.
   const profitBeforeTax = running;
-  const taxReserve = percentOfTotal(profitBeforeTax, input.incomeTaxReserveRatePct, "Income tax reserve rate not set");
-  if (!isKnown(taxReserve)) unresolved.push(input.incomeTaxReserveRatePct === null ? "Business income tax reserve rate" : "Income tax reserve (depends on unknown costs)");
+  const mixed = businessAllocations.filter((a) => a.kind === "mixed");
+  let taxReserve = percentOfTotal(profitBeforeTax, input.incomeTaxReserveRatePct, "Income tax reserve rate not set");
+  if (isKnown(taxReserve) && mixed.length) taxReserve = unknown(`taxable profit depends on the business vs household split of: ${mixed.map((a) => a.name).join(", ")}`);
+  if (!isKnown(taxReserve)) unresolved.push(input.incomeTaxReserveRatePct === null ? "Business income tax reserve rate" : `Income tax reserve (${taxReserve.reason})`);
   push({
     id: "tax-reserve",
     label: "Business income tax reserve",
     kind: "reserve",
     amount: isKnown(taxReserve) && taxReserve.cents < 0 ? known(0) : taxReserve,
     source: "Settings → Company → Income tax reserve rate",
-    note: isKnown(taxReserve) ? `${input.incomeTaxReserveRatePct}% of profit before distributions` : "Stays unknown until a rate is entered. Not assumed to be zero.",
+    note: isKnown(taxReserve) ? `${input.incomeTaxReserveRatePct}% of profit before distributions` : "Stays unknown until a rate (and any split) is entered. Not assumed to be zero.",
   });
 
   const distributable = running;
   lines.push({
     id: "distributable",
-    label: "Available for owner distributions to the household",
+    label: "Available for owner distributions",
     kind: "result",
     amount: distributable.complete ? known(distributable.knownCents) : unknown("depends on unknown items"),
     running: distributable,
+    source: "Computed",
+  });
+
+  // 7. Distributions: household-earmarked allocations and the planned monthly distribution.
+  for (const a of householdAllocations) {
+    push({ id: `alloc-${a.id}`, label: a.name, kind: "outflow", amount: a.amount, source: "Settings → Company → Allocations", note: [ALLOCATION_KIND_SHORT[a.kind], a.note].filter(Boolean).join(". ") });
+  }
+  if (!isKnown(input.plannedHouseholdDistribution)) unresolved.push("Planned monthly distribution to the household");
+  push({
+    id: "planned-distribution",
+    label: "Planned distribution to the household",
+    kind: "outflow",
+    amount: input.plannedHouseholdDistribution,
+    source: "Settings → Household → Planned company distribution",
+    note: "What is intended to be paid out each month to fund shared bills.",
+  });
+  const remaining = running;
+  lines.push({
+    id: "remaining",
+    label: remaining.complete && remaining.knownCents < 0 ? "Shortfall after distributions" : "Retained in the company",
+    kind: "result",
+    amount: remaining.complete ? known(remaining.knownCents) : unknown("depends on unknown items"),
+    running: remaining,
     source: "Computed",
   });
 
@@ -200,11 +236,12 @@ export function computeCompany(input: CompanyInput): CompanyResult {
         { label: "Reserve months", value: input.cashReserveTargetMonths === null ? "not set" : String(input.cashReserveTargetMonths), source: "Settings → Company → Cash reserve target" },
       ],
       assumptions: [],
-      caveats: operatingCost.complete ? [] : ["Operating cost includes unknown items; the target is a lower bound."],
+      caveats: input.cashReserveTargetMonths === null ? ["No reserve rule set yet."] : operatingCost.complete ? [] : ["Operating cost includes unknown items; the target is a lower bound."],
     },
   };
 
   const runwayMonths = isKnown(input.cashBalance) && operatingCost.knownCents > 0 ? Math.floor(input.cashBalance.cents / operatingCost.knownCents) : null;
+  const allocationNotes = input.allocations.map((a) => `${a.name}: ${ALLOCATION_KIND_SHORT[a.kind]}`);
 
   const cash: Metric = {
     id: "company-cash",
@@ -235,9 +272,9 @@ export function computeCompany(input: CompanyInput): CompanyResult {
     label: "Committed each month",
     total: committed,
     provenance: {
-      formula: "employees + owner gross salaries + employer payroll costs + bills + other overhead + tax reserve",
-      inputs: lines.filter((l) => l.kind === "outflow" || l.kind === "reserve").map((l) => ({ label: l.label, value: formatAmount(l.amount), source: l.source })),
-      assumptions: [classificationLabel],
+      formula: "gross salaries + business allocations + employer payroll costs + bills + other overhead + tax reserve",
+      inputs: lines.filter((l) => (l.kind === "outflow" || l.kind === "reserve") && !l.id.startsWith("planned") && !householdAllocations.some((a) => `alloc-${a.id}` === l.id)).map((l) => ({ label: l.label, value: formatAmount(l.amount), source: l.source })),
+      assumptions: allocationNotes,
       caveats: committed.complete ? [] : ["Includes unknown items; the figure shown is what is known so far."],
     },
   };
@@ -252,12 +289,26 @@ export function computeCompany(input: CompanyInput): CompanyResult {
         { label: "Revenue", value: formatAmount(input.anticipatedRevenue), source: "Settings → Company" },
         { label: "Committed", value: formatTotal(committed), source: "Computed" },
       ],
-      assumptions: [input.revenueBasis === "anticipated" ? "Revenue is anticipated, not contracted." : "Revenue is contracted."],
+      assumptions: [input.revenueBasis === "anticipated" ? "Revenue is anticipated, not contracted." : "Revenue is contracted.", ...allocationNotes],
       caveats: distributable.complete
         ? []
-        : [
-            `Upper bound only: ${distributable.unknowns.length} unknown cost item(s) still reduce this figure (${distributable.unknowns.join("; ")}).`,
-          ],
+        : [`Upper bound only: ${distributable.unknowns.length} unknown item(s) still reduce this figure (${distributable.unknowns.join("; ")}).`],
+    },
+  };
+
+  const remainingMetric: Metric = {
+    id: "company-remaining",
+    label: remaining.complete && remaining.knownCents < 0 ? "Shortfall after distributions" : "Retained after distributions",
+    total: remaining,
+    provenance: {
+      formula: "available for distributions − household-earmarked allocations − planned distribution",
+      inputs: [
+        { label: "Available for distributions", value: formatTotal(distributable), source: "Computed" },
+        ...householdAllocations.map((a) => ({ label: a.name, value: formatAmount(a.amount), source: "Settings → Company → Allocations" })),
+        { label: "Planned distribution", value: formatAmount(input.plannedHouseholdDistribution), source: "Settings → Household" },
+      ],
+      assumptions: [],
+      caveats: remaining.complete && remaining.knownCents < 0 ? [`The planned distribution exceeds what is available by ${formatAmount(known(-remaining.knownCents))}.`] : [],
     },
   };
 
@@ -267,6 +318,7 @@ export function computeCompany(input: CompanyInput): CompanyResult {
     revenue,
     committed: committedMetric,
     distributable: distributableMetric,
+    remaining: remainingMetric,
     monthlyOperatingCost: operatingCost,
     reserveTarget,
     runwayMonths,
@@ -277,22 +329,17 @@ export function computeCompany(input: CompanyInput): CompanyResult {
 function employerPayrollCosts(input: CompanyInput, ownerGross: Total): Amount {
   const rate = input.employerPayrollCostRatePct;
   if (rate === null) return unknown("Employer payroll cost rate not set");
-  if (!ownerGross.complete) return unknown("Owner gross salaries incomplete");
-
-  // Owner salaries are gross W-2 wages: employer costs always apply.
+  if (!ownerGross.complete) return unknown("Gross salaries incomplete");
   const ownerCosts = percentOf(known(ownerGross.knownCents), rate, "rate");
   if (!isKnown(ownerCosts)) return ownerCosts;
-
-  switch (input.employeeClassification) {
-    case "contractor":
-      return ownerCosts;
-    case "w2_gross_plus_employer_costs":
-      return ownerCosts; // employer costs already inside the allocation
-    case "w2_gross": {
-      const empl = percentOf(input.employeeAllocation, rate, "rate");
-      return isKnown(empl) ? known(empl.cents + ownerCosts.cents) : empl;
+  let cents = ownerCosts.cents;
+  for (const a of input.allocations) {
+    if (a.kind === "employees_unresolved") return unknown(`${a.name}: payroll classification unresolved, so employer payroll costs on it cannot be computed`);
+    if (a.kind === "employees_w2") {
+      const c = percentOf(a.amount, rate, "rate");
+      if (!isKnown(c)) return unknown(`${a.name}: amount not entered`);
+      cents += c.cents;
     }
-    case "unresolved":
-      return unknown("Employee allocation classification unresolved, so employer payroll costs on it cannot be computed");
   }
+  return known(cents);
 }

@@ -12,10 +12,10 @@ money that must never be blended into one balance:
 
 | Space | Who can see it by default | Purpose |
 |---|---|---|
-| **Company** | Both owners | Service revenue, employees/payroll, taxes, overhead, owner salaries |
-| **Household** | Both partners | Shared bills, shared goals, funded by each person's contribution |
-| **Personal (Alex)** | Alex only | Take-home, personal goals, personal spending |
-| **Personal (Sam)** | Sam only | Take-home, personal goals, personal spending |
+| **Company** | Will (owner) and Arielle (editor) | Service revenue, gross salaries, monthly allocations, taxes, overhead, distributions |
+| **Household** | Both | Rent, cars, utilities, groceries, dining together; funded by company distributions |
+| **Personal (Will, CEO)** | Will only | Take-home, personal goals, personal spending |
+| **Personal (Arielle, Creative Director)** | Arielle only | Take-home, the friends-travel goal, her spending plan |
 
 The spaces connect through classified transactions (a company payroll expense becomes a personal
 income; a personal transfer becomes a household contribution), scoped permissions, and
@@ -32,13 +32,19 @@ consolidated views that show each space's number side by side, never summed into
 ## 3. Financial rules (non-negotiable)
 
 - $30,000/month is **anticipated** company service revenue. It is never personal take-home pay.
-- $8,000/month is the **stated employee allocation**. Its payroll classification (W-2 gross,
-  contractor, or gross plus employer payroll costs) is **unresolved** and stays an editable field.
-- The two proposed $3,000 owner salaries are **gross**. Net take-home is unknown until
-  withholding assumptions are entered.
+- $8,000/month is a **monthly operating allocation** for tools, equipment (Claude Max, ChatGPT
+  Pro, a 2026 Mac mini) and apartment furnishing. No other employees are paid right now. Its
+  business vs household split is **unresolved** and stays an editable field; the household part
+  is an owner distribution, not a business expense.
+- Will and Arielle each take a separate **$3,000 gross W-2 salary**. Net take-home is derived
+  from an employee FICA rate (7.65%) plus an income-tax withholding estimate ($150–350, midpoint
+  $250), never assumed.
+- The household is funded by a **planned company distribution**, which stays unknown until set.
+- Arielle's plan after the $1,000 travel goal is a spending plan: Shopping $700, Massage $300,
+  Pedicure $100, Arts & crafts $200, Coffee/snacks/eating out with friends $200.
 - The superseded $270,000 engineering salary is not used anywhere. $22,000/month of take-home is
   never assumed.
-- Alex's $1,000/month friends-travel goal is funded **before** personal discretionary spending.
+- Arielle's $1,000/month friends-travel goal is funded **before** personal discretionary spending.
 - Unknown taxes, payroll costs, overhead, and balances stay **unknown**. They are never coerced to
   zero; every subtotal that depends on an unknown says so and reports a "known so far" figure.
 - Shortfalls are shown as shortfalls. Assumptions are never adjusted to make a budget look
@@ -59,10 +65,10 @@ consolidated views that show each space's number side by side, never summed into
 | `/household` | Household funding, bills, shared goals, contribution split |
 | `/personal/[person]` | Personal take-home waterfall, goals in priority order, discretionary, private |
 | `/transactions` | Ledger with filters, manual entry, CSV import, classification, transfer matching |
-| `/accounts` | Accounts per space with balances (unknown allowed) and "as of" dates |
+| `/accounts` | Accounts, bills, spending budgets and goals per space; balances may be unknown |
 | `/scenarios` | Proposed-purchase simulator: cash flow, runway, goal timelines |
 | `/assistant` | Chat. Tool-computed results explained by Claude when a key is set, labelled deterministic previews otherwise |
-| `/settings` | Workspace, members and per-space roles, invite links (not sent), mode indicator, data export |
+| `/settings` | Company assumptions and allocations, people (roles, salaries, withholding), members and per-space roles, invite links (not sent), mode indicator, data export |
 
 ## 5. Modes
 

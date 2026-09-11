@@ -4,6 +4,7 @@ import { getDb } from "../db";
 import * as s from "../db/schema";
 import { accountBalance, monthlyEquivalent, type LedgerTransaction } from "../finance";
 import { amountFromNullable, isKnown, known, sumAmounts, unknown, type Amount, type Total } from "../finance/money";
+import type { BudgetInput } from "../finance/personal";
 import type { BillInput, GoalInput } from "../finance/types";
 import { todayIso } from "../ids";
 
@@ -18,6 +19,7 @@ export interface SpaceData {
   accounts: AccountWithBalance[];
   bills: s.Bill[];
   goals: s.Goal[];
+  budgets: s.Budget[];
   transactions: s.Transaction[];
   categories: s.Category[];
   accountIds: Set<string>;
@@ -38,6 +40,7 @@ export function loadSpaceData(viewer: Viewer, space: ViewerSpace): SpaceData {
     : [];
   const bills = db.select().from(s.bills).where(and(eq(s.bills.spaceId, space.id), eq(s.bills.isActive, true))).all();
   const goals = db.select().from(s.goals).where(eq(s.goals.spaceId, space.id)).orderBy(s.goals.priority).all();
+  const budgets = db.select().from(s.budgets).where(eq(s.budgets.spaceId, space.id)).orderBy(s.budgets.sortOrder).all();
   const categories = db.select().from(s.categories).where(eq(s.categories.workspaceId, viewer.workspace.id)).all();
   const ledger = toLedger(transactions);
   const today = todayIso();
@@ -49,7 +52,7 @@ export function loadSpaceData(viewer: Viewer, space: ViewerSpace): SpaceData {
     const since = ledger.filter((t) => !a.openingBalanceAsOf || t.date >= a.openingBalanceAsOf);
     return { ...a, balance: known(accountBalance(a.id, a.openingBalanceCents, since, today)), balanceAsOf: today, transactionCount: count };
   });
-  return { space, accounts: withBalances, bills, goals, transactions, categories, accountIds: new Set(ids) };
+  return { space, accounts: withBalances, bills, goals, budgets, transactions, categories, accountIds: new Set(ids) };
 }
 
 export function toLedger(rows: s.Transaction[]): LedgerTransaction[] {
@@ -105,4 +108,16 @@ export function monthlyBillCents(b: s.Bill): number | null {
 /** Known portion of cash plus the accounts whose balance is missing. */
 export function cashTotal(accounts: AccountWithBalance[]): Total {
   return sumAmounts(accounts.filter((a) => !a.isArchived && a.type !== "credit_card").map((a) => a.balance));
+}
+
+/** Budgets with the month's actual spending: expenses and bill payments in the space's accounts with the budget's category. */
+export function toBudgetInputs(budgets: s.Budget[], ledger: LedgerTransaction[], accountIds: Set<string>, period: { from: string; to: string }): BudgetInput[] {
+  return budgets.map((b) => {
+    const actual = b.categoryId
+      ? ledger
+          .filter((t) => (t.kind === "expense" || t.kind === "bill_payment") && t.categoryId === b.categoryId && accountIds.has(t.accountId) && t.date >= period.from && t.date <= period.to)
+          .reduce((sum, t) => sum + t.amountCents, 0)
+      : null;
+    return { id: b.id, name: b.name, monthly: amountFromNullable(b.monthlyCents, `${b.name} budget not set`), actualCents: actual };
+  });
 }

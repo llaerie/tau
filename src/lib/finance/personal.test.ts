@@ -2,58 +2,65 @@ import { describe, expect, it } from "vitest";
 import { known, unknown } from "./money";
 import { computePersonal, type PersonalInput } from "./personal";
 
-const alex: PersonalInput = {
-  personId: "alex",
-  name: "Alex",
+const arielle: PersonalInput = {
+  personId: "arielle",
+  name: "Arielle",
   grossSalary: known(300000),
-  withholdingRatePct: null,
+  withholding: { ficaRatePct: 7.65, incomeTax: known(25000), incomeTaxRangeCents: [15000, 35000] },
   otherNetIncome: known(0),
-  householdContribution: known(80000),
-  bills: [{ id: "phone", name: "Phone", amount: known(6000), cadence: "monthly" }],
-  goals: [
-    { id: "gear", name: "Camera gear", monthlyTarget: known(30000), priority: 2 },
-    { id: "travel", name: "Friends travel", monthlyTarget: known(100000), priority: 1, rule: "Funded before discretionary spending" },
+  householdContribution: known(0),
+  bills: [],
+  goals: [{ id: "travel", name: "Friends travel", monthlyTarget: known(100000), priority: 1, rule: "Funded before any discretionary spending" }],
+  budgets: [
+    { id: "shopping", name: "Shopping", monthly: known(70000), actualCents: 42000 },
+    { id: "massage", name: "Massage", monthly: known(30000), actualCents: 0 },
+    { id: "pedicure", name: "Pedicure", monthly: known(10000) },
+    { id: "crafts", name: "Arts & crafts", monthly: known(20000) },
+    { id: "coffee", name: "Coffee, snacks & eating out with friends", monthly: known(20000) },
   ],
   cashBalance: known(520000),
 };
 
 describe("personal waterfall", () => {
-  it("keeps net take-home unknown when withholding is not set, and never assumes net = gross", () => {
-    const r = computePersonal(alex);
-    expect(r.gross.total.knownCents).toBe(300000);
+  it("derives net from gross using FICA and the income-tax estimate, with the range as a caveat", () => {
+    const r = computePersonal(arielle);
+    // 3,000 - 229.50 - 250 = 2,520.50 → FICA rounds to 22950 cents
+    expect(r.net.total.knownCents).toBe(300000 - 22950 - 25000);
+    expect(r.net.provenance.caveats[0]).toMatch(/between \$2,421 and \$2,621/);
+    expect(r.gross.provenance.caveats[0]).toMatch(/Not a spending allowance/);
+  });
+
+  it("funds the travel goal first, then the spending plan, and reports what is unallocated", () => {
+    const r = computePersonal(arielle);
+    expect(r.goals!.allocations[0]).toMatchObject({ goalId: "travel", fundedCents: 100000, shortfallCents: 0 });
+    expect(r.discretionary.total.knownCents).toBe(252050 - 100000);
+    expect(r.plannedSpending.knownCents).toBe(150000);
+    expect(r.unallocated.total.knownCents).toBe(152050 - 150000);
+    expect(r.budgets.find((b) => b.id === "shopping")).toMatchObject({ plannedCents: 70000, actualCents: 42000, remainingCents: 28000 });
+    expect(r.budgets.find((b) => b.id === "pedicure")!.remainingCents).toBeNull();
+  });
+
+  it("keeps net unknown when the income-tax estimate is missing and never assumes net = gross", () => {
+    const r = computePersonal({ ...arielle, withholding: { ficaRatePct: 7.65, incomeTax: unknown("not estimated") } });
     expect(r.net.total.complete).toBe(false);
     expect(r.discretionary.total.complete).toBe(false);
-    // Upper bound if nothing were withheld: 3,000 - 800 - 60 - 1,300 = 840
-    expect(r.discretionaryUpperBoundCents).toBe(84000);
-    expect(r.discretionary.provenance.caveats[0]).toMatch(/at most \$840/);
-    expect(r.unresolved[0]).toMatch(/withholding/i);
+    expect(r.unallocated.total.complete).toBe(false);
+    expect(r.discretionaryUpperBoundCents).toBe(300000 - 100000);
+    expect(r.unresolved[0]).toMatch(/income-tax/i);
   });
 
-  it("funds the friends-travel goal before discretionary spending once net is known", () => {
-    const r = computePersonal({ ...alex, withholdingRatePct: 25 });
-    // net = 2,250; after obligations = 2,250 - 800 - 60 = 1,390
-    expect(r.net.total.knownCents).toBe(225000);
-    expect(r.afterObligations.knownCents).toBe(139000);
-    const [first, second] = r.goals!.allocations;
-    expect(first.goalId).toBe("travel");
-    expect(first.fundedCents).toBe(100000);
-    expect(second.goalId).toBe("gear");
-    expect(second.fundedCents).toBe(30000);
-    expect(r.discretionary.total.knownCents).toBe(9000);
-  });
-
-  it("reports the shortfall when goals cannot be fully funded", () => {
-    const r = computePersonal({ ...alex, withholdingRatePct: 40 });
-    // net = 1,800; after obligations = 940; travel gets 940, gear gets 0
-    expect(r.goals!.allocations[0].fundedCents).toBe(94000);
-    expect(r.goals!.allocations[0].shortfallCents).toBe(6000);
-    expect(r.goals!.allocations[1].fundedCents).toBe(0);
+  it("reports a shortfall on goals when net cannot cover them", () => {
+    const r = computePersonal({ ...arielle, withholding: { ficaRatePct: 7.65, incomeTax: known(200000) } });
+    // net = 3,000 - 229.50 - 2,000 = 770.50
+    expect(r.goals!.allocations[0].fundedCents).toBe(77050);
+    expect(r.goals!.allocations[0].shortfallCents).toBe(22950);
     expect(r.discretionary.total.knownCents).toBeLessThan(0);
-    expect(r.discretionary.provenance.caveats[0]).toMatch(/Shortfall of \$360/);
+    expect(r.discretionary.provenance.caveats[0]).toMatch(/Shortfall/);
   });
 
-  it("keeps discretionary unknown when a bill amount is unknown", () => {
-    const r = computePersonal({ ...alex, withholdingRatePct: 25, bills: [{ id: "x", name: "Gym", amount: unknown("Gym amount not entered"), cadence: "monthly" }] });
-    expect(r.discretionary.total.complete).toBe(false);
+  it("flags an over-planned spending plan", () => {
+    const r = computePersonal({ ...arielle, budgets: [{ id: "big", name: "Big", monthly: known(200000) }] });
+    expect(r.unallocated.label).toBe("Over-planned");
+    expect(r.unallocated.total.knownCents).toBe(152050 - 200000);
   });
 });

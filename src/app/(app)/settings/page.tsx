@@ -1,7 +1,7 @@
 import { and, eq, isNull } from "drizzle-orm";
 import { ModeBadge } from "@/components/AppShell";
 import { CompanyAssumptionsForm, OwnerAssumptionsForm } from "@/components/forms/AssumptionsForms";
-import { InviteForm, ResetDemoButton, RoleSelect, RevokeInviteButton, SignOutButton } from "@/components/forms/SettingsForms";
+import { InviteForm, RenameWorkspaceForm, ResetDemoButton, RoleSelect, RevokeInviteButton, SignOutButton } from "@/components/forms/SettingsForms";
 import { Card, Notice, PageHeader, Section } from "@/components/ui";
 import { requireViewer } from "@/lib/actions/helpers";
 import { canEditAssumptions } from "@/lib/auth/authorize";
@@ -50,17 +50,18 @@ export default async function SettingsPage() {
         </Card>
       </Section>
 
-      <Section title="Company assumptions" description="The figures every company number is derived from.">
+      <Section title="Company assumptions" id="company" description="The figures every company number is derived from.">
         <Card>
+          {isOwner && <div className="mb-5 border-b border-line pb-5"><RenameWorkspaceForm name={viewer.workspace.name} /></div>}
           {canEditAssumptions(viewer) ? <CompanyAssumptionsForm a={viewer.assumptions} /> : <Notice>You need edit access to the company space to change these.</Notice>}
         </Card>
       </Section>
 
-      <Section title="Owners" description="Gross salaries, withholding estimates and household contributions.">
+      <Section title="People" id="people" description="Roles, gross salaries, withholding estimates and household contributions.">
         <div className="grid gap-3 lg:grid-cols-2">
           {viewer.persons.map((p) => (
             <Card key={p.id}>
-              <OwnerAssumptionsForm personId={p.id} name={p.name} o={viewer.assumptions.owners[p.id]} editable={p.userId === viewer.user.id || isOwner} />
+              <OwnerAssumptionsForm personId={p.id} name={p.name} title={p.title} o={viewer.assumptions.owners[p.id]} editable={p.userId === viewer.user.id || isOwner} />
             </Card>
           ))}
         </div>

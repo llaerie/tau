@@ -14,13 +14,13 @@ export function DemoPersonaButtons() {
     });
   return (
     <div className="mt-4 grid gap-2">
-      <button type="button" className="btn btn-primary justify-between" disabled={pending} onClick={() => go("alex")} data-testid="persona-alex">
-        <span>Alex Rivera</span>
-        <span className="text-xs font-normal opacity-80">owner · sees Alex&apos;s personal space</span>
+      <button type="button" className="btn btn-primary justify-between" disabled={pending} onClick={() => go("will")} data-testid="persona-will">
+        <span>Will</span>
+        <span className="text-xs font-normal opacity-80">CEO · company owner · his personal space</span>
       </button>
-      <button type="button" className="btn btn-secondary justify-between" disabled={pending} onClick={() => go("sam")} data-testid="persona-sam">
-        <span>Sam Okafor</span>
-        <span className="text-xs font-normal text-ink-3">owner · sees Sam&apos;s personal space</span>
+      <button type="button" className="btn btn-secondary justify-between" disabled={pending} onClick={() => go("arielle")} data-testid="persona-arielle">
+        <span>Arielle</span>
+        <span className="text-xs font-normal text-ink-3">Creative Director · her personal space</span>
       </button>
       {error && <p className="text-sm text-bad">{error}</p>}
     </div>
@@ -46,14 +46,21 @@ export function LiveAuthForms({ inviteCode }: { inviteCode: string }) {
         </form>
       ) : (
         <form action={regAction} className="space-y-3">
-          <label className="block text-sm"><span className="label">Your name</span><input name="name" required className="input mt-1" /></label>
+          <div className="grid grid-cols-2 gap-2">
+            <label className="block text-sm"><span className="label">Your first name</span><input name="name" required className="input mt-1" placeholder="Will" /></label>
+            <label className="block text-sm"><span className="label">Your role</span><input name="title" className="input mt-1" placeholder="CEO" /></label>
+          </div>
           <label className="block text-sm"><span className="label">Email</span><input name="email" type="email" autoComplete="email" required className="input mt-1" /></label>
           <label className="block text-sm"><span className="label">Password (10+ characters)</span><input name="password" type="password" autoComplete="new-password" minLength={10} required className="input mt-1" /></label>
           <label className="block text-sm"><span className="label">Invite code (if you were invited)</span><input name="inviteCode" defaultValue={inviteCode} className="input mt-1" /></label>
           {!inviteCode && (
             <>
               <label className="block text-sm"><span className="label">Company name</span><input name="workspaceName" className="input mt-1" placeholder="Your company" /></label>
-              <label className="block text-sm"><span className="label">Partner&apos;s first name (optional)</span><input name="partnerName" className="input mt-1" placeholder="Creates their private personal space; invite them later" /></label>
+              <div className="grid grid-cols-2 gap-2">
+                <label className="block text-sm"><span className="label">Partner&apos;s first name</span><input name="partnerName" className="input mt-1" placeholder="Arielle" /></label>
+                <label className="block text-sm"><span className="label">Partner&apos;s role</span><input name="partnerTitle" className="input mt-1" placeholder="Creative Director" /></label>
+              </div>
+              <p className="text-xs text-ink-3">Your partner gets a private personal space you cannot see. Invite them from Settings afterwards. Using the names Will and Arielle pre-fills the plan you described (travel goal, spending plan, household bills).</p>
             </>
           )}
           {regState && !regState.ok && <p className="text-sm text-bad">{regState.error}</p>}

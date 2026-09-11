@@ -52,25 +52,31 @@ test("live mode uses password accounts, rejects demo personas, and scopes spaces
     expect(res.status()).toBe(401);
 
     await page.getByRole("button", { name: "Create account" }).click();
-    await page.getByLabel("Your name").fill("Jordan");
-    await page.getByLabel("Email").fill("jordan@example.com");
+    await page.getByLabel("Your first name").fill("Will");
+    await page.getByLabel("Your role").fill("CEO");
+    await page.getByLabel("Email").fill("will@example.com");
     await page.getByLabel(/Password/).fill("a-long-passphrase-123");
-    await page.getByLabel("Company name").fill("Jordan Consulting");
-    await page.getByLabel(/Partner/).fill("Riley");
+    await page.getByLabel("Company name").fill("Will & Arielle Studio");
+    await page.getByLabel("Partner's first name").fill("Arielle");
+    await page.getByLabel("Partner's role").fill("Creative Director");
     await page.getByRole("button", { name: "Create workspace" }).click();
     await page.waitForURL(/onboarding/);
     await expect(page.getByRole("heading", { name: "Start with what you know" })).toBeVisible();
     await page.getByTestId("company-assumptions-form").getByRole("button", { name: /Save and open the overview/ }).click();
     await page.waitForURL((u) => u.pathname === "/");
     await expect(page.getByTestId("mode-badge").first()).toHaveText("Live data");
-    // The partner's personal space exists but is not visible to Jordan.
+    // The partner's personal space exists but is not visible to Will.
     await expect(page.getByTestId("cash-personal")).toHaveCount(1);
     await expect(page.getByTestId("cash-company")).toContainText("$0");
+    // The plan was pre-filled from the template: unknown household bills, Arielle's budgets live in her private space.
+    await page.goto(`${base}/household`);
+    await expect(page.getByRole("row", { name: /Tesla payments/ })).toBeVisible();
+    await expect(page.getByTestId("metric-household-funding")).toContainText("Unknown");
 
     await page.goto(`${base}/more`);
     await page.getByRole("button", { name: "Sign out" }).click();
     await page.waitForURL(/sign-in/);
-    await page.getByLabel("Email").fill("jordan@example.com");
+    await page.getByLabel("Email").fill("will@example.com");
     await page.getByLabel("Password").fill("wrong-password-123");
     await page.locator("form").getByRole("button", { name: "Sign in" }).click();
     await expect(page.getByText("Email or password is incorrect.")).toBeVisible();

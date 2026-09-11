@@ -11,7 +11,7 @@ export function Waterfall({ lines, caption }: { lines: WaterfallLine[]; caption?
           <tr>
             <th>Line</th>
             <th className="r">Amount</th>
-            <th className="r">Running</th>
+            <th className="r hidden sm:table-cell">Running</th>
           </tr>
         </thead>
         <tbody>
@@ -19,17 +19,17 @@ export function Waterfall({ lines, caption }: { lines: WaterfallLine[]; caption?
             const isResult = l.kind === "result";
             const sign = l.kind === "inflow" ? "+" : l.kind === "outflow" || l.kind === "reserve" ? "−" : "";
             return (
-              <tr key={l.id} className={isResult ? "bg-surface-2 font-semibold" : ""}>
+              <tr key={l.id} className={isResult ? "bg-surface-2 font-semibold" : l.kind === "subtotal" ? "bg-surface-2/60 font-medium" : ""}>
                 <td>
                   <div className="flex flex-wrap items-center gap-2">
                     <span>{l.label}</span>
                     {l.kind === "reserve" && <span className="chip chip-neutral">reserve</span>}
                   </div>
-                  {l.note && <p className="mt-0.5 max-w-prose text-xs text-ink-3">{l.note}</p>}
-                  <p className="mt-0.5 text-[11px] text-ink-3/80">{l.source}</p>
+                  {l.note && <p className="mt-0.5 max-w-prose text-[12px] text-ink-3">{l.note}</p>}
+                  <p className="mt-0.5 text-[11px] text-ink-3/70">{l.source}</p>
                 </td>
                 <td className="r whitespace-nowrap">
-                  {isResult ? (
+                  {isResult || l.kind === "subtotal" ? (
                     <TotalText total={l.running} size="sm" className={l.running.complete && l.running.knownCents < 0 ? "text-bad" : ""} />
                   ) : (
                     <span className={isKnown(l.amount) ? "" : ""}>
@@ -38,7 +38,7 @@ export function Waterfall({ lines, caption }: { lines: WaterfallLine[]; caption?
                     </span>
                   )}
                 </td>
-                <td className="r whitespace-nowrap text-ink-2">{!isResult && <TotalText total={l.running} size="sm" />}</td>
+                <td className="r hidden whitespace-nowrap text-ink-2 sm:table-cell">{!isResult && l.kind !== "subtotal" && <TotalText total={l.running} size="sm" />}</td>
               </tr>
             );
           })}
