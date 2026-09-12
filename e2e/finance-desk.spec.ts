@@ -12,9 +12,15 @@ test.beforeAll(async ({ browser }) => {
 
 test("A. Arielle opens the app: assistant first, briefing, composer, three starters", async ({ page, isMobile }) => {
   await signIn(page, "arielle");
+  // Arielle's plan is incomplete, so the briefing leads with setup and names one next step.
+  await expect(page.getByTestId("briefing")).toContainText("Let’s finish your money plan.");
   await expect(page.getByTestId("briefing")).toContainText(/Good (morning|afternoon|evening), Arielle/);
-  await expect(page.getByTestId("briefing")).toContainText("before income tax");
-  await expect(page.getByTestId("attention").getByRole("listitem")).toHaveCount(3);
+  await expect(page.getByTestId("next-step")).toContainText("Set your food target");
+  // The one money summary lives in the context rail: a floor, with its caveat attached.
+  const rail = page.getByTestId(isMobile ? "context-inline" : "context-rail");
+  await expect(rail).toContainText("Take-home so far");
+  await expect(rail).toContainText("$2,732");
+  await expect(rail).toContainText("Before income tax.");
   await expect(page.getByTestId("starter-what-can-i-spend-")).toBeVisible();
   await expect(page.getByTestId("starter-record-a-receipt")).toBeVisible();
   await expect(page.getByTestId("starter-plan-a-purchase")).toBeVisible();
@@ -40,14 +46,14 @@ test("B. food question separates gross, take-home status, target and missing inp
   await expect(turn.getByTestId("result-food_plan")).toContainText("Gross salary");
   await expect(turn.getByTestId("result-food_plan")).toContainText("$3,000");
   await expect(turn.getByTestId("next-action")).toHaveText("Set a food target");
-  await expect(turn.getByText("Preview answer (no model connected)")).toBeVisible();
+  await expect(turn.getByText("Preview answer.", { exact: false })).toBeVisible();
 });
 
 test("C/J. 'Set my food budget to $1,200' previews old/new, needs approval, persists once even when repeated", async ({ page }) => {
   await signIn(page, "arielle");
   const turn = await ask(page, "Set my food budget to $1,200");
   const card = turn.getByTestId("action-budget_change");
-  await expect(card).toContainText("Waiting for your approval");
+  await expect(card).toContainText("Waiting for you");
   await expect(card).toContainText("$1,200");
   await expect(card).toContainText(/Left after plan|unallocated/i);
   await card.getByTestId("action-approve").click();
@@ -58,20 +64,28 @@ test("C/J. 'Set my food budget to $1,200' previews old/new, needs approval, pers
   await card2.getByTestId("action-approve").click();
   await expect(card2).toContainText("Applied");
   await page.goto("/money?space=me");
-  await expect(page.getByTestId("food-plan")).toContainText("of $1,200");
-  await expect(page.getByTestId("unallocated")).toContainText("$1,200");
+  await expect(page.getByTestId("food-plan")).toContainText("$1,200");
+  await expect(page.getByTestId("food-plan")).toContainText("left");
+  // Setting the target does not invent an unallocated figure: withholding is still unconfirmed.
+  await expect(page.getByTestId("plan-panel")).toContainText("Not yet known");
+  await expect(page.getByTestId("plan-panel")).toContainText("Confirm withholding");
 });
 
 test("K. a detailed number opens its calculation in one click", async ({ page }) => {
   await signIn(page, "arielle");
   await page.goto("/money?space=me");
-  await page.getByTestId("calc-take-home").click();
+  // The principal figure opens its evidence in one click.
+  await page.getByTestId("calc-unallocated-monthly-plan").click();
   const dialog = page.getByRole("dialog");
+  await expect(dialog).toContainText("Where this comes from");
   await expect(dialog).toContainText("Formula");
-  await expect(dialog).toContainText("FICA");
-  await expect(dialog).toContainText("Income tax withheld");
+  await expect(dialog).toContainText("Inputs");
   await dialog.getByRole("button", { name: "Close" }).click();
   await expect(dialog).toBeHidden();
+  // Take-home keeps its own breakdown, one disclosure away.
+  await page.getByTestId("take-home").locator("summary").click();
+  await expect(page.getByTestId("take-home")).toContainText("Employee FICA");
+  await expect(page.getByTestId("take-home")).toContainText("Income tax withheld");
 });
 
 test("D. a $120 dinner receipt split equally records one expense with two $60 shares", async ({ page }) => {

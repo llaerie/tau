@@ -15,34 +15,34 @@ export function ResultCard({ component }: { component: ResultComponent }) {
   const [open, setOpen] = useState(false);
   const hasDetail = (component.rows?.length ?? 0) > 0 || (component.assumptions?.length ?? 0) > 0 || (component.missing?.length ?? 0) > 0;
   return (
-    <section className="fade-in rounded-xl border border-line bg-surface" data-testid={`result-${component.kind}`}>
-      <div className="flex items-start justify-between gap-3 px-4 pt-3.5">
+    <section className="fade-in card overflow-hidden" data-testid={`result-${component.kind}`}>
+      <div className="flex items-start justify-between gap-3 px-5 pt-4">
         <div className="min-w-0">
-          <h3 className="truncate text-[13.5px] font-semibold">{component.title}</h3>
-          {component.asOf && <p className="text-[11.5px] text-ink-3">As of {component.asOf}</p>}
+          <h3 className="truncate text-[15px] font-semibold">{component.title}</h3>
+          {component.asOf && <p className="text-[12.5px] text-ink-3">As of {component.asOf}</p>}
         </div>
         {hasDetail && (
           <button type="button" className="btn btn-ghost btn-sm shrink-0" onClick={() => setOpen(true)}>
-            View calculation
+            Where this comes from
           </button>
         )}
       </div>
       {component.values.length > 0 && (
-        <dl className="mt-2 divide-y divide-line border-t border-line">
+        <dl className="mt-3 divide-y divide-line border-t border-line">
           {component.values.map((v) => (
-            <div key={v.id} className="grid grid-cols-[1fr_auto] items-baseline gap-x-4 gap-y-0.5 px-4 py-2.5">
-              <dt className="text-[13px] text-ink-2">{v.label}</dt>
+            <div key={v.id} className="grid grid-cols-[1fr_auto] items-baseline gap-x-4 gap-y-0.5 px-5 py-3">
+              <dt className="text-[13.5px] text-ink-2">{v.label}</dt>
               <dd className="flex items-center gap-2 text-right">
-                <span className={`num text-[14px] font-medium ${v.status === "unknown" ? "text-unknown" : ""}`}>{v.value}</span>
+                <span className={`fd-money text-[16px] font-semibold ${v.status === "unknown" ? "text-ink-3" : ""}`}>{v.value}</span>
                 <StatusChip status={v.status} />
               </dd>
-              {v.note && <p className="col-span-2 text-[12px] text-ink-3">{v.note}</p>}
+              {v.note && <p className="col-span-2 text-[12.5px] leading-snug text-ink-3">{v.note}</p>}
             </div>
           ))}
         </dl>
       )}
       {component.missing && component.missing.length > 0 && (
-        <p className="border-t border-line px-4 py-2 text-[12.5px] text-ink-2">
+        <p className="border-t border-line px-5 py-3 text-[13px] text-ink-2">
           <span className="chip chip-unknown mr-1.5">Unknown</span>
           {component.missing.join(" · ")}
         </p>

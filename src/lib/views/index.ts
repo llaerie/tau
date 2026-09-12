@@ -248,7 +248,15 @@ export function upcomingObligations(viewer: Viewer, spaceIds: string[], horizonD
       }
     }
   }
-  return out.sort((x, y) => x.dueDate.localeCompare(y.dueDate));
+  const seen = new Set<string>();
+  return out
+    .filter((o) => {
+      const key = `${o.id}:${o.dueDate}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .sort((x, y) => x.dueDate.localeCompare(y.dueDate));
 }
 
 // ---------- Briefing, partner summary ----------
@@ -284,9 +292,14 @@ export function buildBriefing(viewer: Viewer): Briefing {
     if (v.food.foodTarget === null) summary.push(`Food this month so far: ${formatCents(v.food.foodSpentCents)} across ${v.data.shares.length ? "your shares of " : ""}${v.food.foodSpentCents ? "recorded meals" : "no recorded meals"}. No food target yet.`);
     else summary.push(`Food: ${formatCents(v.food.foodSpentCents)} of ${formatCents(v.food.foodTarget)} used this month; ${formatCents(v.food.foodRemainingCents!)} left.`);
     moneyLine = {
-      label: v.takeHome.status === "verified" ? "Take-home" : v.takeHome.status === "estimate" ? "Take-home estimate" : "Take-home so far",
-      value: v.takeHome.takeHome.complete ? formatCents(v.takeHome.takeHome.knownCents) : `${formatCents(v.takeHome.beforeIncomeTax.knownCents)} before income tax`,
-      caveat: v.takeHome.status === "verified" ? null : v.takeHome.status === "estimate" ? "estimate, not a verified paycheck" : "income-tax withholding not confirmed",
+      label: v.takeHome.status === "verified" ? "Take-home this month" : v.takeHome.status === "estimate" ? "Take-home estimate" : "Take-home so far",
+      value: v.takeHome.takeHome.complete ? formatCents(v.takeHome.takeHome.knownCents) : formatCents(v.takeHome.beforeIncomeTax.knownCents),
+      caveat:
+        v.takeHome.status === "verified"
+          ? null
+          : v.takeHome.status === "estimate"
+            ? "An estimate, not a verified paycheck."
+            : "Before income tax. Your withholding is not confirmed, so this is a floor.",
     };
   }
   const upcoming = upcomingObligations(viewer, viewer.spaces.filter((sp) => sp.kind !== "personal" || sp.id === mine?.id).map((sp) => sp.id), 14).filter((o) => !o.paid).slice(0, 4);

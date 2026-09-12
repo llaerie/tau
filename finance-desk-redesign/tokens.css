@@ -1,0 +1,129 @@
+/* Finance Desk: authored visual starting tokens, not a complete UI.
+   Map into the existing app. Scope deliberately; do not blindly override it.
+   No external font files or UI screenshot assets are required.
+   Verify final contrast over actual gradients, overlays, and disabled states. */
+
+:root,
+[data-theme="light"] {
+  color-scheme: light;
+  --fd-canvas: #f3f5f9;
+  --fd-surface: #ffffff;
+  --fd-surface-raised: #ffffff;
+  --fd-surface-inset: #eaf0f7;
+  --fd-text: #141b2d;
+  --fd-text-secondary: #52617b;
+  --fd-text-muted: #5b6b80;
+  --fd-border: #dce3ee;
+  --fd-control-border: #78879b;
+  --fd-primary: #155eef;
+  --fd-on-primary: #ffffff;
+  --fd-primary-soft: #e7efff;
+  --fd-link: #174fbd;
+  --fd-focus: #155eef;
+  --fd-success: #17643e;
+  --fd-success-soft: #e7f5ed;
+  --fd-warning: #815200;
+  --fd-warning-soft: #fff4da;
+  --fd-danger: #b42318;
+  --fd-danger-soft: #fff0ee;
+  --fd-backdrop: rgb(12 22 40 / 32%);
+  --fd-shadow-panel: 0 12px 34px -22px rgb(30 57 92 / 28%), 0 1px 2px rgb(30 57 92 / 5%);
+  --fd-shadow-overlay: 0 24px 70px -24px rgb(19 36 64 / 30%), 0 0 0 1px rgb(35 62 98 / 6%);
+  --fd-highlight: inset 0 1px 0 rgb(255 255 255 / 90%);
+  --fd-action-gradient: linear-gradient(115deg, #1d4ed8 0%, #2563eb 100%);
+  --fd-atmosphere: radial-gradient(ellipse at 80% 0%, rgb(131 188 255 / 22%) 0%, transparent 65%);
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+  --fd-canvas: #0d1117;
+  --fd-surface: #151b24;
+  --fd-surface-raised: #1c2430;
+  --fd-surface-inset: #10151d;
+  --fd-text: #f6f8fc;
+  --fd-text-secondary: #b8c4d6;
+  --fd-text-muted: #8f9fb6;
+  --fd-border: #2b3748;
+  --fd-control-border: #74859d;
+  --fd-primary: #85b4ff;
+  --fd-on-primary: #0d1729;
+  --fd-primary-soft: #1e304b;
+  --fd-link: #a9ccff;
+  --fd-focus: #a9ccff;
+  --fd-success: #8ed7ad;
+  --fd-success-soft: #173025;
+  --fd-warning: #efc474;
+  --fd-warning-soft: #342b18;
+  --fd-danger: #ffaaa2;
+  --fd-danger-soft: #38201f;
+  --fd-backdrop: rgb(0 0 0 / 58%);
+  --fd-shadow-panel: 0 12px 32px -22px rgb(0 0 0 / 72%);
+  --fd-shadow-overlay: 0 24px 70px -24px rgb(0 0 0 / 80%), 0 0 0 1px rgb(224 236 255 / 9%);
+  --fd-highlight: inset 0 1px 0 rgb(224 236 255 / 6%);
+  --fd-action-gradient: linear-gradient(115deg, #89b8ff 0%, #b2d5ff 100%);
+  --fd-atmosphere: radial-gradient(ellipse at 80% 0%, rgb(69 120 223 / 16%) 0%, transparent 65%);
+}
+
+:root {
+  --fd-font: "Geist", "Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --fd-space-1: 4px;
+  --fd-space-2: 8px;
+  --fd-space-3: 12px;
+  --fd-space-4: 16px;
+  --fd-space-5: 20px;
+  --fd-space-6: 24px;
+  --fd-space-8: 32px;
+  --fd-space-10: 40px;
+  --fd-space-12: 48px;
+  --fd-radius-field: 14px;
+  --fd-radius-card: 18px;
+  --fd-radius-feature: 24px;
+  --fd-radius-pill: 999px;
+  --fd-sidebar: 208px;
+  --fd-context-rail: 308px;
+  --fd-conversation-max: 760px;
+  --fd-motion-fast: 160ms;
+  --fd-motion-surface: 240ms;
+  --fd-motion-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* Optional scoped helpers. Keep semantic HTML and existing behavior. */
+.fd-app {
+  color: var(--fd-text);
+  background: var(--fd-canvas);
+  font-family: var(--fd-font);
+  font-size: 16px;
+  line-height: 1.5;
+}
+.fd-money {
+  font-variant-numeric: tabular-nums lining-nums;
+  font-feature-settings: "tnum" 1, "lnum" 1;
+  letter-spacing: -0.035em;
+}
+.fd-feature-panel {
+  background: var(--fd-surface);
+  border-radius: var(--fd-radius-feature);
+  box-shadow: var(--fd-highlight), var(--fd-shadow-panel);
+}
+.fd-primary-action {
+  min-height: 44px;
+  color: var(--fd-on-primary);
+  background: var(--fd-action-gradient);
+  border: 0;
+  border-radius: var(--fd-radius-pill);
+  padding: 10px 20px;
+  font: inherit;
+  font-weight: 600;
+}
+.fd-app :focus-visible {
+  outline: 2px solid var(--fd-focus);
+  outline-offset: 3px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .fd-app *, .fd-app *::before, .fd-app *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

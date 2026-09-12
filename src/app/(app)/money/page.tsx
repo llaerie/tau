@@ -5,7 +5,7 @@ import { AmountText, Cents, TotalText } from "@/components/Money";
 import { CalcButton } from "@/components/money/CalcButton";
 import { PurchasePlanEditor, SubscriptionConfirm } from "@/components/money/CompanyEditors";
 import { AllocationsEditor, FoodTargetEditor } from "@/components/money/PersonalEditors";
-import { Card, EmptyState, Notice, PageHeader, dateLabel, monthLabel } from "@/components/ui";
+import { Card, EmptyState, Notice, dateLabel, monthLabel } from "@/components/ui";
 import { requireViewer } from "@/lib/actions/helpers";
 import { canEdit } from "@/lib/auth/authorize";
 import type { Viewer } from "@/lib/auth/session";
@@ -38,10 +38,19 @@ export default async function MoneyPage({ searchParams }: { searchParams: Promis
 
   return (
     <>
-      <PageHeader title="Money" description="Each space on its own. Unknown inputs stay unknown; nothing is netted across spaces." actions={<ModeBadge isDemo={viewer.isDemo} />} />
-      <nav className="mb-5 flex gap-1 overflow-x-auto border-b border-line" aria-label="Spaces">
+      <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
+        <p className="max-w-xl text-[14.5px] leading-relaxed text-ink-2">Each space on its own. Unknown inputs stay unknown, and nothing is netted across spaces.</p>
+        <ModeBadge isDemo={viewer.isDemo} />
+      </div>
+      <nav className="mb-5 flex gap-1 overflow-x-auto rounded-[var(--fd-radius-pill)] bg-surface-2 p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" aria-label="Spaces">
         {tabs.map((t) => (
-          <Link key={t.key} href={`/money?space=${t.key}`} className={`-mb-px whitespace-nowrap border-b-2 px-3 py-2 text-[13.5px] font-medium transition-colors ${tab === t.key ? "border-accent text-ink" : "border-transparent text-ink-3 hover:text-ink"}`} aria-current={tab === t.key ? "page" : undefined} data-testid={`tab-${t.key}`}>
+          <Link
+            key={t.key}
+            href={`/money?space=${t.key}`}
+            className={`flex min-h-[40px] items-center whitespace-nowrap rounded-[var(--fd-radius-pill)] px-4 text-[14px] font-medium transition-colors ${tab === t.key ? "bg-surface text-ink shadow-panel" : "text-ink-2 hover:text-ink"}`}
+            aria-current={tab === t.key ? "page" : undefined}
+            data-testid={`tab-${t.key}`}
+          >
             {t.label}
           </Link>
         ))}
@@ -72,104 +81,209 @@ function PersonalTab({ viewer }: { viewer: Viewer }) {
   const th = v.takeHome;
   const f = v.food;
   const editable = canEdit(viewer, mine.id);
-  const statusChip = th.status === "verified" ? <span className="chip chip-good">Verified from pay stub</span> : th.status === "estimate" ? <span className="chip chip-neutral">Estimate</span> : <span className="chip chip-unknown">Incomplete</span>;
+  const unallocated = f.unallocated.total;
+  const takeHomeStatus = th.status === "verified" ? "Verified from a pay stub" : th.status === "estimate" ? "Estimate, not a verified paycheck" : "Incomplete";
+  const recent = [...v.data.transactions]
+    .filter((x) => !x.voidedAt && v.data.accountIds.has(x.accountId))
+    .sort((a, b) => b.date.localeCompare(a.date))
+    .slice(0, 5);
+
   return (
-    <div className="space-y-6" data-testid="tab-me-content">
-      <p className="text-[13px] text-ink-3">{v.personName}{v.personTitle ? ` · ${v.personTitle}` : ""} · {monthLabel(v.month)} · private to you</p>
+    <div className="grid min-w-0 grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start" data-testid="tab-me-content">
 
-      <Card testId="take-home">
-        <div className="flex flex-wrap items-start justify-between gap-2">
-          <div>
-            <p className="label">Monthly take-home</p>
-            <p className="mt-1 flex flex-wrap items-baseline gap-2">
-              <TotalText total={th.takeHome} size="lg" />
-              {statusChip}
-            </p>
-            {!th.takeHome.complete && <p className="mt-1 text-[13px] text-ink-2">Before income tax: <Cents value={th.beforeIncomeTax.knownCents} /> · income-tax withholding not confirmed, so the exact figure cannot be given.</p>}
-            {th.rangeCents && <p className="mt-1 text-[12.5px] text-ink-3">Estimate range {formatCents(th.rangeCents[0])} – {formatCents(th.rangeCents[1])}.</p>}
-          </div>
-          <CalcButton label="Take-home" provenance={f.takeHome.provenance} value={formatTotal(th.takeHome)} status={th.status} />
-        </div>
-        <dl className="mt-3 grid grid-cols-2 gap-x-6 sm:grid-cols-4">
-          <Row label="Gross salary" amount={th.gross} />
-          <Row label="Employee FICA" amount={th.fica} negative />
-          <Row label="CA SDI" amount={th.sdi} negative />
-          <Row label="Income tax withheld" amount={th.incomeTax} negative />
-        </dl>
-        {th.status !== "verified" && (
-          <p className="mt-3 text-[12.5px] text-ink-3">
-            Enter figures from a pay stub in <Link href="/settings#payroll" className="link">Settings → Payroll</Link> to verify. Federal and state income tax withholding are never assumed.
-          </p>
-        )}
-      </Card>
+      <div className="flex min-w-0 flex-col gap-5">
+        {/* The one prominent panel. Its principal figure is explicitly named. */}
+        <section className="fd-feature-panel overflow-hidden" data-testid="plan-panel">
+          <div className="fd-atmosphere px-5 pb-5 pt-5 sm:px-7 sm:pt-6">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="label">Unallocated monthly plan</p>
+                <p className="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                  {unallocated.complete ? (
+                    <span className="fd-money text-[42px] font-semibold leading-none sm:text-[46px]">{formatCents(unallocated.knownCents)}</span>
+                  ) : (
+                    <span className="text-[26px] font-semibold leading-tight text-ink-2 sm:text-[30px]">Not yet known</span>
+                  )}
+                  <span className="chip chip-unknown" hidden={unallocated.complete}>
+                    {unallocated.unknowns.length} missing input{unallocated.unknowns.length === 1 ? "" : "s"}
+                  </span>
+                </p>
+                <p className="mt-2.5 max-w-md text-[14px] leading-relaxed text-ink-2">
+                  What is left each month after fixed bills, your household contribution, your food target and the allocations you chose.
+                </p>
+              </div>
+              <span className="shrink-0">
+                <CalcButton label="Unallocated monthly plan" provenance={f.unallocated.provenance} value={formatTotal(unallocated)} status={unallocated.complete ? "Complete" : "Incomplete"} asOf={v.month} />
+              </span>
+            </div>
 
-      <Card testId="food-plan">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <p className="label">Food this month</p>
-            {f.foodTarget === null ? (
-              <p className="mt-1 text-[15px]"><Cents value={f.foodSpentCents} className="font-semibold" /> spent · no target set</p>
-            ) : (
-              <p className="mt-1 text-[15px]"><Cents value={f.foodSpentCents} className="font-semibold" /> of <Cents value={f.foodTarget} /> · <Cents value={f.foodRemainingCents!} signed={f.foodRemainingCents! < 0} className={f.foodStatus === "over" ? "text-bad" : f.foodStatus === "close" ? "text-warn" : "text-good"} /> left</p>
+            {!unallocated.complete && (
+              <div className="mt-4 rounded-[var(--fd-radius-card)] bg-surface px-4 py-3.5 sm:flex sm:items-center sm:gap-4">
+                <p className="min-w-0 text-[13.5px] leading-relaxed text-ink-2 sm:flex-1">
+                  {(unallocated.unknowns[0] ?? "One input is still missing").replace(/\.?$/, ".")} Finish that and this figure becomes exact.
+                </p>
+                <Link href={f.foodTarget === null ? "#food" : "/settings#payroll"} className="btn btn-primary btn-sm mt-3 w-full shrink-0 sm:mt-0 sm:w-auto">
+                  {f.foodTarget === null ? "Set your food target" : "Confirm withholding"}
+                </Link>
+              </div>
             )}
-            <p className="mt-0.5 text-[12.5px] text-ink-3">Your shares of recorded meals and groceries. A split dinner counts only your part. The target is planning capacity; it is subtracted once, spending is tracked against it.</p>
           </div>
-          <FoodTargetEditor personId={v.personId} targetCents={f.foodTarget} editable={editable} />
-        </div>
-        {f.foodTarget !== null && (
-          <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-surface-3" role="progressbar" aria-valuemin={0} aria-valuemax={f.foodTarget} aria-valuenow={Math.min(f.foodSpentCents, f.foodTarget)}>
-            <div className={`h-full rounded-full ${f.foodStatus === "over" ? "bg-bad" : f.foodStatus === "close" ? "bg-warn" : "bg-accent"}`} style={{ width: `${Math.min(100, (f.foodSpentCents / f.foodTarget) * 100)}%` }} />
+
+          {/* Take-home sits in a breakdown, not as a competing headline card. */}
+          <details className="group border-t border-line" data-testid="take-home">
+            <summary className="flex min-h-[52px] cursor-pointer list-none items-center justify-between gap-3 px-5 py-3 text-[14px] hover:bg-surface-2 sm:px-7">
+              <span className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
+                <span className="font-medium">Take-home</span>
+                <TotalText total={th.takeHome} size="sm" />
+                <span className={`chip ${th.status === "verified" ? "chip-good" : th.status === "estimate" ? "chip-neutral" : "chip-unknown"}`}>{takeHomeStatus}</span>
+              </span>
+              <svg viewBox="0 0 24 24" className="h-4 w-4 shrink-0 text-ink-3 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+                <path d="m6 9 6 6 6-6" />
+              </svg>
+            </summary>
+            <div className="border-t border-line px-5 pb-4 pt-3 sm:px-7">
+              <dl className="grid grid-cols-2 gap-x-6 sm:grid-cols-4">
+                <Row label="Gross salary" amount={th.gross} />
+                <Row label="Employee FICA" amount={th.fica} negative />
+                <Row label="California SDI" amount={th.sdi} negative />
+                <Row label="Income tax withheld" amount={th.incomeTax} negative />
+              </dl>
+              {!th.takeHome.complete && (
+                <p className="mt-3 text-[13px] text-ink-2">
+                  Before income tax this is <Cents value={th.beforeIncomeTax.knownCents} />. Gross pay is not spendable cash, and withholding is never assumed.
+                </p>
+              )}
+              <p className="mt-3">
+                <Link href="/settings#payroll" className="link text-[13.5px]">
+                  {th.status === "verified" ? "Payroll details" : "Enter figures from a pay stub"}
+                </Link>
+              </p>
+            </div>
+          </details>
+        </section>
+
+        {/* Food: target, spent, remaining, and one direct adjustment. */}
+        <section className="card px-5 py-5 sm:px-6" id="food" data-testid="food-plan">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="label">Food this month</p>
+              {f.foodTarget === null ? (
+                <p className="mt-1.5 text-[20px] font-semibold">
+                  <Cents value={f.foodSpentCents} /> spent <span className="font-normal text-ink-3">· no target yet</span>
+                </p>
+              ) : (
+                <p className="mt-1.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-[19px] font-semibold sm:text-[20px]">
+                  <Cents value={f.foodSpentCents} />
+                  <span className="text-[15px] font-normal text-ink-3">of</span>
+                  <Cents value={f.foodTarget} />
+                  <span className={`text-[15px] font-medium ${f.foodStatus === "over" ? "text-bad" : f.foodStatus === "close" ? "text-warn" : "text-good"}`}>
+                    <Cents value={f.foodRemainingCents!} /> left
+                  </span>
+                </p>
+              )}
+              <p className="mt-1.5 max-w-md text-[13px] leading-snug text-ink-3">
+                Your share of recorded meals and groceries. A split dinner counts only your part.
+              </p>
+            </div>
+            <span className="shrink-0">
+              <FoodTargetEditor personId={v.personId} targetCents={f.foodTarget} editable={editable} />
+            </span>
           </div>
-        )}
-      </Card>
+          {f.foodTarget !== null && (
+            <div
+              className="mt-4 h-2 w-full overflow-hidden rounded-full bg-surface-2"
+              role="progressbar"
+              aria-label="Food spent against target"
+              aria-valuemin={0}
+              aria-valuemax={f.foodTarget}
+              aria-valuenow={Math.min(f.foodSpentCents, f.foodTarget)}
+            >
+              <div
+                className={`h-full rounded-full ${f.foodStatus === "over" ? "bg-bad" : f.foodStatus === "close" ? "bg-warn" : "bg-accent"}`}
+                style={{ width: `${Math.min(100, (f.foodSpentCents / f.foodTarget) * 100)}%` }}
+              />
+            </div>
+          )}
+        </section>
 
-      <Card testId="unallocated">
-        <div className="flex flex-wrap items-start justify-between gap-2">
-          <div>
-            <p className="label">Left after plan</p>
-            <p className="mt-1"><TotalText total={f.unallocated.total} size="lg" /></p>
-            <p className="mt-0.5 text-[12.5px] text-ink-3">Take-home − fixed bills − household contribution − food target − optional allocations.</p>
+        <section className="card px-5 py-5 sm:px-6" data-testid="allocations">
+          <p className="label">What you chose to set aside</p>
+          <p className="mt-1 text-[13px] text-ink-3">Savings, investing or a spending pot. Your choices, never imposed.</p>
+          <div className="mt-3">
+            <AllocationsEditor personId={v.personId} allocations={v.owner.allocations} editable={editable} />
           </div>
-          <CalcButton label="Left after plan" provenance={f.unallocated.provenance} value={formatTotal(f.unallocated.total)} />
-        </div>
-        <dl className="mt-3 divide-y divide-line border-t border-line">
-          <Line label="Fixed personal bills"><TotalText total={v.fixedBillsTotal} size="sm" /></Line>
-          <Line label="Household contribution"><Cents value={v.owner.householdContributionCents ?? 0} /> {(v.owner.householdContributionCents ?? 0) === 0 && <span className="text-[12px] text-ink-3">(the company pays the household bills directly)</span>}</Line>
-          <Line label="Food target">{f.foodTarget === null ? <span className="chip chip-unknown">not set</span> : <Cents value={f.foodTarget} />}</Line>
-          <Line label="Optional allocations"><Cents value={f.allocationsTotalCents} /></Line>
-        </dl>
-        <div className="mt-4">
-          <p className="mb-1.5 text-[13px] font-medium">Optional allocations</p>
-          <AllocationsEditor personId={v.personId} allocations={v.owner.allocations} editable={editable} />
-        </div>
-      </Card>
+        </section>
 
-      <Card testId="personal-accounts">
-        <p className="label">Accounts</p>
-        <ul className="mt-2 divide-y divide-line">
-          {v.data.accounts.map((a) => (
-            <li key={a.id} className="flex items-center justify-between py-2 text-[13.5px]">
-              <span>{a.name}<span className="ml-2 text-[12px] text-ink-3">{a.type.replace("_", " ")}</span></span>
-              <AmountText amount={a.balance} />
-            </li>
-          ))}
-        </ul>
-        <p className="mt-2 text-[12px] text-ink-3">Recorded balances from opening balance plus entries; not reconciled with the bank.</p>
-      </Card>
+        <section className="card px-5 py-5 sm:px-6" data-testid="recent-activity">
+          <div className="flex items-baseline justify-between gap-3">
+            <p className="label">Recent activity</p>
+            <Link href="/activity?space=me" className="link text-[13px]">
+              See all
+            </Link>
+          </div>
+          {recent.length === 0 ? (
+            <p className="mt-2 text-[13.5px] text-ink-3">Nothing recorded yet this month.</p>
+          ) : (
+            <ul className="mt-2 divide-y divide-line">
+              {recent.map((x) => (
+                <li key={x.id} className="flex items-center gap-3 py-2.5">
+                  <span className="w-14 shrink-0 text-[12.5px] text-ink-3">{dateLabel(x.date)}</span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[14px]">{x.description}</span>
+                    <span className="block truncate text-[12px] text-ink-3">
+                      {v.data.categories.find((c) => c.id === x.categoryId)?.name ?? TREATMENT_LABELS[x.treatment ?? "none"] ?? "Uncategorised"}
+                    </span>
+                  </span>
+                  {x.reviewStatus === "review_required" && <span className="chip chip-warn shrink-0">review</span>}
+                  <Cents value={x.kind === "income" ? x.amountCents : -x.amountCents} signed className={`shrink-0 text-[14px] font-medium ${x.kind === "income" ? "text-good" : ""}`} />
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      </div>
 
-      {v.upcoming.length > 0 && (
-        <Card testId="personal-upcoming">
-          <p className="label">Upcoming (30 days)</p>
+      {/* Lower-priority detail: cash, bills and what is coming. */}
+      <div className="flex min-w-0 flex-col gap-4">
+        <section className="card px-5 py-4" data-testid="personal-accounts">
+          <p className="label">Your accounts</p>
           <ul className="mt-2 divide-y divide-line">
-            {v.upcoming.map((o) => (
-              <li key={o.id} className="flex items-center justify-between py-2 text-[13.5px]">
-                <span>{o.label}<span className="ml-2 text-[12px] text-ink-3">{dateLabel(o.dueDate)}{o.paid ? " · paid" : ""}</span></span>
-                <AmountText amount={o.amount} />
+            {v.data.accounts.map((a) => (
+              <li key={a.id} className="flex items-center justify-between gap-3 py-2.5 text-[14px]">
+                <span className="min-w-0">
+                  <span className="block truncate">{a.name}</span>
+                  <span className="block text-[12px] text-ink-3">{a.type.replace("_", " ")}</span>
+                </span>
+                <AmountText amount={a.balance} className="shrink-0" />
               </li>
             ))}
           </ul>
-        </Card>
-      )}
+          <p className="mt-2 text-[12px] text-ink-3">Recorded from an opening balance plus entries. Not reconciled with the bank.</p>
+        </section>
+
+        <section className="card px-5 py-4" data-testid="fixed-bills">
+          <p className="label">Fixed bills</p>
+          <p className="mt-1.5"><TotalText total={v.fixedBillsTotal} size="md" /></p>
+          <p className="mt-1 text-[12px] text-ink-3">Subtracted from take-home before anything else.</p>
+        </section>
+
+        {v.upcoming.length > 0 && (
+          <section className="card px-5 py-4" data-testid="personal-upcoming">
+            <p className="label">Coming up</p>
+            <ul className="mt-2 divide-y divide-line">
+              {v.upcoming.slice(0, 4).map((o) => (
+                <li key={o.id} className="flex items-center justify-between gap-3 py-2.5 text-[13.5px]">
+                  <span className="min-w-0">
+                    <span className="block truncate">{o.label}</span>
+                    <span className="block text-[12px] text-ink-3">{dateLabel(o.dueDate)}{o.paid ? " · paid" : ""}</span>
+                  </span>
+                  <AmountText amount={o.amount} className="shrink-0" />
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+      </div>
     </div>
   );
 }

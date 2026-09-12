@@ -71,7 +71,7 @@ test("live mode uses password accounts, rejects demo personas, and scopes spaces
     await expect(page.getByTestId("household-company-paid")).toContainText("$5,800");
     await page.goto(`${base}/money?space=company`);
     await expect(page.getByTestId("subscriptions")).toContainText("tier to confirm");
-    await expect(page.getByTestId("metric-recorded-cash")).toContainText("Unknown");
+    await expect(page.getByTestId("metric-recorded-cash")).toContainText("Not known");
 
     await page.goto(`${base}/settings`);
     await page.getByRole("button", { name: "Sign out" }).first().click();
