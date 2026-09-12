@@ -1,0 +1,142 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Instrument+Serif&family=Archivo:wght@400;500;600&display=swap">
+  <style>
+    body { margin: 0; font-family: Archivo, "Helvetica Neue", Arial, sans-serif; font-size: 14px; line-height: 1.5; }
+    a { color: #17201C; } a:hover { color: #000; }
+    .eyebrow { font-size: 10.5px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: #77736B; }
+    .sw { width: 100%; height: 44px; border-radius: 3px; }
+    .li { display: flex; gap: 9px; font-size: 13px; line-height: 1.5; }
+    .li span:first-child { flex-shrink: 0; width: 13px; }
+  </style>
+</helmet>
+
+<div style="width: 1240px; min-height: 1180px; background: #EFECE5; color: #17201C; padding: 44px 48px; box-sizing: border-box">
+
+  <div class="eyebrow">Two directions · assistant surface</div>
+  <h1 style="margin: 8px 0 6px; font-size: 32px; font-weight: 600; letter-spacing: -.025em">Pick one and I will build it out</h1>
+  <p style="margin: 0 0 30px; max-width: 780px; font-size: 15px; color: #4F4B45; text-wrap: pretty">Both push material as far as the platform allows: gradients, layered surfaces, real shadow, and a drawn object. They differ on two axes at once, light against dark and instrument against document, so this is a real choice rather than two shades of one idea.</p>
+
+  <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 26px">
+
+    <sc-for list="{{cols}}" as="c" hint-placeholder-count="2">
+      <div style="background: #FFFFFF; border: 1px solid #DCD7CD; border-radius: 6px; overflow: hidden">
+        <div style="padding: 20px 22px; background: {{c.band}}; color: {{c.bandInk}}">
+          <div style="font-size: 11px; font-weight: 600; letter-spacing: .16em; text-transform: uppercase; opacity: .7">{{c.tag}}</div>
+          <div style="margin-top: 7px; font-size: 27px; font-weight: 600; letter-spacing: -.02em">{{c.name}}</div>
+          <div style="margin-top: 5px; font-size: 13.5px; opacity: .85">{{c.line}}</div>
+        </div>
+
+        <div style="padding: 20px 22px">
+          <div class="eyebrow">Palette</div>
+          <div style="display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 7px; margin-top: 9px">
+            <sc-for list="{{c.swatches}}" as="s" hint-placeholder-count="5">
+              <div>
+                <div class="sw" style="background: {{s.hex}}; border: 1px solid rgba(0,0,0,.09)"></div>
+                <div style="margin-top: 5px; font-size: 10px; color: #77736B">{{s.name}}</div>
+              </div>
+            </sc-for>
+          </div>
+
+          <div class="eyebrow" style="margin-top: 22px">Type</div>
+          <div style="margin-top: 8px; padding: 14px 16px; border: 1px solid #E6E2DA; border-radius: 4px">
+            <div style="font-family: {{c.face}}; font-size: 40px; line-height: 1; letter-spacing: -.02em">$2,732</div>
+            <div style="margin-top: 9px; font-size: 12.5px; color: #4F4B45">{{c.type}}</div>
+          </div>
+
+          <div class="eyebrow" style="margin-top: 22px">How it carries the unknown</div>
+          <p style="margin: 8px 0 0; font-size: 13px; color: #3E3A35; text-wrap: pretty">{{c.epistemic}}</p>
+
+          <div class="eyebrow" style="margin-top: 22px">Why this one</div>
+          <div style="display: flex; flex-direction: column; gap: 7px; margin-top: 9px">
+            <sc-for list="{{c.pros}}" as="p" hint-placeholder-count="3">
+              <div class="li"><span style="color: #1F7A45">+</span><span>{{p}}</span></div>
+            </sc-for>
+          </div>
+
+          <div class="eyebrow" style="margin-top: 20px">What it costs</div>
+          <div style="display: flex; flex-direction: column; gap: 7px; margin-top: 9px">
+            <sc-for list="{{c.cons}}" as="p" hint-placeholder-count="4">
+              <div class="li"><span style="color: #B3262A">&minus;</span><span>{{p}}</span></div>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+    </sc-for>
+  </div>
+
+  <div style="margin-top: 30px; padding: 20px 24px; background: #FFFFFF; border: 1px solid #DCD7CD; border-radius: 6px">
+    <div class="eyebrow">True of both, and worth knowing before you pick</div>
+    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 22px; margin-top: 12px">
+      <p style="margin: 0; font-size: 13px; color: #3E3A35; text-wrap: pretty"><strong style="font-weight: 600">The objects are drawn, not rendered.</strong> The published page cannot fetch images, so the seal and the document are inline vector art with gradients. They will read as illustration rather than photoreal 3D, which I think is the right register for money anyway.</p>
+      <p style="margin: 0; font-size: 13px; color: #3E3A35; text-wrap: pretty"><strong style="font-weight: 600">Fonts come from Google Fonts.</strong> That is the one network exception the page gets. PNG and PDF export will fall back to the metric-matched stack, so exported frames will not look exactly like the screen.</p>
+      <p style="margin: 0; font-size: 13px; color: #3E3A35; text-wrap: pretty"><strong style="font-weight: 600">Only the assistant surface is designed here.</strong> Activity's ledger, Documents and the settings page are the surfaces most likely to resist this much material. I would test the chosen direction against the ledger before committing the rest of the app.</p>
+    </div>
+  </div>
+</div>
+</x-dc>
+
+<script data-dc-script>
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      cols: [
+        {
+          tag: 'Direction A', name: 'Vault', band: '#0B0C0F', bandInk: '#F2F0EA',
+          line: 'Dark, instrument-grade. Money as something held.',
+          face: '"Space Grotesk", sans-serif',
+          type: 'Space Grotesk for figures and headings, Archivo for body. Geometric, wide numerals, reads as engineered rather than friendly.',
+          swatches: [
+            { name: 'ground', hex: '#0B0C0F' }, { name: 'raised', hex: '#191B21' }, { name: 'brass', hex: '#D4A94A' },
+            { name: 'unknown', hex: '#A794F5' }, { name: 'paper', hex: '#F2F0EA' },
+          ],
+          epistemic: 'A brass seal sits beside the figure. Unresolved it is hollow and dashed, struck through the middle. Once a pay stub confirms withholding it fills solid and the dashes close. The material itself tells you whether a number is finished.',
+          pros: [
+            'The seriousness fits a product that talks about tax treatment, shareholder distributions and things it refuses to guess.',
+            'Brass on near-black is specific. It is not the acid green every crypto wallet uses, so it will not date the same way.',
+            'Depth is cheap here: one bloom, one glass layer and a shadow do most of the work.',
+          ],
+          cons: [
+            'Seventy-two rows of ledger in near-black is tiring to read for any length of time.',
+            'Brass at small sizes is hard to keep above the contrast floor, and small text is most of Activity and Settings.',
+            'Dark-first makes the light theme a follower, which is a second system to design and maintain rather than a toggle.',
+            'Exporting a statement for a CPA out of a dark interface tends to look wrong on paper.',
+          ],
+        },
+        {
+          tag: 'Direction B', name: 'Daylight', band: '#0F5147', bandInk: '#F7F2E8',
+          line: 'Cream and pine, editorial. Money as a document you read.',
+          face: '"Instrument Serif", Georgia, serif',
+          type: 'Instrument Serif for figures and headings, Archivo for body. High contrast, one weight, so hierarchy comes from size rather than boldness.',
+          swatches: [
+            { name: 'paper', hex: '#F7F2E8' }, { name: 'pine', hex: '#0F5147' }, { name: 'amber', hex: '#C96A17' },
+            { name: 'unknown', hex: '#6B5BC4' }, { name: 'ink', hex: '#17201C' },
+          ],
+          epistemic: 'The figure sits on an unstamped page. A wax seal waits beside it, hollow and dashed while the number is unconfirmed, pressed and solid once it is verified. Same idea as Vault, told as paperwork rather than hardware.',
+          pros: [
+            'Long ledgers and settings pages are genuinely comfortable to read, which is most of what this app is.',
+            'The paper metaphor is already true: this product has receipts, statements, quotes and an audit log.',
+            'A serif at a hundred points gives instant scale contrast, which is most of what the references have and the current build lacks.',
+            'Printing or exporting for an accountant looks correct rather than inverted.',
+          ],
+          cons: [
+            'Serif numerals are less legible in dense tabular columns than a grotesque, so Activity needs a different face for figures.',
+            'Instrument Serif ships one weight, so every hierarchy decision has to be made with size and colour.',
+            'Cream and green goes muddy quickly if the greens drift warm. It needs discipline to stay crisp.',
+            'The wax seal will tip twee if it appears more than once or twice per screen.',
+          ],
+        },
+      ],
+    };
+  }
+}
+</script>
+</body>
+</html>

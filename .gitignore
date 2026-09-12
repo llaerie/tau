@@ -51,4 +51,5 @@ next-env.d.ts
 /data/uploads/
 
 # seeded design canvas (2.5 MB build artifact; re-seed from design/*.dc.html)
-/design/approval-moment.html
+/design/approval-moment/approval-moment.html
+/design/assistant-directions/assistant-directions.html

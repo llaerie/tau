@@ -1,0 +1,106 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Archivo:wght@400;500;600&display=swap">
+  <style>
+    body { margin: 0; font-family: Archivo, "Helvetica Neue", Arial, sans-serif; font-size: 14px; line-height: 1.5; }
+    a { color: #E3BC63; text-decoration: none; }
+    .fig { font-family: "Space Grotesk", "Helvetica Neue", Arial, sans-serif; font-variant-numeric: tabular-nums lining-nums; }
+    .eyebrow { font-size: 10px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; }
+    .glass { background: linear-gradient(180deg, rgba(255,255,255,.055), rgba(255,255,255,.022)); border: 1px solid rgba(255,255,255,.085); box-shadow: inset 0 1px 0 rgba(255,255,255,.10), 0 16px 34px -22px rgba(0,0,0,.9); }
+  </style>
+</helmet>
+
+<div style="position: relative; display: flex; flex-direction: column; width: 390px; height: 844px; background: #0B0C0F; color: #F2F0EA; overflow: hidden">
+  <div style="position: absolute; top: -230px; left: -60px; width: 520px; height: 470px; border-radius: 50%; background: radial-gradient(closest-side, rgba(212,169,74,.26), transparent 72%); filter: blur(12px)"></div>
+
+  <div style="position: relative; display: flex; align-items: center; justify-content: space-between; padding: 20px 20px 0">
+    <div style="display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 11px; background: linear-gradient(160deg, #F0D080, #A8801F); color: #1A1405; font-family: 'Space Grotesk'; font-size: 15px; font-weight: 700">F</div>
+    <div class="glass" style="display: flex; align-items: center; gap: 7px; padding: 7px 12px; border-radius: 999px">
+      <span style="width: 5px; height: 5px; border-radius: 50%; background: #E07A3C"></span>
+      <span style="font-size: 11px; color: #A8A79F">Preview</span>
+    </div>
+  </div>
+
+  <div style="position: relative; padding: 26px 20px 0">
+    <div class="eyebrow" style="color: #8A8880">Good evening, Arielle</div>
+    <div class="eyebrow" style="margin-top: 16px; color: #8A8880">Take-home, this month</div>
+    <div style="display: flex; align-items: flex-start; gap: 11px; margin-top: 8px">
+      <span class="fig" style="font-size: 60px; font-weight: 500; line-height: .95; letter-spacing: -.035em; background: linear-gradient(174deg, #FFFDF6, #D8C79A); -webkit-background-clip: text; background-clip: text; color: transparent">$2,732</span>
+      <span class="eyebrow" style="margin-top: 6px; padding: 4px 8px; border-radius: 6px; border: 1px solid rgba(167,148,245,.4); background: rgba(167,148,245,.13); color: #BDB1F7">Incomplete</span>
+    </div>
+    <div style="margin-top: 12px; font-size: 13.5px; color: #A8A79F">Before income tax. Withholding is not confirmed, so this is a floor, not a paycheck.</div>
+    <a href="#" style="display: inline-block; margin-top: 10px; font-size: 12.5px; font-weight: 500">Confirm withholding</a>
+  </div>
+
+  <div style="position: relative; display: flex; flex-direction: column; gap: 10px; padding: 24px 20px 0">
+    <sc-for list="{{items}}" as="i" hint-placeholder-count="2">
+      <div class="glass" style="padding: 14px 16px; border-radius: 15px">
+        <div style="display: flex; align-items: center; gap: 7px">
+          <span style="width: 5px; height: 5px; border-radius: 50%; background: #E07A3C"></span>
+          <span class="eyebrow" style="color: #8A8880">{{i.kind}}</span>
+        </div>
+        <div style="margin-top: 7px; font-size: 14.5px; font-weight: 500">{{i.title}}</div>
+        <div style="margin-top: 3px; font-size: 12px; color: #93928B">{{i.blocks}}</div>
+      </div>
+    </sc-for>
+  </div>
+
+  <div style="flex-grow: 1"></div>
+
+  <div style="position: relative; padding: 0 16px 14px">
+    <div class="glass" style="border-radius: 19px; padding: 13px 16px 10px">
+      <div style="font-size: 15px; color: #74736D">Ask about your money…</div>
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 12px">
+        <div style="display: flex; align-items: center; gap: 6px; height: 40px; padding: 0 13px; border-radius: 12px; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.08); font-size: 12.5px; color: #C9C8C1">My money
+          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="#8A8880" stroke-width="2" stroke-linecap="round"><path d="m6 9 6 6 6-6"></path></svg>
+        </div>
+        <div style="display: flex; align-items: center; gap: 7px">
+          <div style="display: flex; align-items: center; justify-content: center; width: 46px; height: 46px; border-radius: 14px; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.08)">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#C9C8C1" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"></rect><path d="M5 11a7 7 0 0 0 14 0M12 18v3M9 21h6"></path></svg>
+          </div>
+          <div style="display: flex; align-items: center; justify-content: center; width: 46px; height: 46px; border-radius: 14px; background: linear-gradient(160deg, #F0D080, #B08C28); box-shadow: inset 0 1px 0 rgba(255,255,255,.55), 0 10px 20px -10px rgba(212,169,74,.85)">
+            <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="#1A1405" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h13m-5-5 5 5-5 5"></path></svg>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="position: relative; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border-top: 1px solid rgba(255,255,255,.06)">
+    <sc-for list="{{tabs}}" as="t" hint-placeholder-count="4">
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 12px 0 15px">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="{{t.fg}}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="{{t.d}}"></path></svg>
+        <span style="font-size: 10px; color: {{t.fg}}">{{t.label}}</span>
+      </div>
+    </sc-for>
+  </div>
+</div>
+</x-dc>
+
+<script data-dc-script>
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      items: [
+        { kind: 'Blocks an exact answer', title: 'Confirm your withholding', blocks: 'Take-home stays a floor until a pay stub sets the figure.' },
+        { kind: 'Blocks a food answer', title: 'Set your food target', blocks: '$53 spent this month against no target.' },
+      ],
+      tabs: [
+        { label: 'Assistant', d: 'M4 6h16v10H10l-4 4v-4H4zM8 10h8M8 13h5', fg: '#E3BC63' },
+        { label: 'Money', d: 'M3 7h18v10H3zM3 11h18M7 15h3M12 7V5M12 19v-2', fg: '#74736D' },
+        { label: 'Activity', d: 'M4 18 9 11l4 4 3-5 4 6M4 6h16', fg: '#74736D' },
+        { label: 'Documents', d: 'M7 3h7l4 4v14H7zM14 3v4h4M10 12h6M10 16h6', fg: '#74736D' },
+      ],
+    };
+  }
+}
+</script>
+</body>
+</html>

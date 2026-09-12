@@ -1,19 +1,19 @@
-# Design artboards
+# Design canvases
 
-Source for the design canvas reviewed before the approval-moment rework.
-Each `.dc.html` is one artboard; `canvas.json` places them and picks the launch view.
+Two separate canvases, each with its own sources and layout manifest.
+Every `.dc.html` is one artboard; `canvas.json` places them.
+The seeded `*.html` output bakes in a 2.5 MB editor and is gitignored;
+re-seed it from the sources through the `design` skill rather than editing it.
 
-| File | What it shows |
-|---|---|
-| `Main.dc.html` | Desktop 1440x900, light. The approval moment, with working controls: approve, then undo |
-| `Dark.dc.html` | Desktop 1440x900, dark. The applied and reversed states |
-| `Mobile.dc.html` | Phone 390x844, light. The card above a collapsed composer, with the pending bar |
-| `Before.dc.html` | Today's card at the same scale, composer drawn at its real 233px, marking where the approve button disappears |
-| `Anatomy.dc.html` | Measurements, colour, what changed and what was deliberately kept |
+| Directory | Canvas | What it settles |
+|---|---|---|
+| `approval-moment/` | Approval Moment | How the draft-preview-approve-apply card behaves: hierarchy, the applied and undo states, the pending bar, and where the approve button lives |
+| `assistant-directions/` | Assistant Directions | Which visual direction the product commits to: Vault (dark, instrument) or Daylight (cream and pine, document) |
 
-Figures are Arielle's real demo numbers, including the case where the consequence
-cannot be computed because her withholding is unconfirmed.
+The two canvases answer different questions and can be decided independently.
+The approval-moment layout holds under either direction; the direction changes
+its material, not its anatomy.
 
-The published canvas is a 2.5 MB file built from these and is not committed.
-Edit the artboards, then re-seed and republish through the `design` skill;
-never hand-edit the seeded output.
+Figures throughout are Arielle's real demo numbers. Her take-home is $2,732
+before income tax with withholding unconfirmed, so both directions have to
+carry an incomplete figure rather than a clean one.

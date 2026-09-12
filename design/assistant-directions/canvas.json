@@ -1,0 +1,15 @@
+{
+  "artboards": [
+    { "file": "Directions.dc.html", "x": 0, "y": 0, "w": 1240, "h": 1220, "title": "Start here — the two directions" },
+    { "file": "Main.dc.html", "x": 1400, "y": 0, "w": 1440, "h": 900, "title": "A · Vault — assistant home" },
+    { "file": "VaultCard.dc.html", "x": 2960, "y": 0, "w": 820, "h": 760, "title": "A · Vault — approval moment" },
+    { "file": "VaultPhone.dc.html", "x": 3900, "y": 0, "w": 390, "h": 844, "title": "A · Vault — phone" },
+    { "file": "Daylight.dc.html", "x": 1400, "y": 1400, "w": 1440, "h": 900, "title": "B · Daylight — assistant home" },
+    { "file": "DaylightCard.dc.html", "x": 2960, "y": 1400, "w": 820, "h": 760, "title": "B · Daylight — approval moment" },
+    { "file": "DaylightPhone.dc.html", "x": 3900, "y": 1400, "w": 390, "h": 844, "title": "B · Daylight — phone" }
+  ],
+  "annotations": [
+    { "id": "how-to-read", "x": 0, "y": 1400, "w": 1240, "text": "Top row is Direction A, Vault. Bottom row is Direction B, Daylight.\n\nSame screens, same real figures, same wording, so the only variable is the direction. Arielle's take-home is $2,732 before income tax and her withholding is unconfirmed, which is why both heroes carry an Incomplete mark rather than a clean number.\n\nTell me A or B, or tell me which half of each you want and I will make a third." }
+  ],
+  "launch": { "view": "canvas" }
+}

@@ -1,0 +1,78 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Archivo:wght@400;500;600&display=swap">
+  <style>
+    body { margin: 0; font-family: Archivo, "Helvetica Neue", Arial, sans-serif; font-size: 14px; line-height: 1.5; }
+    a { color: #E3BC63; text-decoration: none; } a:hover { color: #F0D080; }
+    .fig { font-family: "Space Grotesk", "Helvetica Neue", Arial, sans-serif; font-variant-numeric: tabular-nums lining-nums; }
+    .eyebrow { font-size: 10.5px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; }
+  </style>
+</helmet>
+
+<div style="position: relative; width: 820px; height: 760px; background: #0B0C0F; padding: 40px; box-sizing: border-box; color: #F2F0EA; overflow: hidden">
+  <div style="position: absolute; top: 40px; left: 140px; width: 560px; height: 420px; border-radius: 50%; background: radial-gradient(closest-side, rgba(212,169,74,.16), transparent 72%); filter: blur(14px)"></div>
+
+  <div style="position: relative; display: flex; justify-content: flex-end; margin-bottom: 20px">
+    <span style="max-width: 66%; padding: 11px 17px; border-radius: 18px 18px 5px 18px; background: rgba(212,169,74,.13); border: 1px solid rgba(212,169,74,.26); font-size: 14px; color: #EDE6D4">Set my food budget to $1,200</span>
+  </div>
+
+  <div style="position: relative; border-radius: 20px; overflow: hidden; background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.022)); border: 1px solid rgba(255,255,255,.09); box-shadow: inset 0 1px 0 rgba(255,255,255,.12), 0 34px 60px -34px rgba(0,0,0,.95)">
+
+    <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; padding: 22px 26px 0">
+      <div style="min-width: 0">
+        <div class="eyebrow" style="color: #8A8880">My money</div>
+        <div style="margin-top: 8px; font-family: 'Space Grotesk'; font-size: 21px; font-weight: 400; letter-spacing: -.015em">Set your food target to $1,200 a month</div>
+        <div style="margin-top: 5px; font-size: 13.5px; color: #A8A79F">Changes your personal plan only. No money moves.</div>
+      </div>
+      <div class="eyebrow" style="flex-shrink: 0; display: inline-flex; align-items: center; gap: 7px; padding: 7px 12px; border-radius: 999px; border: 1px solid rgba(224,122,60,.42); background: rgba(224,122,60,.14); color: #EFA771; letter-spacing: .1em"><span style="width: 6px; height: 6px; border-radius: 50%; background: #E07A3C"></span>Waiting for you</div>
+    </div>
+
+    <div style="padding: 24px 26px 20px">
+      <div class="eyebrow" style="color: #8A8880">Food target</div>
+      <div style="display: flex; align-items: baseline; flex-wrap: wrap; gap: 16px; margin-top: 10px">
+        <span class="fig" style="font-size: 23px; color: #74736D; text-decoration: line-through; text-decoration-thickness: 1.5px">not set</span>
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#8A8880" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="align-self: center"><path d="M5 12h13m-5-5 5 5-5 5"></path></svg>
+        <span class="fig" style="font-size: 54px; font-weight: 500; line-height: 1; letter-spacing: -.03em; background: linear-gradient(172deg, #FFFDF6, #D8C79A); -webkit-background-clip: text; background-clip: text; color: transparent">$1,200</span>
+        <span style="font-size: 14px; color: #A8A79F">a month</span>
+      </div>
+
+      <div style="display: flex; align-items: flex-start; gap: 11px; margin-top: 20px; padding: 14px 16px; border-radius: 14px; background: rgba(167,148,245,.10); border: 1px solid rgba(167,148,245,.24)">
+        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="#BDB1F7" stroke-width="1.8" stroke-linecap="round" style="flex-shrink: 0; margin-top: 2px"><circle cx="12" cy="12" r="8.5"></circle><path d="M12 11v5.5M12 7.8v.2"></path></svg>
+        <div style="min-width: 0">
+          <div style="font-size: 14px; color: #EDEBE4">Your unallocated plan stays <span style="color: #BDB1F7; font-weight: 500">unknown</span> either way, so this change does not tell you what is left.</div>
+          <div style="margin-top: 4px; font-size: 12.5px; color: #A8A79F">It needs your income-tax withholding, which is not confirmed.</div>
+          <a href="#" style="display: inline-block; margin-top: 8px; font-size: 12.5px; font-weight: 500">Confirm withholding</a>
+        </div>
+      </div>
+    </div>
+
+    <div style="padding: 15px 26px; border-top: 1px solid rgba(255,255,255,.07); background: rgba(0,0,0,.22)">
+      <div class="eyebrow" style="color: #74736D">What this does not do</div>
+      <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 10px">
+        <div style="display: flex; align-items: flex-start; gap: 10px">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#74736D" stroke-width="1.7" style="flex-shrink: 0; margin-top: 2px"><circle cx="12" cy="12" r="8.5"></circle><path d="m6.5 6.5 11 11"></path></svg>
+          <span style="font-size: 13px; color: #A8A79F">Does not move money or change anyone else's plan.</span>
+        </div>
+        <div style="display: flex; align-items: flex-start; gap: 10px">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#74736D" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0; margin-top: 2px"><rect x="5" y="10.5" width="14" height="9" rx="2"></rect><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"></path></svg>
+          <span style="font-size: 13px; color: #A8A79F">Your plan details stay private; your partner can see only a coarse summary if you allow it.</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 14px; padding: 18px 26px; border-top: 1px solid rgba(255,255,255,.07)">
+      <button style="flex-grow: 1; min-height: 50px; border: none; border-radius: 14px; background: linear-gradient(160deg, #F4D68C, #B78F2A); box-shadow: inset 0 1px 0 rgba(255,255,255,.6), 0 14px 28px -12px rgba(212,169,74,.8); color: #1A1405; font-family: 'Space Grotesk'; font-size: 16px; font-weight: 500; cursor: pointer">Approve and apply</button>
+      <button style="min-height: 50px; padding: 0 22px; border: 1px solid rgba(255,255,255,.14); border-radius: 14px; background: rgba(255,255,255,.04); color: #C9C8C1; font-family: inherit; font-size: 14px; font-weight: 500; cursor: pointer">Cancel</button>
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

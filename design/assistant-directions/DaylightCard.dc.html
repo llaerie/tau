@@ -1,0 +1,77 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Archivo:wght@400;500;600&display=swap">
+  <style>
+    body { margin: 0; font-family: Archivo, "Helvetica Neue", Arial, sans-serif; font-size: 14px; line-height: 1.5; }
+    a { color: #A8560F; text-decoration: none; } a:hover { color: #7E3F0A; }
+    .fig { font-family: "Instrument Serif", Georgia, "Times New Roman", serif; font-variant-numeric: lining-nums; }
+    .eyebrow { font-size: 10.5px; font-weight: 600; letter-spacing: .15em; text-transform: uppercase; }
+  </style>
+</helmet>
+
+<div style="width: 820px; height: 760px; background: #F7F2E8; padding: 40px; box-sizing: border-box; color: #17201C; overflow: hidden">
+
+  <div style="display: flex; justify-content: flex-end; margin-bottom: 20px">
+    <span style="max-width: 66%; padding: 11px 17px; border-radius: 3px; background: #0F5147; color: #F7F2E8; font-size: 14px">Set my food budget to $1,200</span>
+  </div>
+
+  <div style="border-radius: 4px; overflow: hidden; background: #FFFDF8; border: 1px solid #E5DCCA; box-shadow: 0 1px 0 rgba(255,255,255,.9) inset, 0 30px 50px -28px rgba(52,38,16,.6)">
+
+    <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; padding: 22px 26px 0">
+      <div style="min-width: 0">
+        <div class="eyebrow" style="color: #8A9289">My money</div>
+        <div class="fig" style="margin-top: 7px; font-size: 27px; line-height: 1.15">Set your food target to $1,200 a month</div>
+        <div style="margin-top: 6px; font-size: 13.5px; color: #5B665F">Changes your personal plan only. No money moves.</div>
+      </div>
+      <div class="eyebrow" style="flex-shrink: 0; display: inline-flex; align-items: center; gap: 7px; padding: 7px 12px; border-radius: 999px; background: #F7E6D2; border: 1px solid #E8C79C; color: #8A470B; letter-spacing: .1em"><span style="width: 6px; height: 6px; border-radius: 50%; background: #C96A17"></span>Waiting for you</div>
+    </div>
+
+    <div style="padding: 24px 26px 20px">
+      <div class="eyebrow" style="color: #8A9289">Food target</div>
+      <div style="display: flex; align-items: baseline; flex-wrap: wrap; gap: 16px; margin-top: 8px">
+        <span class="fig" style="font-size: 26px; color: #8A9289; text-decoration: line-through; text-decoration-thickness: 1.5px">not set</span>
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#8A9289" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="align-self: center"><path d="M5 12h13m-5-5 5 5-5 5"></path></svg>
+        <span class="fig" style="font-size: 62px; line-height: 1; letter-spacing: -.02em; color: #17201C">$1,200</span>
+        <span style="font-size: 14px; color: #5B665F">a month</span>
+      </div>
+
+      <div style="display: flex; align-items: flex-start; gap: 11px; margin-top: 20px; padding: 14px 16px; border-radius: 3px; background: #EFEBFB; border-left: 3px solid #6B5BC4">
+        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="#6B5BC4" stroke-width="1.8" stroke-linecap="round" style="flex-shrink: 0; margin-top: 2px"><circle cx="12" cy="12" r="8.5"></circle><path d="M12 11v5.5M12 7.8v.2"></path></svg>
+        <div style="min-width: 0">
+          <div style="font-size: 14px; color: #17201C">Your unallocated plan stays <span style="color: #554399; font-weight: 500">unknown</span> either way, so this change does not tell you what is left.</div>
+          <div style="margin-top: 4px; font-size: 12.5px; color: #4A554F">It needs your income-tax withholding, which is not confirmed.</div>
+          <a href="#" style="display: inline-block; margin-top: 8px; font-size: 12.5px; font-weight: 500">Confirm withholding</a>
+        </div>
+      </div>
+    </div>
+
+    <div style="padding: 15px 26px; border-top: 1px solid #E5DCCA; background: #F4EFE3">
+      <div class="eyebrow" style="color: #8A9289">What this does not do</div>
+      <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 10px">
+        <div style="display: flex; align-items: flex-start; gap: 10px">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#8A9289" stroke-width="1.7" style="flex-shrink: 0; margin-top: 2px"><circle cx="12" cy="12" r="8.5"></circle><path d="m6.5 6.5 11 11"></path></svg>
+          <span style="font-size: 13px; color: #4A554F">Does not move money or change anyone else's plan.</span>
+        </div>
+        <div style="display: flex; align-items: flex-start; gap: 10px">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#8A9289" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0; margin-top: 2px"><rect x="5" y="10.5" width="14" height="9" rx="2"></rect><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"></path></svg>
+          <span style="font-size: 13px; color: #4A554F">Your plan details stay private; your partner can see only a coarse summary if you allow it.</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 14px; padding: 18px 26px; border-top: 1px solid #E5DCCA">
+      <button style="flex-grow: 1; min-height: 50px; border: none; border-radius: 3px; background: linear-gradient(155deg, #E08B33, #AF580E); box-shadow: 0 14px 26px -12px rgba(175,88,14,.75); color: #FFF8EE; font-family: 'Instrument Serif'; font-size: 20px; cursor: pointer">Approve and apply</button>
+      <button style="min-height: 50px; padding: 0 22px; border: 1px solid #D8CCB2; border-radius: 3px; background: #FFFDF8; color: #4A554F; font-family: inherit; font-size: 14px; font-weight: 500; cursor: pointer">Cancel</button>
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

@@ -1,0 +1,161 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Archivo:wght@400;500;600&display=swap">
+  <style>
+    body { margin: 0; font-family: Archivo, "Helvetica Neue", Arial, sans-serif; font-size: 14px; line-height: 1.5; }
+    a { color: #E3BC63; text-decoration: none; } a:hover { color: #F0D080; text-decoration: underline; }
+    .fig { font-family: "Space Grotesk", "Helvetica Neue", Arial, sans-serif; font-variant-numeric: tabular-nums lining-nums; }
+    .eyebrow { font-size: 10.5px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; }
+    .glass { background: linear-gradient(180deg, rgba(255,255,255,.055), rgba(255,255,255,.022)); border: 1px solid rgba(255,255,255,.085); box-shadow: inset 0 1px 0 rgba(255,255,255,.10), 0 18px 40px -24px rgba(0,0,0,.9); }
+  </style>
+</helmet>
+
+<div style="position: relative; width: 1440px; height: 900px; background: #0B0C0F; color: #F2F0EA; overflow: hidden">
+
+  <div style="position: absolute; top: -340px; left: 190px; width: 900px; height: 760px; border-radius: 50%; background: radial-gradient(closest-side, rgba(212,169,74,.22), rgba(212,169,74,.05) 55%, transparent 72%); filter: blur(18px)"></div>
+  <div style="position: absolute; inset: 0; opacity: .5; background-image: url('data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"160\" height=\"160\"><filter id=\"n\"><feTurbulence type=\"fractalNoise\" baseFrequency=\"0.85\" numOctaves=\"3\"/><feColorMatrix type=\"saturate\" values=\"0\"/></filter><rect width=\"160\" height=\"160\" filter=\"url(%23n)\" opacity=\"0.035\"/></svg>')"></div>
+
+  <div style="position: relative; display: flex; height: 900px">
+
+    <div style="display: flex; flex-direction: column; width: 84px; flex-shrink: 0; align-items: center; gap: 26px; padding: 26px 0; border-right: 1px solid rgba(255,255,255,.06)">
+      <div style="display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 12px; background: linear-gradient(160deg, #F0D080, #A8801F); box-shadow: inset 0 1px 0 rgba(255,255,255,.6), 0 8px 18px -8px rgba(212,169,74,.7); color: #1A1405; font-family: 'Space Grotesk'; font-size: 17px; font-weight: 700">F</div>
+      <div style="display: flex; flex-direction: column; gap: 8px">
+        <sc-for list="{{nav}}" as="n" hint-placeholder-count="5">
+          <div style="display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; border-radius: 12px; background: {{n.bg}}; border: 1px solid {{n.bd}}">
+            <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="{{n.fg}}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="{{n.d}}"></path></svg>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+
+    <div style="display: flex; flex-direction: column; flex-grow: 1; min-width: 0; padding: 40px 56px 20px">
+
+      <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 40px">
+        <div style="min-width: 0">
+          <div class="eyebrow" style="color: #8A8880">Thursday, 11 September</div>
+          <h1 style="margin: 10px 0 0; font-family: 'Space Grotesk'; font-size: 27px; font-weight: 400; letter-spacing: -.015em; color: #F2F0EA">Good evening, Arielle.</h1>
+        </div>
+        <div class="glass" style="display: flex; align-items: center; gap: 9px; padding: 9px 15px; border-radius: 999px">
+          <span style="width: 6px; height: 6px; border-radius: 50%; background: #E07A3C; box-shadow: 0 0 9px 1px rgba(224,122,60,.85)"></span>
+          <span style="font-size: 12px; color: #A8A79F">Preview mode</span>
+        </div>
+      </div>
+
+      <!-- hero: an honest figure, given weight -->
+      <div style="display: flex; align-items: center; gap: 46px; margin-top: 34px">
+        <div style="min-width: 0">
+          <div class="eyebrow" style="color: #8A8880">Take-home, this month</div>
+          <div style="display: flex; align-items: flex-start; gap: 14px; margin-top: 10px">
+            <span class="fig" style="font-size: 78px; font-weight: 500; line-height: .92; letter-spacing: -.035em; background: linear-gradient(174deg, #FFFDF6 8%, #D8C79A 92%); -webkit-background-clip: text; background-clip: text; color: transparent">$2,732</span>
+            <span class="eyebrow" style="margin-top: 9px; padding: 5px 9px; border-radius: 6px; border: 1px solid rgba(167,148,245,.4); background: rgba(167,148,245,.13); color: #BDB1F7; letter-spacing: .1em">Incomplete</span>
+          </div>
+          <div style="margin-top: 14px; font-size: 14.5px; color: #A8A79F; max-width: 430px">Before income tax. Your withholding is not confirmed, so this is a floor, not a paycheck.</div>
+          <a href="#" style="display: inline-block; margin-top: 12px; font-size: 13px; font-weight: 500">Confirm withholding</a>
+        </div>
+
+        <!-- the seal: solid when verified, unresolved when not -->
+        <svg viewBox="0 0 200 200" width="182" height="182" style="flex-shrink: 0; filter: drop-shadow(0 24px 34px rgba(0,0,0,.75))">
+          <defs>
+            <radialGradient id="vs" cx="34%" cy="26%" r="78%">
+              <stop offset="0%" stop-color="#3A3B42"></stop>
+              <stop offset="58%" stop-color="#1C1E24"></stop>
+              <stop offset="100%" stop-color="#101116"></stop>
+            </radialGradient>
+            <linearGradient id="vr" x1="0" y1="0" x2="0.7" y2="1">
+              <stop offset="0%" stop-color="#F4D68C"></stop>
+              <stop offset="42%" stop-color="#C39A3E"></stop>
+              <stop offset="100%" stop-color="#6E5417"></stop>
+            </linearGradient>
+            <linearGradient id="vh" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="rgba(255,255,255,.5)"></stop>
+              <stop offset="100%" stop-color="rgba(255,255,255,0)"></stop>
+            </linearGradient>
+          </defs>
+          <circle cx="100" cy="100" r="86" fill="url(#vs)" stroke="url(#vr)" stroke-width="2.5"></circle>
+          <circle cx="100" cy="100" r="86" fill="none" stroke="url(#vh)" stroke-width="1.2"></circle>
+          <circle cx="100" cy="100" r="70" fill="none" stroke="rgba(212,169,74,.28)" stroke-width="1" stroke-dasharray="3 7"></circle>
+          <circle cx="100" cy="100" r="52" fill="none" stroke="rgba(212,169,74,.5)" stroke-width="1.4" stroke-dasharray="16 10"></circle>
+          <path d="M100 62v46" stroke="url(#vr)" stroke-width="7" stroke-linecap="round"></path>
+          <circle cx="100" cy="126" r="4.6" fill="#C39A3E"></circle>
+          <text x="100" y="160" text-anchor="middle" font-family="Archivo, sans-serif" font-size="10" letter-spacing="2.4" fill="#8A8880">UNRESOLVED</text>
+        </svg>
+      </div>
+
+      <!-- attention -->
+      <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 38px">
+        <sc-for list="{{items}}" as="i" hint-placeholder-count="3">
+          <div class="glass" style="padding: 15px 17px; border-radius: 15px">
+            <div style="display: flex; align-items: center; gap: 8px">
+              <span style="width: 5px; height: 5px; border-radius: 50%; background: {{i.dot}}"></span>
+              <span class="eyebrow" style="color: #8A8880">{{i.kind}}</span>
+            </div>
+            <div style="margin-top: 8px; font-size: 14.5px; font-weight: 500; color: #F2F0EA">{{i.title}}</div>
+            <div style="margin-top: 4px; font-size: 12.5px; line-height: 1.45; color: #93928B">{{i.blocks}}</div>
+          </div>
+        </sc-for>
+      </div>
+
+      <div style="display: flex; align-items: center; gap: 18px; margin-top: 22px; font-size: 12.5px; color: #8A8880">
+        <span class="eyebrow" style="color: #74736D">Next 14 days</span>
+        <sc-for list="{{due}}" as="d" hint-placeholder-count="3">
+          <span style="display: inline-flex; align-items: baseline; gap: 7px"><span class="fig" style="color: #C9C8C1">{{d.when}}</span>{{d.what}}<span style="color: #63625D">{{d.amt}}</span></span>
+        </sc-for>
+      </div>
+
+      <div style="flex-grow: 1"></div>
+
+      <div class="glass" style="border-radius: 20px; padding: 6px 6px 6px 20px; display: flex; align-items: center; gap: 14px">
+        <span style="font-size: 15.5px; color: #74736D; flex-grow: 1">Ask about your take-home, food, or record something…</span>
+        <div style="display: flex; align-items: center; gap: 7px">
+          <div style="display: flex; align-items: center; gap: 6px; height: 46px; padding: 0 14px; border-radius: 14px; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.08); font-size: 13px; color: #C9C8C1">My money
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="#8A8880" stroke-width="2" stroke-linecap="round"><path d="m6 9 6 6 6-6"></path></svg>
+          </div>
+          <div style="display: flex; align-items: center; justify-content: center; width: 46px; height: 46px; border-radius: 14px; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.08)">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#C9C8C1" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"></rect><path d="M5 11a7 7 0 0 0 14 0M12 18v3M9 21h6"></path></svg>
+          </div>
+          <div style="display: flex; align-items: center; justify-content: center; width: 46px; height: 46px; border-radius: 14px; background: linear-gradient(160deg, #F0D080, #B08C28); box-shadow: inset 0 1px 0 rgba(255,255,255,.55), 0 10px 22px -10px rgba(212,169,74,.8)">
+            <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="#1A1405" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h13m-5-5 5 5-5 5"></path></svg>
+          </div>
+        </div>
+      </div>
+      <div style="margin-top: 10px; font-size: 11.5px; color: #63625D">Reads and drafts. Never pays, moves money, or changes payroll.</div>
+    </div>
+  </div>
+</div>
+</x-dc>
+
+<script data-dc-script>
+class Component extends DCLogic {
+  renderVals() {
+    const nav = [
+      { d: 'M4 6h16v10H10l-4 4v-4H4zM8 10h8M8 13h5', on: true },
+      { d: 'M3 7h18v10H3zM3 11h18M7 15h3M12 7V5M12 19v-2', on: false },
+      { d: 'M4 18 9 11l4 4 3-5 4 6M4 6h16', on: false },
+      { d: 'M7 3h7l4 4v14H7zM14 3v4h4M10 12h6M10 16h6', on: false },
+      { d: 'M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Zm8 4-1.6.6a6.6 6.6 0 0 1-.8 2l.8 1.5-2.1 2.1-1.5-.8a6.6 6.6 0 0 1-2 .8L12 20l-.6-1.6a6.6 6.6 0 0 1-2-.8l-1.5.8-2.1-2.1.8-1.5a6.6 6.6 0 0 1-.8-2L4 12l1.6-.6a6.6 6.6 0 0 1 .8-2l-.8-1.5 2.1-2.1 1.5.8a6.6 6.6 0 0 1 2-.8L12 4l.6 1.6a6.6 6.6 0 0 1 2 .8l1.5-.8 2.1 2.1-.8 1.5a6.6 6.6 0 0 1 .8 2Z', on: false },
+    ].map((n) => ({ ...n, bg: n.on ? 'rgba(212,169,74,.14)' : 'transparent', bd: n.on ? 'rgba(212,169,74,.34)' : 'transparent', fg: n.on ? '#E3BC63' : '#74736D' }));
+    return {
+      nav,
+      items: [
+        { kind: 'Blocks an exact answer', title: 'Confirm your withholding', blocks: 'Take-home stays a floor until payroll or a pay stub sets the figure.', dot: '#E07A3C' },
+        { kind: 'Blocks a food answer', title: 'Set your food target', blocks: 'You have spent $53 this month against no target.', dot: '#E07A3C' },
+        { kind: 'Company', title: 'Tax reserve not set', blocks: 'No distribution is safe to call affordable until it is reviewed.', dot: '#A794F5' },
+      ],
+      due: [
+        { when: '09-12', what: 'Utilities', amt: 'unknown' },
+        { when: '09-15', what: 'Two Teslas', amt: '$1,200' },
+        { when: '09-20', what: 'Insurance', amt: 'unknown' },
+      ],
+    };
+  }
+}
+</script>
+</body>
+</html>
