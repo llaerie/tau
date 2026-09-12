@@ -25,14 +25,33 @@ export interface ExtractedReceipt {
 }
 
 /**
+ * Read a printed amount without guessing. A separator is the decimal point only
+ * when exactly two digits follow it, so "1,399.00", "1.399,00" and "1,399" all
+ * mean one thousand three hundred and ninety-nine dollars, and "12,50" means
+ * twelve fifty. Anything that is not a plain grouped number returns null rather
+ * than a number that happens to parse.
+ */
+export function parseAmountCents(raw: string): number | null {
+  const text = raw.trim();
+  if (!/^\d[\d.,]*$/.test(text)) return null;
+  const sep = Math.max(text.lastIndexOf(","), text.lastIndexOf("."));
+  const hasFraction = sep !== -1 && text.length - sep - 1 === 2;
+  const whole = (hasFraction ? text.slice(0, sep) : text).replace(/[.,]/g, "");
+  const fraction = hasFraction ? text.slice(sep + 1) : "";
+  if (!/^\d+$/.test(whole) || whole.length > 12) return null;
+  const cents = Number(whole) * 100 + (fraction ? Number(fraction) : 0);
+  return Number.isSafeInteger(cents) ? cents : null;
+}
+
+/**
  * Parse digital text only. Image receipts are stored and reviewed by hand;
  * no fabricated OCR. Document text is data, never instructions.
  */
 export function extractReceipt(text: string | null): ExtractedReceipt {
   if (!text) return { amountCents: null, date: null, merchant: null, confidence: "none" };
   const clean = text.replace(/\r/g, "");
-  const totalMatch = clean.match(/(?:total|amount due|grand total)[^\d$]*\$?\s*(\d{1,5}(?:[.,]\d{2}))/i) ?? clean.match(/\$\s*(\d{1,5}(?:[.,]\d{2}))/);
-  const amountCents = totalMatch ? Math.round(Number(totalMatch[1].replace(",", ".")) * 100) : null;
+  const totalMatch = clean.match(/(?:total|amount due|grand total)[^\d$]*\$?\s*(\d[\d.,]*\d|\d)/i) ?? clean.match(/\$\s*(\d[\d.,]*\d|\d)/);
+  const amountCents = totalMatch ? parseAmountCents(totalMatch[1]) : null;
   const dateMatch = clean.match(/(\d{4}-\d{2}-\d{2})/) ?? clean.match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
   let date: string | null = null;
   if (dateMatch) {

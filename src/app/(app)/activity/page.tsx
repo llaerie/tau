@@ -1,9 +1,10 @@
-import Link from "next/link";
 import { inArray } from "drizzle-orm";
+import { ActivityFilters } from "@/components/activity/ActivityFilters";
 import { ActivityList, type ActivityRow } from "@/components/activity/ActivityList";
 import { RecordExpense, type ExpenseAccount } from "@/components/activity/RecordExpense";
 import { CsvImport } from "@/components/forms/CsvImport";
-import { Card, EmptyState, PageHeader } from "@/components/ui";
+import { Disclosure } from "@/components/money/Panels";
+import { EmptyState, PageHeader, monthLabel } from "@/components/ui";
 import { requireViewer } from "@/lib/actions/helpers";
 import { canEdit } from "@/lib/auth/authorize";
 import { loadSpaceData } from "@/lib/data/spaces";
@@ -81,51 +82,52 @@ export default async function ActivityPage({ searchParams }: { searchParams: Pro
     .sort((a, b) => b.date.localeCompare(a.date) || a.description.localeCompare(b.description))
     .slice(0, 300);
   const months = Array.from(new Set(rows.map((r) => r.date.slice(0, 7)))).sort().reverse();
+  const monthLabels = Object.fromEntries(months.map((m) => [m, monthLabel(m)]));
   const canImport = accountsForForm.length > 0;
+  const reviewCount = rows.filter((r) => r.reviewStatus === "review_required" && !r.voidedAt).length;
+  const spaceOptions = [
+    { value: "all", label: "All visible" },
+    ...(spaces.some((x) => x.kind === "company") ? [{ value: "company", label: "Company" }] : []),
+    ...(spaces.some((x) => x.kind === "household") ? [{ value: "household", label: "Household" }] : []),
+    ...(mine ? [{ value: "me", label: "My money" }] : []),
+  ];
 
   return (
     <>
       <PageHeader title="Activity" description="Everything recorded in the spaces you can see. Your partner's private entries are never loaded here." actions={<RecordExpense accounts={accountsForForm} categories={categories} persons={persons} meId={viewer.person?.id ?? null} today={todayIso()} />} />
-      <form className="mb-4 grid gap-2 sm:grid-cols-[1fr_auto_auto_auto] sm:items-end" method="get" action="/activity">
-        <label className="text-sm">
-          <span className="label">Search</span>
-          <input name="q" className="input mt-1" defaultValue={q} placeholder="Description, category or account" data-testid="activity-search" />
-        </label>
-        <label className="text-sm">
-          <span className="label">Space</span>
-          <select name="space" className="input mt-1" defaultValue={spaceFilter}>
-            <option value="all">All visible</option>
-            {spaces.some((x) => x.kind === "company") && <option value="company">Company</option>}
-            {spaces.some((x) => x.kind === "household") && <option value="household">Household</option>}
-            {mine && <option value="me">My money</option>}
-          </select>
-        </label>
-        <label className="text-sm">
-          <span className="label">Month</span>
-          <select name="month" className="input mt-1" defaultValue={month}>
-            <option value="">All months</option>
-            {months.map((m) => <option key={m} value={m}>{m}</option>)}
-          </select>
-        </label>
-        <div className="flex gap-2">
-          <button className="btn btn-secondary">Filter</button>
-          {reviewOnly && <input type="hidden" name="review" value="1" />}
+
+      {reviewCount > 0 && !reviewOnly && (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-[var(--fd-radius-card)] border border-line bg-warn-soft px-4 py-3" data-testid="review-queue">
+          <p className="text-[14px]">
+            <strong className="font-semibold">{reviewCount} entr{reviewCount === 1 ? "y needs" : "ies need"} your review.</strong>{" "}
+            <span className="text-ink-2">Each one is missing a purpose, a beneficiary or a treatment, so it is not counted as settled.</span>
+          </p>
+          <a href="/activity?review=1" className="btn btn-secondary shrink-0">Review them</a>
         </div>
-      </form>
-      <div className="mb-3 flex flex-wrap items-center gap-2 text-[12.5px] text-ink-3">
-        <span>{filtered.length} entr{filtered.length === 1 ? "y" : "ies"}</span>
-        <Link href={reviewOnly ? "/activity" : "/activity?review=1"} className={`chip ${reviewOnly ? "chip-warn" : "chip-neutral"}`} data-testid="filter-review">
-          {reviewOnly ? "Showing: needs review ×" : "Needs review"}
-        </Link>
-      </div>
-      {filtered.length === 0 ? <EmptyState title="No entries match">Try another month or clear the search.</EmptyState> : <ActivityList rows={filtered} persons={persons} meId={viewer.person?.id ?? null} />}
+      )}
+
+      <ActivityFilters
+        initial={{ q: typeof sp.q === "string" ? sp.q : "", space: spaceFilter, month, reviewOnly }}
+        spaceOptions={spaceOptions}
+        months={months}
+        monthLabels={monthLabels}
+        reviewCount={reviewCount}
+        shownCount={filtered.length}
+        totalCount={rows.length}
+      />
+
+      {filtered.length === 0 ? (
+        <EmptyState title="No entries match">Try another month, another space, or clear the filters above.</EmptyState>
+      ) : (
+        <ActivityList rows={filtered} persons={persons} meId={viewer.person?.id ?? null} />
+      )}
+
       {canImport && (
-        <details className="mt-8">
-          <summary className="cursor-pointer text-[13.5px] font-medium">Import a CSV statement</summary>
-          <Card className="mt-3">
+        <div className="mt-6">
+          <Disclosure title="Import a CSV statement" hint="Rows arrive unreviewed. Nothing is counted until you give each one a purpose and a treatment." testId="csv-import">
             <CsvImport accounts={accountsForForm.filter((a) => canEdit(viewer, a.spaceId))} allAccounts={accountsForForm.map((a) => ({ id: a.id, name: a.name, spaceName: a.spaceName }))} />
-          </Card>
-        </details>
+          </Disclosure>
+        </div>
       )}
     </>
   );

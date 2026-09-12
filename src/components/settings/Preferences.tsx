@@ -21,13 +21,23 @@ export function ThemePicker({ initial }: { initial: Theme }) {
     }
   };
   return (
-    <div role="radiogroup" aria-label="Theme" className="flex flex-wrap gap-2" data-testid="theme-picker">
-      {(["system", "light", "dark"] as const).map((t) => (
-        <button key={t} type="button" role="radio" aria-checked={theme === t} className={`btn btn-sm ${theme === t ? "btn-primary" : "btn-secondary"}`} onClick={() => apply(t)} data-testid={`theme-${t}`}>
-          {t === "system" ? "Match system" : t === "light" ? "Light" : "Dark"}
-        </button>
-      ))}
-      {error && <p className="w-full text-[13px] text-bad">{error}</p>}
+    <div>
+      <div role="radiogroup" aria-label="Theme" className="inline-flex items-center gap-1 rounded-[var(--fd-radius-pill)] bg-surface-2 p-1" data-testid="theme-picker">
+        {(["system", "light", "dark"] as const).map((t) => (
+          <button
+            key={t}
+            type="button"
+            role="radio"
+            aria-checked={theme === t}
+            className={`min-h-[36px] rounded-[var(--fd-radius-pill)] px-3.5 text-[13.5px] font-medium transition-colors ${theme === t ? "bg-surface text-ink shadow-panel" : "text-ink-2 hover:text-ink"}`}
+            onClick={() => apply(t)}
+            data-testid={`theme-${t}`}
+          >
+            {t === "system" ? "Match system" : t === "light" ? "Light" : "Dark"}
+          </button>
+        ))}
+      </div>
+      {error && <p className="mt-2 text-[13px] text-bad">{error}</p>}
     </div>
   );
 }
@@ -36,10 +46,10 @@ export function Toggle({ label, description, initial, field, testId }: { label: 
   const [on, setOn] = useState(initial);
   const [error, setError] = useState<string | null>(null);
   return (
-    <label className="flex items-start gap-3 text-sm">
+    <label className="flex cursor-pointer items-start gap-3 text-sm">
       <input
         type="checkbox"
-        className="mt-1"
+        className="peer sr-only"
         checked={on}
         data-testid={testId}
         onChange={async (e) => {
@@ -54,7 +64,13 @@ export function Toggle({ label, description, initial, field, testId }: { label: 
           }
         }}
       />
-      <span>
+      <span
+        aria-hidden="true"
+        className={`mt-0.5 flex h-[26px] w-[44px] shrink-0 items-center rounded-[var(--fd-radius-pill)] border p-[3px] transition-colors peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-[var(--fd-primary)] ${on ? "border-transparent bg-accent" : "border-line-2 bg-surface-2"}`}
+      >
+        <span className={`h-[18px] w-[18px] rounded-full bg-surface shadow-panel transition-transform ${on ? "translate-x-[18px]" : ""}`} />
+      </span>
+      <span className="min-w-0">
         <span className="block font-medium">{label}</span>
         <span className="block text-[12.5px] text-ink-3">{description}</span>
         {error && <span className="block text-[12.5px] text-bad">{error}</span>}

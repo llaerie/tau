@@ -16,7 +16,8 @@ export async function signOut(page: Page) {
 }
 
 export async function resetDemo(page: Page) {
-  await page.goto("/settings");
+  // The reset control lives in the "Data & export" settings group.
+  await page.goto("/settings#data");
   page.once("dialog", (d) => d.accept());
   await page.getByTestId("reset-demo").click();
   await expect(page.getByText("Demo data reset.")).toBeVisible();

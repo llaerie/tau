@@ -67,8 +67,9 @@ test("live mode uses password accounts, rejects demo personas, and scopes spaces
     await page.goto(`${base}/money`);
     await expect(page.getByTestId("tab-partner")).toHaveText("Arielle's summary");
     await page.goto(`${base}/money?space=household`);
-    await expect(page.getByTestId("household-company-paid")).toContainText("Two Teslas");
-    await expect(page.getByTestId("household-company-paid")).toContainText("$5,800");
+    await expect(page.getByTestId("household-company-bills")).toContainText("Two Teslas");
+    await expect(page.getByTestId("household-company-bills")).toContainText("$5,800");
+    await expect(page.getByTestId("household-company-paid")).toContainText("Paid by the company for the household");
     await page.goto(`${base}/money?space=company`);
     await expect(page.getByTestId("subscriptions")).toContainText("tier to confirm");
     await expect(page.getByTestId("metric-recorded-cash")).toContainText("Not known");

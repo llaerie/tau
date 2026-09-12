@@ -38,29 +38,42 @@ export function ActivityList({ rows, persons, meId }: { rows: ActivityRow[]; per
   const row = rows.find((r) => r.id === openId) ?? null;
   return (
     <>
-      <ul className="divide-y divide-line rounded-xl border border-line bg-surface" data-testid="activity-list">
-        {rows.map((r) => (
-          <li key={r.id}>
-            <button type="button" className="flex w-full items-center gap-3 px-3.5 py-2.5 text-left transition-colors hover:bg-surface-2" onClick={() => setOpenId(r.id)} data-testid={`txn-${r.id}`}>
-              <span className="w-12 shrink-0 text-[12px] text-ink-3">{dateLabel(r.date)}</span>
-              <span className="min-w-0 flex-1">
-                <span className={`block truncate text-[13.5px] ${r.voidedAt ? "text-ink-3 line-through" : ""}`}>{r.description}</span>
-                <span className="block truncate text-[11.5px] text-ink-3">
-                  {r.spaceName} · {r.accountName}
-                  {r.categoryName ? ` · ${r.categoryName}` : ""}
-                  {r.kind !== "expense" && r.kind !== "income" ? ` · ${r.kindLabel}` : ""}
-                </span>
-              </span>
-              <span className="flex shrink-0 items-center gap-1.5">
-                {r.reviewStatus === "review_required" && !r.voidedAt && <span className="chip chip-warn">review</span>}
-                {r.shares.length > 0 && <span className="chip chip-neutral">split</span>}
-                {r.voidedAt && <span className="chip chip-neutral">voided</span>}
-                <Cents value={r.signedCents} signed className={`text-[13.5px] ${r.voidedAt ? "text-ink-3" : r.signedCents > 0 ? "text-good" : ""}`} />
-              </span>
-            </button>
-          </li>
+      <div className="card overflow-hidden [&>section:first-child>h2]:border-t-0" data-testid="activity-list">
+        {groupByDay(rows).map(([day, items]) => (
+          <section key={day} aria-label={dayHeading(day)}>
+            <h2 className="border-y border-line bg-surface-2 px-4 py-1.5 text-[12.5px] font-semibold text-ink-2">
+              {dayHeading(day)}
+            </h2>
+            <ul className="divide-y divide-line">
+              {items.map((r) => (
+                <li key={r.id}>
+                  <button
+                    type="button"
+                    className="flex min-h-[60px] w-full items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-surface-2"
+                    onClick={() => setOpenId(r.id)}
+                    data-testid={`txn-${r.id}`}
+                  >
+                    <span className="min-w-0 flex-1">
+                      <span className={`block truncate text-[14.5px] ${r.voidedAt ? "text-ink-3 line-through" : ""}`}>{r.description}</span>
+                      <span className="block truncate text-[12.5px] text-ink-3">
+                        {r.spaceName} · {r.accountName}
+                        {r.categoryName ? ` · ${r.categoryName}` : ""}
+                        {r.kind !== "expense" && r.kind !== "income" ? ` · ${r.kindLabel}` : ""}
+                      </span>
+                    </span>
+                    <span className="flex shrink-0 items-center gap-2">
+                      {r.reviewStatus === "review_required" && !r.voidedAt && <span className="chip chip-warn">review</span>}
+                      {r.shares.length > 0 && <span className="chip chip-neutral">split</span>}
+                      {r.voidedAt && <span className="chip chip-neutral">voided</span>}
+                      <Cents value={r.signedCents} signed className={`text-[15px] font-semibold ${r.voidedAt ? "text-ink-3" : r.signedCents > 0 ? "text-good" : ""}`} />
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
         ))}
-      </ul>
+      </div>
       <Drawer open={row !== null} onClose={() => setOpenId(null)} title={row?.description ?? ""} eyebrow={row ? `${row.spaceName} · ${dateLabel(row.date)}` : undefined} testId="activity-detail">
         {row && <Detail row={row} persons={persons} meId={meId} onClose={() => setOpenId(null)} />}
       </Drawer>
@@ -75,10 +88,10 @@ function Detail({ row, persons, meId, onClose }: { row: ActivityRow; persons: { 
   const canSplit = row.canEdit && row.kind === "expense" && !row.voidedAt && row.spaceKind !== "company" && persons.length >= 2;
   return (
     <div className="space-y-4">
-      <p className="num text-[24px] font-semibold">
+      <p className="fd-money text-[32px] font-semibold leading-none">
         <Cents value={row.signedCents} signed />
       </p>
-      <dl className="divide-y divide-line rounded-lg border border-line text-[13px]">
+      <dl className="mt-4 divide-y divide-line overflow-hidden rounded-[var(--fd-radius-field)] bg-surface-2 text-[13.5px]">
         {[
           ["Kind", row.kindLabel],
           ["Account", row.counterAccountName ? `${row.accountName} → ${row.counterAccountName}` : row.accountName],
@@ -89,7 +102,7 @@ function Detail({ row, persons, meId, onClose }: { row: ActivityRow; persons: { 
           ["Review", row.reviewStatus.replace("_", " ")],
           ["Source", row.source],
         ].map(([k, v]) => (
-          <div key={k} className="flex justify-between gap-3 px-3 py-1.5">
+          <div key={k} className="flex justify-between gap-3 px-3.5 py-2">
             <dt className="text-ink-3">{k}</dt>
             <dd className="text-right">{v}</dd>
           </div>
@@ -97,10 +110,10 @@ function Detail({ row, persons, meId, onClose }: { row: ActivityRow; persons: { 
       </dl>
       {row.shares.length > 0 && (
         <div>
-          <p className="label">Shares</p>
-          <ul className="mt-1 divide-y divide-line rounded-lg border border-line text-[13px]">
+          <p className="label text-[12px]">Shares</p>
+          <ul className="mt-1.5 divide-y divide-line overflow-hidden rounded-[var(--fd-radius-field)] bg-surface-2 text-[13.5px]">
             {row.shares.map((s) => (
-              <li key={s.personId} className="flex justify-between px-3 py-1.5">
+              <li key={s.personId} className="flex justify-between px-3.5 py-2">
                 <span>{s.name}</span>
                 <Cents value={s.cents} />
               </li>
@@ -148,6 +161,23 @@ function Detail({ row, persons, meId, onClose }: { row: ActivityRow; persons: { 
       )}
     </div>
   );
+}
+
+function groupByDay(rows: ActivityRow[]): [string, ActivityRow[]][] {
+  const map = new Map<string, ActivityRow[]>();
+  for (const r of rows) {
+    const list = map.get(r.date);
+    if (list) list.push(r);
+    else map.set(r.date, [r]);
+  }
+  return [...map.entries()];
+}
+
+function dayHeading(date: string): string {
+  const today = new Date().toISOString().slice(0, 10);
+  if (date === today) return "Today";
+  const [y, m, d] = date.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString("en-US", { weekday: "long", day: "numeric", month: "long", timeZone: "UTC" });
 }
 
 function equalShares(cents: number, personIds: string[]) {

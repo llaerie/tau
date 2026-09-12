@@ -5,7 +5,8 @@ import { AmountText, Cents, TotalText } from "@/components/Money";
 import { CalcButton } from "@/components/money/CalcButton";
 import { PurchasePlanEditor, SubscriptionConfirm } from "@/components/money/CompanyEditors";
 import { AllocationsEditor, FoodTargetEditor } from "@/components/money/PersonalEditors";
-import { Card, EmptyState, Notice, dateLabel, monthLabel } from "@/components/ui";
+import { EmptyState, dateLabel, monthLabel } from "@/components/ui";
+import { Disclosure, FeaturePanel, ListRow, SupportRow, UnknownCallout } from "@/components/money/Panels";
 import { requireViewer } from "@/lib/actions/helpers";
 import { canEdit } from "@/lib/auth/authorize";
 import type { Viewer } from "@/lib/auth/session";
@@ -63,15 +64,6 @@ export default async function MoneyPage({ searchParams }: { searchParams: Promis
   );
 }
 
-function Stat({ label, children, calc, note, testId }: { label: string; children: React.ReactNode; calc?: React.ReactNode; note?: string; testId?: string }) {
-  return (
-    <div className="min-w-0 py-3" data-testid={testId}>
-      <p className="text-[12.5px] text-ink-3">{label}</p>
-      <div className="mt-0.5 flex flex-wrap items-baseline gap-x-3 gap-y-1">{children}{calc}</div>
-      {note && <p className="mt-0.5 text-[12px] text-ink-3">{note}</p>}
-    </div>
-  );
-}
 
 // ---------- My money ----------
 
@@ -297,14 +289,6 @@ function Row({ label, amount, negative }: { label: string; amount: Amount; negat
   );
 }
 
-function Line({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="flex items-baseline justify-between gap-3 py-2 text-[13.5px]">
-      <dt className="text-ink-2">{label}</dt>
-      <dd className="text-right">{children}</dd>
-    </div>
-  );
-}
 
 // ---------- Company ----------
 
@@ -317,39 +301,79 @@ function CompanyTab({ viewer }: { viewer: Viewer }) {
   const editable = canEdit(viewer, space.id);
   const groups = ["receipts", "payroll", "household_via_company", "operating", "one_time"] as const;
   const persons = viewer.persons.map((x) => ({ id: x.id, name: x.name }));
-  return (
-    <div className="space-y-6" data-testid="tab-company-content">
-      <p className="text-[13px] text-ink-3">{space.name} · {monthLabel(v.month)}</p>
-      <Card testId="cash-plan">
-        <div className="grid gap-x-6 sm:grid-cols-2 lg:grid-cols-3">
-          <Stat label={`Recorded cash${v.cashAsOf ? ` · as of ${dateLabel(v.cashAsOf)}` : ""}`} calc={<CalcButton label="Recorded cash" provenance={p.recordedCash.provenance} value={formatTotal(p.recordedCash.total)} />} note="Recorded, not reconciled." testId="metric-recorded-cash"><TotalText total={p.recordedCash.total} size="lg" /></Stat>
-          <Stat label="Expected receipts" calc={<CalcButton label="Expected receipts" provenance={p.expectedReceipts.provenance} value={formatTotal(p.expectedReceipts.total)} />} note="Anticipated, not received. Company money, never take-home." testId="metric-expected-receipts"><TotalText total={p.expectedReceipts.total} size="lg" /></Stat>
-          <Stat label="Received so far this month" note="Income entries recorded in company accounts." testId="metric-received"><TotalText total={p.receivedSoFar.total} size="lg" /></Stat>
-          <Stat label="Known monthly commitments" calc={<CalcButton label="Known commitments" provenance={p.knownCommitments.provenance} value={formatTotal(p.knownCommitments.total)} />} testId="metric-known-commitments"><TotalText total={p.knownCommitments.total} size="lg" /></Stat>
-          <Stat label={PARTIAL_LABEL} calc={<CalcButton label="Partial remainder" provenance={p.partialRemainder.provenance} value={formatTotal(p.partialRemainder.total)} />} note="Not profit, not a balance, not safe to spend." testId="metric-partial-remainder"><TotalText total={p.partialRemainder.total} size="lg" /></Stat>
-          <Stat label="Runway on known costs" note={p.runwayMonthsOnKnownCosts === null ? "Needs recorded cash and known commitments." : "Recorded cash ÷ known monthly commitments. Ignores unknown costs."}>{p.runwayMonthsOnKnownCosts === null ? <span className="chip chip-unknown">Unknown</span> : <span className="num hero-value">{p.runwayMonthsOnKnownCosts.toFixed(1)} mo</span>}</Stat>
-        </div>
-        {p.unknownCosts.length > 0 && (
-          <Notice tone="unknown">
-            Still unknown: {p.unknownCosts.join("; ")}. These are not zero. Set them in <Link href="/settings#company" className="link">Settings</Link>.
-          </Notice>
-        )}
-      </Card>
+  const live = v.purchasePlans.filter((x) => x.status !== "cancelled");
 
-      <Card testId="plan-lines">
-        <p className="label">Monthly plan lines</p>
-        <div className="mt-2 divide-y divide-line">
+  return (
+    <div className="flex flex-col gap-5" data-testid="tab-company-content">
+      <p className="text-[13px] text-ink-3">{space.name} · {monthLabel(v.month)}</p>
+
+      {/* Recorded cash is the one figure that is a fact. Everything else qualifies it. */}
+      <FeaturePanel
+        testId="cash-plan"
+        label={`Recorded company cash${v.cashAsOf ? ` · as of ${dateLabel(v.cashAsOf)}` : ""}`}
+        figure={
+          <span data-testid="metric-recorded-cash" className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            <TotalText total={p.recordedCash.total} size="lg" />
+            {p.runwayMonthsOnKnownCosts !== null && (
+              <span className="text-[15px] text-ink-2">
+                <span className="fd-money font-semibold text-ink">{p.runwayMonthsOnKnownCosts.toFixed(1)} months</span> on known costs
+              </span>
+            )}
+          </span>
+        }
+        caption="Recorded from entries, not reconciled against a bank statement. The runway ignores every cost below that is still unknown."
+        evidence={<CalcButton label="Recorded company cash" provenance={p.recordedCash.provenance} value={formatTotal(p.recordedCash.total)} asOf={v.cashAsOf ?? v.month} />}
+        callout={
+          <UnknownCallout
+            items={p.unknownCosts}
+            action={
+              <Link href="/settings#company" className="btn btn-primary btn-sm">
+                Set what is missing
+              </Link>
+            }
+          />
+        }
+        footer={
+          <SupportRow
+            items={[
+              { id: "exp", label: "Expected receipts", value: <TotalText total={p.expectedReceipts.total} size="md" />, note: "Anticipated, not received. Company money, never take-home.", testId: "metric-expected-receipts" },
+              { id: "rec", label: "Received so far this month", value: <TotalText total={p.receivedSoFar.total} size="md" />, note: "Income entries recorded in company accounts.", testId: "metric-received" },
+              { id: "com", label: "Known monthly commitments", value: <TotalText total={p.knownCommitments.total} size="md" />, note: "Payroll, bills and confirmed software.", testId: "metric-known-commitments" },
+            ]}
+          />
+        }
+      />
+
+      {/* The partial remainder keeps its exact label. It is not an affordability figure. */}
+      <section className="card px-5 py-4 sm:px-6" data-testid="metric-partial-remainder">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-[12.5px] leading-snug text-ink-3">{PARTIAL_LABEL}</p>
+            <p className="mt-1.5"><TotalText total={p.partialRemainder.total} size="md" /></p>
+            <p className="mt-1 text-[13px] text-ink-2">Not profit, not a balance, and not safe to spend.</p>
+          </div>
+          <span className="shrink-0">
+            <CalcButton label="Partial remainder" provenance={p.partialRemainder.provenance} value={formatTotal(p.partialRemainder.total)} asOf={v.month} />
+          </span>
+        </div>
+      </section>
+
+      <Disclosure title="Monthly plan lines" hint="Every recurring commitment, grouped by what it is" testId="plan-lines">
+        <div className="divide-y divide-line">
           {groups.map((g) => {
             const lines = p.lines.filter((l) => l.group === g);
             if (!lines.length) return null;
             return (
-              <div key={g} className="py-2.5">
-                <p className="text-[12.5px] font-medium text-ink-2">{GROUP_LABEL[g]}</p>
-                <ul className="mt-1 space-y-1">
+              <div key={g} className="py-3 first:pt-0 last:pb-0">
+                <p className="label text-[12px]">{GROUP_LABEL[g]}</p>
+                <ul className="mt-1.5 space-y-1.5">
                   {lines.map((l) => (
-                    <li key={l.id} className="flex items-baseline justify-between gap-3 text-[13.5px]">
-                      <span className="min-w-0">{l.label}{l.note && <span className="block text-[11.5px] text-ink-3">{l.note}</span>}</span>
-                      <AmountText amount={l.amount} />
+                    <li key={l.id} className="flex items-baseline justify-between gap-3 text-[14px]">
+                      <span className="min-w-0">
+                        {l.label}
+                        {l.note && <span className="block text-[12px] leading-snug text-ink-3">{l.note}</span>}
+                      </span>
+                      <AmountText amount={l.amount} className="shrink-0" />
                     </li>
                   ))}
                 </ul>
@@ -357,91 +381,123 @@ function CompanyTab({ viewer }: { viewer: Viewer }) {
             );
           })}
         </div>
-        <p className="mt-2 text-[12px] text-ink-3">Household rent and cars paid from company accounts are personal costs to the owners: shown here as cash out, flagged for tax treatment, and never counted as deductible business expenses by default.</p>
-      </Card>
+        <p className="mt-3 text-[12.5px] leading-relaxed text-ink-3">
+          Rent and the cars are paid from company accounts for the household. They appear here as cash out, are flagged for tax-treatment review, and are never counted as deductible business expenses by default.
+        </p>
+      </Disclosure>
 
-      <Card testId="subscriptions">
-        <div className="flex items-baseline justify-between gap-2" id="subscriptions">
-          <p className="label">Software and AI subscriptions</p>
-          <span className="text-[12.5px] text-ink-3">Known monthly total: <TotalText total={p.subscriptionsTotal} size="sm" /></span>
+      <section className="card overflow-hidden" id="subscriptions" data-testid="subscriptions">
+        <div className="flex flex-wrap items-baseline justify-between gap-2 px-5 pt-4">
+          <h2 className="text-[15px] font-semibold">Software and AI subscriptions</h2>
+          <span className="text-[13px] text-ink-3">
+            Confirmed monthly <TotalText total={p.subscriptionsTotal} size="sm" />
+          </span>
         </div>
         {v.subscriptions.length === 0 ? (
-          <EmptyState title="No subscriptions recorded" />
+          <div className="px-5 pb-5 pt-3">
+            <EmptyState title="No subscriptions recorded" />
+          </div>
         ) : (
-          <ul className="mt-2 divide-y divide-line">
+          <ul className="mt-1 divide-y divide-line px-5 pb-2">
             {v.subscriptions.map((sub) => {
               const monthly = subscriptionMonthly(toPlannedSubscription(sub));
               return (
-                <li key={sub.id} className="py-2.5" data-testid={`sub-${sub.id}`}>
-                  <div className="flex flex-wrap items-baseline justify-between gap-2 text-[13.5px]">
-                    <span>
+                <ListRow
+                  key={sub.id}
+                  testId={`sub-${sub.id}`}
+                  title={
+                    <>
                       {sub.provider} {sub.product}
-                      {sub.quantity > 1 && <span className="text-ink-3"> × {sub.quantity}</span>}
-                      <span className={`chip ml-2 ${sub.status === "active" ? "chip-good" : sub.status === "cancelled" ? "chip-neutral" : "chip-accent"}`}>{sub.status}</span>
-                      {sub.kind === "api_usage" && <span className="chip chip-neutral ml-1">metered</span>}
-                    </span>
-                    <span className="flex items-center gap-2">
-                      {sub.tier ? <span className="text-[12.5px] text-ink-3">{sub.tier}</span> : <span className="chip chip-unknown">tier to confirm</span>}
-                      <AmountText amount={monthly} />
-                    </span>
-                  </div>
-                  {sub.notes && <p className="text-[12px] text-ink-3">{sub.notes}</p>}
+                      {sub.quantity > 1 && <span className="font-normal text-ink-3"> × {sub.quantity}</span>}
+                    </>
+                  }
+                  meta={
+                    <>
+                      {sub.tier ?? "Tier not confirmed"}
+                      {sub.kind === "api_usage" ? " · metered usage" : ""}
+                      {sub.notes ? ` · ${sub.notes}` : ""}
+                    </>
+                  }
+                  badges={
+                    <>
+                      <span className={`chip ${sub.status === "active" ? "chip-good" : sub.status === "cancelled" ? "chip-neutral" : "chip-accent"}`}>{sub.status}</span>
+                      {!sub.tier && <span className="chip chip-unknown">tier to confirm</span>}
+                    </>
+                  }
+                  value={<AmountText amount={monthly} className="text-[15px] font-semibold" />}
+                >
                   <SubscriptionConfirm sub={sub} editable={editable} />
-                </li>
+                </ListRow>
               );
             })}
           </ul>
         )}
-      </Card>
+      </section>
 
-      <Card testId="purchase-plans">
-        <div className="flex items-baseline justify-between gap-2" id="plans">
-          <p className="label">One-time purchases</p>
+      <section className="card overflow-hidden" id="plans" data-testid="purchase-plans">
+        <div className="flex flex-wrap items-baseline justify-between gap-2 px-5 pt-4">
+          <h2 className="text-[15px] font-semibold">One-time purchases</h2>
+          <span className="text-[13px] text-ink-3">Dated plans, never payments</span>
         </div>
-        {v.purchasePlans.filter((x) => x.status !== "cancelled").length === 0 ? (
-          <EmptyState title="No planned purchases">Hardware and furniture are dated one-time plans, not monthly allocations.</EmptyState>
+        {live.length === 0 ? (
+          <div className="px-5 pb-4 pt-3">
+            <EmptyState title="No planned purchases">Hardware and furniture are dated one-time plans, not monthly allocations.</EmptyState>
+          </div>
         ) : (
-          <ul className="mt-2 divide-y divide-line">
-            {v.purchasePlans.filter((x) => x.status !== "cancelled").map((plan) => (
-              <li key={plan.id} className="py-2.5" data-testid={`plan-${plan.id}`}>
-                <div className="flex flex-wrap items-baseline justify-between gap-2 text-[13.5px]">
-                  <span>
-                    {plan.name}{plan.quantity > 1 ? ` × ${plan.quantity}` : ""}
-                    <span className="chip chip-neutral ml-2">{plan.category}</span>
-                    <span className="chip chip-neutral ml-1">{plan.status}</span>
-                    <span className="ml-2 text-[12px] text-ink-3">{plan.targetMonth ? monthLabel(plan.targetMonth) : "not scheduled"} · for {plan.beneficiary} · {plan.purpose === "unresolved" ? "purpose not decided" : plan.purpose}</span>
-                  </span>
-                  {plan.unitPriceCents === null ? <span className="chip chip-unknown">price unknown</span> : <Cents value={plan.unitPriceCents * plan.quantity + (plan.taxShippingCents ?? 0)} />}
-                </div>
-                {plan.specification && <p className="text-[12px] text-ink-3">{plan.specification}</p>}
+          <ul className="mt-1 divide-y divide-line px-5">
+            {live.map((plan) => (
+              <ListRow
+                key={plan.id}
+                testId={`plan-${plan.id}`}
+                title={`${plan.name}${plan.quantity > 1 ? ` × ${plan.quantity}` : ""}`}
+                meta={
+                  <>
+                    {plan.targetMonth ? monthLabel(plan.targetMonth) : "Not scheduled"} · for {plan.beneficiary} · {plan.purpose === "unresolved" ? "purpose not decided" : plan.purpose}
+                    {plan.specification ? ` · ${plan.specification}` : ""}
+                  </>
+                }
+                badges={<span className="chip chip-neutral">{plan.category}</span>}
+                value={plan.unitPriceCents === null ? <span className="chip chip-unknown">price unknown</span> : <Cents value={plan.unitPriceCents * plan.quantity + (plan.taxShippingCents ?? 0)} className="text-[15px] font-semibold" />}
+              >
                 <PurchasePlanEditor payerSpaceId={space.id} persons={persons} editable={editable} existing={plan} />
-              </li>
+              </ListRow>
             ))}
           </ul>
         )}
+        {editable && (
+          <div className="border-t border-line px-5 py-3.5">
+            <PurchasePlanEditor payerSpaceId={space.id} persons={persons} editable={editable} />
+          </div>
+        )}
+      </section>
+
+      <Disclosure title="Projection and accounts" hint="Recorded cash carried forward on known lines only">
+        <p className="text-[13px] leading-relaxed text-ink-2">
+          Expected receipts minus known commitments and dated purchases. The unknown costs above are absent from this line, so it is an upper bound.
+        </p>
         <div className="mt-3">
-          <PurchasePlanEditor payerSpaceId={space.id} persons={persons} editable={editable} />
+          <ProjectionChart points={v.projection.months.map((m) => ({ month: m.month, label: m.month.slice(5), before: m.endingCashCents }))} />
         </div>
-      </Card>
-
-      <Card testId="projection">
-        <p className="label">Recorded cash, projected on known lines</p>
-        <p className="mb-2 mt-0.5 text-[12.5px] text-ink-3">Expected receipts minus known commitments and dated purchases. Unknown costs are absent, so the line is an upper bound.</p>
-        <ProjectionChart points={v.projection.months.map((m) => ({ month: m.month, label: m.month.slice(5), before: m.endingCashCents }))} />
-      </Card>
-
-      <Card testId="company-accounts">
-        <p className="label">Accounts</p>
-        <ul className="mt-2 divide-y divide-line">
+        <ul className="mt-4 divide-y divide-line border-t border-line" data-testid="company-accounts">
           {v.data.accounts.map((a) => (
-            <li key={a.id} className="flex items-center justify-between py-2 text-[13.5px]">
-              <span>{a.name}<span className="ml-2 text-[12px] text-ink-3">{a.type.replace("_", " ")}</span></span>
-              <AmountText amount={a.balance} />
+            <li key={a.id} className="flex items-center justify-between gap-3 py-2.5 text-[14px]">
+              <span className="min-w-0">
+                <span className="block truncate">{a.name}</span>
+                <span className="block text-[12px] text-ink-3">{a.type.replace("_", " ")}</span>
+              </span>
+              <AmountText amount={a.balance} className="shrink-0" />
             </li>
           ))}
         </ul>
-        {v.reviewCount > 0 && <p className="mt-2 text-[12.5px] text-warn">{v.reviewCount} company payment{v.reviewCount === 1 ? "" : "s"} this month need{v.reviewCount === 1 ? "s" : ""} tax-treatment review. See <Link href="/activity?space=company&review=1" className="link">Activity</Link>.</p>}
-      </Card>
+        {v.reviewCount > 0 && (
+          <p className="mt-3 text-[13px] text-warn">
+            {v.reviewCount} company payment{v.reviewCount === 1 ? "" : "s"} this month need{v.reviewCount === 1 ? "s" : ""} tax-treatment review.{" "}
+            <Link href="/activity?space=company&review=1" className="link">
+              Open the review queue
+            </Link>
+          </p>
+        )}
+      </Disclosure>
     </div>
   );
 }
@@ -450,53 +506,80 @@ function CompanyTab({ viewer }: { viewer: Viewer }) {
 
 function HouseholdTab({ viewer }: { viewer: Viewer }) {
   const v: HouseholdView = buildHouseholdView(viewer);
+  const planned = viewer.assumptions.household.plannedCompanyDistributionCents;
   return (
-    <div className="space-y-6" data-testid="tab-household-content">
+    <div className="flex flex-col gap-5" data-testid="tab-household-content">
       <p className="text-[13px] text-ink-3">{v.space.name} · {monthLabel(v.month)} · shared by both of you</p>
-      <Card testId="household-company-paid">
-        <p className="label">Paid by the company for the household</p>
-        <p className="mt-1 text-[12.5px] text-ink-3">A benefit to the owners, not joint-account cash. Payer: company. Beneficiary: household. Tax treatment: review required.</p>
-        <ul className="mt-2 divide-y divide-line">
+
+      {/* The distinctive fact about this household is who pays for it. */}
+      <FeaturePanel
+        testId="household-company-paid"
+        label="Paid by the company for the household"
+        figure={<TotalText total={v.companyPaidTotal} size="lg" />}
+        caption="A benefit to the owners, not joint-account cash. Payer: the company. Beneficiary: the household. Tax treatment: review required."
+        footer={
+          <SupportRow
+            items={[
+              { id: "joint", label: "Joint account cash", value: <TotalText total={v.cashTotal} size="md" />, note: "Recorded, not reconciled." },
+              { id: "own", label: "Paid from the joint account", value: <TotalText total={v.ownBillsTotal} size="md" />, note: "Monthly, where the amount is known." },
+              { id: "dist", label: "Planned owner distribution", value: planned === null ? <span className="chip chip-unknown">Not decided</span> : <Cents value={planned} />, note: "Beyond the bills the company pays directly." },
+            ]}
+          />
+        }
+      />
+
+      <section className="card overflow-hidden" data-testid="household-company-bills">
+        <h2 className="px-5 pt-4 text-[15px] font-semibold">Bills the company pays</h2>
+        <ul className="mt-1 divide-y divide-line px-5 pb-2">
           {v.companyPaidBills.map((b) => (
-            <li key={b.id} className="flex items-baseline justify-between gap-3 py-2 text-[13.5px]">
-              <span>{b.name}<span className="ml-2 text-[12px] text-ink-3">{b.dueDay ? `due day ${b.dueDay}` : ""}{b.paid ? " · paid this month" : ""} · {TREATMENT_LABELS[b.treatment ?? "review_required"]}</span></span>
-              {b.monthlyCents === null ? <span className="chip chip-unknown">Unknown</span> : <Cents value={b.monthlyCents} />}
-            </li>
+            <ListRow
+              key={b.id}
+              title={b.name}
+              meta={
+                <>
+                  {b.dueDay ? `Due day ${b.dueDay}` : "No due day set"} · {TREATMENT_LABELS[b.treatment ?? "review_required"]}
+                </>
+              }
+              badges={b.paid ? <span className="chip chip-good">paid this month</span> : undefined}
+              value={b.monthlyCents === null ? <span className="chip chip-unknown">amount unknown</span> : <Cents value={b.monthlyCents} className="text-[15px] font-semibold" />}
+            />
           ))}
         </ul>
-        <p className="mt-2 text-right text-[13px]">Known total <TotalText total={v.companyPaidTotal} size="sm" /></p>
-      </Card>
-      <Card testId="household-own-bills">
-        <p className="label">Paid from the joint account</p>
+      </section>
+
+      <section className="card overflow-hidden" data-testid="household-own-bills">
+        <h2 className="px-5 pt-4 text-[15px] font-semibold">Bills the joint account pays</h2>
         {v.ownBills.length === 0 ? (
-          <EmptyState title="No joint bills recorded" />
+          <div className="px-5 pb-5 pt-3">
+            <EmptyState title="No joint bills recorded" />
+          </div>
         ) : (
-          <ul className="mt-2 divide-y divide-line">
+          <ul className="mt-1 divide-y divide-line px-5 pb-2">
             {v.ownBills.map((b) => (
-              <li key={b.id} className="flex items-baseline justify-between gap-3 py-2 text-[13.5px]">
-                <span>{b.name}<span className="ml-2 text-[12px] text-ink-3">{b.paid ? "paid this month" : "not yet paid"}</span></span>
-                {b.monthlyCents === null ? <span className="chip chip-unknown">Unknown</span> : <Cents value={b.monthlyCents} />}
-              </li>
+              <ListRow
+                key={b.id}
+                title={b.name}
+                meta={b.paid ? "Paid this month" : "Not yet paid this month"}
+                value={b.monthlyCents === null ? <span className="chip chip-unknown">amount unknown</span> : <Cents value={b.monthlyCents} className="text-[15px] font-semibold" />}
+              />
             ))}
           </ul>
         )}
-        <p className="mt-2 text-right text-[13px]">Known total <TotalText total={v.ownBillsTotal} size="sm" /></p>
-      </Card>
-      <Card testId="household-cash">
-        <div className="grid gap-x-6 sm:grid-cols-3">
-          <Stat label="Joint account cash" note="Recorded, not reconciled."><TotalText total={v.cashTotal} size="lg" /></Stat>
-          <Stat label="Groceries this month" note="Shared grocery entries from the joint account."><Cents value={v.groceriesThisMonthCents} className="hero-value" /></Stat>
-          <Stat label="Funded by" note="Owner distributions from the company, recorded as shareholder distributions.">{viewer.assumptions.household.plannedCompanyDistributionCents === null ? <span className="chip chip-unknown">Planned amount not decided</span> : <Cents value={viewer.assumptions.household.plannedCompanyDistributionCents} className="hero-value" />}</Stat>
-        </div>
-        <ul className="mt-2 divide-y divide-line">
+      </section>
+
+      <Disclosure title="Joint accounts and groceries" hint="Recorded balances and what has been spent together this month" testId="household-cash">
+        <p className="text-[14px]">
+          Groceries this month: <Cents value={v.groceriesThisMonthCents} className="font-semibold" />
+        </p>
+        <ul className="mt-3 divide-y divide-line border-t border-line">
           {v.data.accounts.map((a) => (
-            <li key={a.id} className="flex items-center justify-between py-2 text-[13.5px]">
-              <span>{a.name}</span>
-              <AmountText amount={a.balance} />
+            <li key={a.id} className="flex items-center justify-between gap-3 py-2.5 text-[14px]">
+              <span className="min-w-0 truncate">{a.name}</span>
+              <AmountText amount={a.balance} className="shrink-0" />
             </li>
           ))}
         </ul>
-      </Card>
+      </Disclosure>
     </div>
   );
 }
@@ -509,20 +592,31 @@ function PartnerTab({ viewer }: { viewer: Viewer }) {
   const foodLabel: Record<string, string> = { no_target: "No target set", on_track: "On track", close: "Close to target", over: "Over target", not_shared: "Not shared" };
   const takeLabel: Record<string, string> = { verified: "Verified", estimate: "Estimate", incomplete: "Incomplete", not_shared: "Not shared" };
   return (
-    <div className="space-y-6" data-testid="tab-partner-content">
-      <p className="text-[13px] text-ink-3">{partner.name} · {monthLabel(s?.month ?? "")} · shared summary only</p>
-      <Card testId="partner-summary">
+    <div className="flex flex-col gap-5" data-testid="tab-partner-content">
+      <p className="text-[13px] text-ink-3">{partner.name} · {monthLabel(s?.month ?? "")} · approved aggregates only</p>
+      <section className="card px-5 py-5 sm:px-6" data-testid="partner-summary">
         {!s || !s.shared ? (
           <EmptyState title={`${partner.name} is not sharing a summary`}>Only they can switch sharing on, from their own Settings.</EmptyState>
         ) : (
           <dl className="divide-y divide-line">
-            <Line label="Food this month"><span className={`chip ${s.foodStatus === "over" ? "chip-bad" : s.foodStatus === "close" ? "chip-warn" : s.foodStatus === "on_track" ? "chip-good" : "chip-neutral"}`}>{foodLabel[s.foodStatus]}</span></Line>
-            <Line label="Take-home status"><span className="chip chip-neutral">{takeLabel[s.takeHomeStatus]}</span></Line>
-            <Line label="Savings and investment allocations">{s.savingsAllocationRoundedCents === null ? <span className="text-ink-3">None</span> : <span className="num">about {formatCents(s.savingsAllocationRoundedCents)}/mo</span>}</Line>
+            <div className="flex items-baseline justify-between gap-3 py-3 text-[14.5px]">
+              <dt className="text-ink-2">Food this month</dt>
+              <dd><span className={`chip ${s.foodStatus === "over" ? "chip-bad" : s.foodStatus === "close" ? "chip-warn" : s.foodStatus === "on_track" ? "chip-good" : "chip-neutral"}`}>{foodLabel[s.foodStatus]}</span></dd>
+            </div>
+            <div className="flex items-baseline justify-between gap-3 py-3 text-[14.5px]">
+              <dt className="text-ink-2">Take-home status</dt>
+              <dd><span className="chip chip-neutral">{takeLabel[s.takeHomeStatus]}</span></dd>
+            </div>
+            <div className="flex items-baseline justify-between gap-3 py-3 text-[14.5px]">
+              <dt className="text-ink-2">Savings and investment allocations</dt>
+              <dd>{s.savingsAllocationRoundedCents === null ? <span className="text-ink-3">None</span> : <span className="fd-money font-semibold">about {formatCents(s.savingsAllocationRoundedCents)}/mo</span>}</dd>
+            </div>
           </dl>
         )}
-        <p className="mt-3 text-[12.5px] text-ink-3">Pre-approved aggregate fields only, at month granularity. No merchants, dates, categories or amounts of individual purchases are ever shown, and none leave the server.</p>
-      </Card>
+        <p className="mt-4 text-[13px] leading-relaxed text-ink-3">
+          Pre-approved aggregate fields only, at month granularity. No merchants, dates, categories or amounts of individual purchases are shown, and none of them leave the server.
+        </p>
+      </section>
     </div>
   );
 }
